@@ -1,0 +1,352 @@
+/* where2play.place — sky itinerary mock */
+
+:root {
+  --sky: #c8e7f2;
+  --sky-deep: #6ba8c4;
+  --mustard: #e8b84a;
+  --mustard-deep: #c9921a;
+  --cloud: #f7fbfd;
+  --ink: #1a2a32;
+  --ink-2: #3d5560;
+  --mute: #6a808a;
+  --line: #b7d0da;
+  --plate: #ffffff;
+  --alert: #b6542a;
+  --radius-bowl: 1.15rem;
+  --radius-control: 0.75rem;
+  --shadow-plate: 0 12px 28px rgba(26, 42, 50, 0.08);
+  --font-display: "Fredoka", system-ui, sans-serif;
+  --font-ui: "Figtree", system-ui, sans-serif;
+  --max-home: 28rem;
+}
+
+@font-face {
+  font-family: "Fredoka";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("https://cdn.jsdelivr.net/fontsource/fonts/fredoka@latest/latin-wght-normal.woff2") format("woff2-variations");
+}
+
+@font-face {
+  font-family: "Figtree";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("https://cdn.jsdelivr.net/fontsource/fonts/figtree@latest/latin-wght-normal.woff2") format("woff2-variations");
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  font-family: var(--font-ui);
+  color: var(--ink);
+  background:
+    radial-gradient(ellipse 90% 60% at 50% -10%, color-mix(in srgb, var(--mustard) 28%, transparent), transparent 55%),
+    linear-gradient(180deg, var(--sky) 0%, var(--cloud) 48%, #eef6fa 100%);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.home-main {
+  flex: 1 0 auto;
+  width: min(var(--max-home), calc(100vw - 2.5rem));
+  margin: 0 auto;
+  padding: 3.5rem 0 2.5rem;
+  text-align: center;
+}
+
+.logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  text-decoration: none;
+  color: inherit;
+}
+
+.logo-word {
+  font-family: var(--font-display);
+  font-weight: 650;
+  font-size: 1.85rem;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+
+.mark-host--plane {
+  position: relative;
+  display: inline-block;
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+.mark--plane {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  animation: plane-cruise 3.4s ease-in-out infinite;
+  transform-origin: 50% 50%;
+}
+
+/* Small single contrail — behind the jet, left of nose */
+.plane-trail {
+  position: absolute;
+  left: -28px;
+  top: 46%;
+  width: 34px;
+  height: 12px;
+  overflow: visible;
+  pointer-events: none;
+  opacity: 0.55;
+  animation: trail-follow 3.4s ease-in-out infinite;
+}
+
+.plane-trail path {
+  fill: none;
+  stroke: var(--sky-deep);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-dasharray: 3 4;
+  animation: trail-drift 1.6s linear infinite;
+}
+
+@keyframes plane-cruise {
+  0% {
+    transform: translate(-10px, 2px) rotate(-1deg);
+  }
+  40% {
+    transform: translate(8px, -5px) rotate(0.5deg);
+  }
+  70% {
+    transform: translate(14px, -2px) rotate(1deg);
+  }
+  100% {
+    transform: translate(-10px, 2px) rotate(-1deg);
+  }
+}
+
+@keyframes trail-follow {
+  0% {
+    transform: translate(-10px, 2px);
+    opacity: 0.35;
+  }
+  40% {
+    transform: translate(8px, -5px);
+    opacity: 0.6;
+  }
+  70% {
+    transform: translate(14px, -2px);
+    opacity: 0.5;
+  }
+  100% {
+    transform: translate(-10px, 2px);
+    opacity: 0.35;
+  }
+}
+
+@keyframes trail-drift {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: -18;
+  }
+}
+
+h1 {
+  margin: 1.25rem 0 0.55rem;
+  font-family: var(--font-display);
+  font-size: 2.15rem;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.lead {
+  margin: 0 auto 1.5rem;
+  max-width: 22rem;
+  color: var(--ink-2);
+  font-size: 1.05rem;
+  line-height: 1.45;
+}
+
+.cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.65rem;
+  padding: 0.45rem 1.15rem;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--mustard);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: var(--shadow-plate);
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: var(--mustard-deep);
+  color: var(--cloud);
+}
+
+.btn-quiet {
+  background: var(--plate);
+  border: 1.5px solid var(--line);
+  box-shadow: none;
+  color: var(--ink-2);
+}
+
+.btn-quiet:hover {
+  border-color: var(--sky-deep);
+  background: color-mix(in srgb, var(--sky) 40%, var(--plate));
+  color: var(--ink);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--sky-deep);
+  outline-offset: 2px;
+}
+
+/* places.family footer — single row with product marks */
+
+.family-footer {
+  margin-top: auto;
+  padding: 0.75rem 1rem 0.95rem;
+  border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--sky) 32%, transparent),
+      color-mix(in srgb, var(--plate) 90%, transparent) 70%
+    );
+}
+
+.family-footer__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem 0.45rem;
+  max-width: 58rem;
+  margin: 0 auto;
+  font-family: "Figtree", system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 500;
+}
+
+.family-footer__sep {
+  color: var(--mute);
+  opacity: 0.5;
+  user-select: none;
+}
+
+.family-footer__label {
+  font-family: "Fredoka", system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+}
+
+.family-footer__link,
+.family-footer__current {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0;
+  border: 0;
+  color: var(--ink-2);
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 600;
+  line-height: inherit;
+  background: transparent;
+}
+
+.family-footer__link img,
+.family-footer__current img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  flex-shrink: 0;
+  background: transparent;
+}
+
+.family-footer__current {
+  color: var(--ink);
+  text-decoration: none;
+  cursor: default;
+}
+
+.family-footer__link {
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 1px;
+}
+
+.family-footer__link:hover {
+  color: var(--ink);
+  background: transparent;
+}
+
+.family-footer__link:focus-visible {
+  outline: 2px solid var(--sky-deep);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.family-footer__copy {
+  color: var(--mute);
+  opacity: 0.8;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 400;
+  line-height: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mark--plane,
+  .plane-trail,
+  .plane-trail path {
+    animation: none;
+  }
+}
