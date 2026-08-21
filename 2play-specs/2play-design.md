@@ -476,7 +476,7 @@ type ChatMessage = {
 | Shell | `shell-public`；`.home-main` 居中，宽 `--max-home` |
 | Logo | mark **72** + wing-trail；`logo-word` where2play.place |
 | Headline | 源 EN：`Where should we play?`（i18n） |
-| Lead | 源 EN：`Pick a place, sketch a day, and go — without the planning fog.` |
+| Lead | 源 EN：`Life is short, and the world is wide.`；CN：`世界这么大，我想去看看 …`（HK/TW 同句繁体） |
 | CTA | Primary `Start exploring` → `/register`；Quiet `Sign in` → `/login` |
 | Footer | 公开 `family-footer`（§1.5） |
 
@@ -494,7 +494,7 @@ type ChatMessage = {
 | email | Email + note「用于登录账号」 | **是** | email |
 | gender | 性别 | 否 | select：不愿透露（默认）/ 女 / 男 / 其他 |
 | age | 年龄 | 否 | number 13–120 |
-| location | 常用出发地 | 否 | text + 定位按钮 |
+| location | 常用出发地 | 否 | text + 定位按钮；浏览器定位成功后经 reverse geocode，**默认展示城市级标签**（`toCityLabel`） |
 | password | 密码 | **是** | password |
 | password_confirm | 确认密码 | **是** | password |
 | interests | **出行兴趣（多选）** | 否 | chips（默认可全关） |
@@ -510,8 +510,8 @@ type ChatMessage = {
 
 | 页 | 要点 |
 | --- | --- |
-| Login | `.auth-card`：Email、Password；`Sign in`；Forgot / Register 链；成功进 `/plan` |
-| Reset | Email → `Send reset link`；成功 `.callout.is-info`（`reset-sent`） |
+| Login | `.auth-card`：Email、Password；`Sign in`；`.auth-links` 为独立链接（glaze + underline），间距 ≥1rem；成功进 `/plan` |
+| Reset | 标题与 `.lead` **左对齐**；lead 单行优先（窄屏可折）；Email → `Send reset link`；成功 `.callout.is-info`（`reset-sent`） |
 | Set password | New / Confirm → `Save password` → login；需支持过期链状态（实现） |
 
 窄列 `--max-auth`；公开 footer。
@@ -529,7 +529,7 @@ type ChatMessage = {
 | email | Email +「用于登录账号」 | **是** | email |
 | gender | 性别 | 否 | select |
 | age | 年龄 | 否 | number 13–120 |
-| location | 常用出发地 | **是**（与 2eat personal / 行程出发一致） | text + 定位 + 旁路「重置密码」 |
+| location | 常用出发地 | **是**（与 2eat personal / 行程出发一致） | text + 定位（城市级标签）+ 旁路「重置密码」 |
 | interests | **出行兴趣（多选）** | 否 | 同注册 9 chips |
 
 头：`用户资料` + `上次保存 {time}`。  

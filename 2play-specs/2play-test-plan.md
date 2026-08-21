@@ -15,7 +15,7 @@
 | ADR live | [ADR-021](../../workspace-specs/adr/ADR-021-live-vendor-no-fixture.md) |
 | ADR HTTP chat | [ADR-020](../../workspace-specs/adr/ADR-020-http-only-chat-and-enrich.md) |
 
-**状态：** draft — §3 MVP DoD 为交付门禁；实现落地后补 Makefile 命令与真实探针日期。
+**状态：** draft — §3 MVP DoD 为交付门禁；MVP-1 质量门命令：`make quality`（`lint` + `test-coverage` + `test-e2e-mvp1`）。
 
 ---
 
@@ -80,7 +80,7 @@ MVP-1 不调 agent，但仍需真实 DB、真实 session、真实邮件路径（
 | 门禁 | 要求 |
 | --- | --- |
 | 功能 | 注册、登录、重置/设置密码、单卡 profile（含出行兴趣）持久化；必填标记 |
-| 测试 | `make test` 绿；`make test-e2e-mvp1` 绿 |
+| 测试 | `make test` / `make test-coverage` 绿；`make test-e2e-mvp1` 绿 |
 | 真实集成 | 测试 DB；session；邮件 outbox |
 | 质量 | common-test-strategy + §4（URL 无 password、i18n key、性别非必填） |
 | 用户 | 明确可用性确认 |
@@ -227,6 +227,8 @@ MVP-1 不调 agent，但仍需真实 DB、真实 session、真实邮件路径（
 | 命令 | 时机 | 内容 |
 | --- | --- | --- |
 | `make test` | 每 PR | Vitest 全量（注入 agent） |
+| `make test` | 单元/集成 | 无覆盖率门禁 |
+| `make test-coverage` | MVP-1 覆盖率门禁 | auth/profile/locale/geocode include；≥80% / branches ≥75% |
 | `make test-e2e-mvp1` | MVP-1 DoD | 真实 DB 旅程 |
 | `make test-e2e-mvp2-live` | MVP-2 DoD | 双服 live；诚实断言 |
 | `make test-e2e-mvp3-live` | MVP-3 DoD | chat 双存储 live |

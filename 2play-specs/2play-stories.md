@@ -13,7 +13,7 @@
 | 行程引擎归属 | [`../../workspace-specs/adr/ADR-008-itinerary-ownership.md`](../../workspace-specs/adr/ADR-008-itinerary-ownership.md) |
 | places-agent | [`../../1.places-agent/agent-specs/`](../../1.places-agent/agent-specs/) |
 
-**状态：** draft — 与 [`ui-mockup/`](./ui-mockup/) 当前 mock-up 及 [`2play-prod-specs.md`](./2play-prod-specs.md) 对齐。格式参照 what2eat [`2eat-stories.md`](../../2.what2eat/2eat-specs/2eat-stories.md)。
+**状态：** MVP-1（features 1–13）实现与测试门禁已落地；MVP-2+ 仍为 draft。与 [`ui-mockup/`](./ui-mockup/) 及 [`2play-prod-specs.md`](./2play-prod-specs.md) 对齐。格式参照 what2eat [`2eat-stories.md`](../../2.what2eat/2eat-specs/2eat-stories.md)。
 
 ## 人物角色
 
@@ -41,7 +41,7 @@
 
 | 切片 | 成果 | Features | E2E 旅程（摘要） | 状态 |
 | --- | --- | --- | --- | --- |
-| **MVP-1** | Onboarding：shell、home、account、profile | **1–13** | 访客注册 → 保存资料与兴趣 → 登出/登录 → 资料持久；locale EN→CN | **To-do** |
+| **MVP-1** | Onboarding：shell、home、account、profile | **1–13** | 访客注册 → 保存资料与兴趣 → 登出/登录 → 资料持久；locale EN→CN | **Done**（2026-08-21 用户确认 usable；`make quality` 绿） |
 | **MVP-2** | Plan 主路径 + 保存行程 + 我的行程 | **14–22** + `plan-07` AC1 | 已登录提交多日边界 → **一条** Day/Hour → 保存（可无对话）→ 我的行程多卡 → 打开详情 | **To-do** |
 | **MVP-3** | 页内 Chat 双存储 | **23–26**（`plan-07` AC2–3） | Chat 改当前行程（local 草稿）→ 刷新仍在 → 保存后 DB 有对话快照 → 详情只读对话；登出清 local | **To-do** |
 | **MVP-4** | Replan + PDF + Chat 高度 | **27–29** | 重新规划确认 → 新行程 + 分隔泡 + 对话保留；导出 PDF；拖拽调高 chat | **To-do** |
@@ -58,19 +58,19 @@
 
 | 编号 | 模块 | Feature code | 功能名 | 功能描述 | Story | MVP | 状态 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Header | `header-01` | App header & navigation | Sticky header：logo、行程规划 / 我的行程 / 个人信息、active、移动 Menu | [§1](#1-header-header-01--app-header--navigation) | **MVP-1** | To-do |
-| 2 | Header | `header-02` | 已登录用户 chrome | 问候、avatar、登出 | [§2](#2-header-header-02--signed-in-user-chrome) | **MVP-1** | To-do |
-| 3 | Header | `header-03` | Locale switcher (app) | EN / CN / HK / TW | [§3](#3-header-header-03--locale-switcher-app) | **MVP-1** | To-do |
-| 4 | Footer | `footer-01` | Family footer (app) | places.family 行（App 底纹） | [§4](#4-footer-footer-01--family-footer-app) | **MVP-1** | To-do |
-| 5 | Footer | `footer-02` | Family footer (public) | places.family 行（公开页） | [§5](#5-footer-footer-02--family-footer-public) | **MVP-1** | To-do |
-| 6 | i18n | `i18n-01` | Four-locale catalogs | 全部用户可见字符串为 key；四 locale | [§6](#6-i18n-i18n-01--four-locale-catalogs) | **MVP-1** | To-do |
-| 7 | Home | `home-01` | Public landing | Headline、lead、注册/登录 CTA | [§7](#7-home-home-01--public-landing) | **MVP-1** | To-do |
-| 8 | Account | `account-01` | Register | 创建账号：必填姓名/邮箱/密码；选填性别年龄出发地兴趣 | [§8](#8-account-account-01--register) | **MVP-1** | To-do |
-| 9 | Account | `account-02` | Sign in | 邮箱密码登录；失败提示 | [§9](#9-account-account-02--sign-in) | **MVP-1** | To-do |
-| 10 | Account | `account-03` | Reset password | 请求重置邮件 | [§10](#10-account-account-03--reset-password) | **MVP-1** | To-do |
-| 11 | Account | `account-04` | Set password | 从链接设新密码；过期态 | [§11](#11-account-account-04--set-password) | **MVP-1** | To-do |
-| 12 | Profile | `profile-01` | User profile | 单卡：资料 + 出行兴趣（多选）；独立保存 | [§12](#12-profile-profile-01--user-profile) | **MVP-1** | To-do |
-| 13 | Profile | `profile-02` | Required-field markers | 个人信息必填项标 `*` 与说明 | [§13](#13-profile-profile-02--required-field-markers) | **MVP-1** | To-do |
+| 1 | Header | `header-01` | App header & navigation | Sticky header：logo、行程规划 / 我的行程 / 个人信息、active、移动 Menu | [§1](#1-header-header-01--app-header--navigation) | **MVP-1** | **Done** |
+| 2 | Header | `header-02` | 已登录用户 chrome | 问候、avatar、登出 | [§2](#2-header-header-02--signed-in-user-chrome) | **MVP-1** | **Done** |
+| 3 | Header | `header-03` | Locale switcher (app) | EN / CN / HK / TW | [§3](#3-header-header-03--locale-switcher-app) | **MVP-1** | **Done** |
+| 4 | Footer | `footer-01` | Family footer (app) | places.family 行（App 底纹） | [§4](#4-footer-footer-01--family-footer-app) | **MVP-1** | **Done** |
+| 5 | Footer | `footer-02` | Family footer (public) | places.family 行（公开页） | [§5](#5-footer-footer-02--family-footer-public) | **MVP-1** | **Done** |
+| 6 | i18n | `i18n-01` | Four-locale catalogs | 全部用户可见字符串为 key；四 locale | [§6](#6-i18n-i18n-01--four-locale-catalogs) | **MVP-1** | **Done** |
+| 7 | Home | `home-01` | Public landing | Headline、lead、注册/登录 CTA | [§7](#7-home-home-01--public-landing) | **MVP-1** | **Done** |
+| 8 | Account | `account-01` | Register | 创建账号：必填姓名/邮箱/密码；选填性别年龄出发地兴趣 | [§8](#8-account-account-01--register) | **MVP-1** | **Done** |
+| 9 | Account | `account-02` | Sign in | 邮箱密码登录；失败提示 | [§9](#9-account-account-02--sign-in) | **MVP-1** | **Done** |
+| 10 | Account | `account-03` | Reset password | 请求重置邮件 | [§10](#10-account-account-03--reset-password) | **MVP-1** | **Done** |
+| 11 | Account | `account-04` | Set password | 从链接设新密码；过期态 | [§11](#11-account-account-04--set-password) | **MVP-1** | **Done** |
+| 12 | Profile | `profile-01` | User profile | 单卡：资料 + 出行兴趣（多选）；独立保存 | [§12](#12-profile-profile-01--user-profile) | **MVP-1** | **Done** |
+| 13 | Profile | `profile-02` | Required-field markers | 个人信息必填项标 `*` 与说明 | [§13](#13-profile-profile-02--required-field-markers) | **MVP-1** | **Done** |
 | 14 | Plan | `plan-01` | Planner form | 三列边界表单；生成一条行程 | [§14](#14-plan-plan-01--planner-form) | **MVP-2** | To-do |
 | 15 | Plan | `plan-02` | Planner validation | 目的地/天数必填；天数范围；时间成对校验 | [§15](#15-plan-plan-02--planner-validation) | **MVP-2** | To-do |
 | 16 | Plan | `plan-03` | Itinerary day/hour view | Day tabs、Highlights、时段行、交通段、配图与外链 | [§16](#16-plan-plan-03--itinerary-dayhour-view) | **MVP-2** | To-do |
