@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>创建账号 — where2play.place</title>
+    <link rel="icon" href="assets/favicon.png" type="image/png" />
+    <link rel="stylesheet" href="assets/mockup.css" />
+  </head>
+  <body class="shell-public">
+    <a class="sr-only" href="#content">Skip to content</a>
+
+    <div class="register-shell">
+      <header class="register-topbar">
+        <a class="logo" href="01-home.html" aria-label="where2play.place">
+          <span class="mark-host mark-host--plane">
+            <svg class="wing-trail" viewBox="0 0 18 10" fill="none" aria-hidden="true">
+              <path d="M17 2.2c-3.2.9-6.5 2.2-10 3.6C4.2 6.8 2.2 7.6 1 8.2" />
+            </svg>
+            <img class="mark mark--plane" src="assets/play-logo.png" alt="" width="40" height="40" />
+          </span>
+          <span class="logo-word">where2play.place</span>
+        </a>
+        <div class="locale-switch" role="group" aria-label="Locale">
+          <button type="button">EN</button>
+          <button type="button" class="is-on">CN</button>
+          <button type="button">HK</button>
+          <button type="button">TW</button>
+        </div>
+      </header>
+
+      <main id="content" class="auth-main auth-main--register">
+        <div class="register-card">
+          <header class="register-card__head">
+            <h1>创建账号</h1>
+          </header>
+
+          <form class="register-card__form" action="06-plan.html" method="get" data-testid="register-form">
+            <div class="register-card__fields">
+              <p class="register-required-note">标 * 为必填</p>
+
+              <div class="field">
+                <label for="name" class="is-required">姓名</label>
+                <input id="name" name="name" type="text" autocomplete="name" required />
+              </div>
+
+              <div class="field">
+                <div class="field-label-row">
+                  <label for="email" class="is-required">Email</label>
+                  <span class="field-label-note">用于登录账号</span>
+                </div>
+                <input id="email" name="email" type="email" autocomplete="email" required />
+              </div>
+
+              <div class="field-row field-row--demographics">
+                <div class="field field--gender">
+                  <label for="gender">性别</label>
+                  <select id="gender" name="gender">
+                    <option value="skip" selected>不愿透露</option>
+                    <option value="female">女</option>
+                    <option value="male">男</option>
+                    <option value="other">其他</option>
+                  </select>
+                </div>
+                <div class="field field--age">
+                  <label for="age">年龄</label>
+                  <input id="age" name="age" type="number" inputmode="numeric" min="13" max="120" />
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="location">常用出发地</label>
+                <div class="location-field">
+                  <input id="location" name="location" type="text" placeholder="城市或区域" autocomplete="off" />
+                  <button type="button" class="location-detect" aria-label="使用当前位置">
+                    <svg class="icon-locate" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                      <circle cx="12" cy="12" r="3" />
+                      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="password" class="is-required">密码</label>
+                <input id="password" name="password" type="password" autocomplete="new-password" required />
+              </div>
+
+              <div class="field">
+                <label for="password_confirm" class="is-required">确认密码</label>
+                <input id="password_confirm" name="password_confirm" type="password" autocomplete="new-password" required />
+              </div>
+
+              <div class="field" data-field="interests">
+                <label id="interests-label">出行兴趣（多选）</label>
+                <div class="chip-row" role="group" aria-labelledby="interests-label">
+                  <button type="button" class="chip">景点</button>
+                  <button type="button" class="chip">美食</button>
+                  <button type="button" class="chip">博物馆</button>
+                  <button type="button" class="chip">公园</button>
+                  <button type="button" class="chip">寺庙</button>
+                  <button type="button" class="chip">夜市</button>
+                  <button type="button" class="chip">购物</button>
+                  <button type="button" class="chip">温泉</button>
+                  <button type="button" class="chip">户外</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="register-card__actions">
+              <button class="btn register-card__submit" type="submit" data-testid="register-submit">创建账号</button>
+              <p class="auth-links"><a href="03-login.html">已有账号？登录</a></p>
+            </div>
+          </form>
+        </div>
+      </main>
+    </div>
+
+    <footer class="family-footer">
+      <div class="family-footer__inner">
+        <nav class="family-footer__row" aria-label="places.family">
+          <span class="family-footer__label">places.family:</span>
+          <span class="family-footer__current"><img src="assets/play-logo.png" alt="" width="18" height="18" /><span>where2play.place</span></span>
+          <span class="family-footer__sep" aria-hidden="true">·</span>
+          <a class="family-footer__link" href="../../../2.what2eat/2eat-specs/ui-mockup/01-home.html" target="_blank" rel="noopener noreferrer"><img src="assets/food-logo.png" alt="" width="18" height="18" /><span>what2eat.food</span></a>
+          <span class="family-footer__sep" aria-hidden="true">·</span>
+          <a class="family-footer__link" href="../../../1.places-agent/agent-specs/ui-mockup/01-home.html" target="_blank" rel="noopener noreferrer"><img src="assets/agent-logo.png" alt="" width="18" height="18" /><span>places.agent-mate.ai</span></a>
+        </nav>
+        <span class="family-footer__copy">copyright © Ethan Huang</span>
+      </div>
+    </footer>
+    <script src="assets/mockup.js"></script>
+  </body>
+</html>

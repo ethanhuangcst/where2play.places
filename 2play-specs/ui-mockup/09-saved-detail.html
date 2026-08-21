@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>行程详情 — where2play.place</title>
+    <link rel="icon" href="assets/favicon.png" type="image/png" />
+    <link rel="stylesheet" href="assets/mockup.css" />
+  </head>
+  <body class="shell-app">
+    <a class="sr-only" href="#content">Skip to content</a>
+    <header class="app-header">
+      <div class="app-header__inner">
+      <a class="logo" href="06-plan.html" aria-label="where2play.place">
+        <span class="mark-host mark-host--plane">
+          <svg class="wing-trail" viewBox="0 0 18 10" fill="none" aria-hidden="true">
+            <path d="M17 2.2c-3.2.9-6.5 2.2-10 3.6C4.2 6.8 2.2 7.6 1 8.2" />
+          </svg>
+          <img class="mark mark--plane" src="assets/play-logo.png" alt="" width="40" height="40" />
+        </span>
+        <span class="logo-word">where2play.place</span>
+      </a>
+      <button type="button" class="menu-toggle btn btn-quiet" data-testid="nav-menu">Menu</button>
+      <nav class="app-nav" aria-label="Primary">
+        <a href="06-plan.html">行程规划</a>
+        <a href="08-saved.html" class="is-active">我的行程</a>
+        <a href="07-profile.html">个人信息</a>
+      </nav>
+      <div class="app-user">
+        <span class="hello">你好，</span>
+        <span class="avatar" aria-hidden="true" title="Mei"><img src="assets/play-logo.png" alt="" /></span>
+        <span class="hello hello--name">Mei</span>
+        <div class="app-user__tools">
+          <div class="locale-switch" role="group" aria-label="Locale">
+            <button type="button">EN</button>
+            <button type="button" class="is-on">CN</button>
+            <button type="button">HK</button>
+            <button type="button">TW</button>
+          </div>
+          <a class="btn btn-quiet" href="01-home.html">登出</a>
+        </div>
+      </div>
+          </div>
+    </header>
+
+    <main id="content" class="app-main">
+      <p class="page-meta"><a href="08-saved.html">← 我的行程</a></p>
+      <h1 class="page-title">台北 2 日 · 情侣节奏</h1>
+      <p class="page-meta">已保存 · 对话来自数据库快照</p>
+
+      <div class="plan-stack">
+        <section class="panel">
+          <div class="panel__head">
+            <h2>行程详情</h2>
+            <span class="page-meta" style="margin:0">saved 2026-08-18</span>
+          </div>
+          <div class="panel__body">
+            <p class="itinerary-summary">西门町起步，城市漫步与夜市；次日北投集中活动。</p>
+            <div class="day-tabs">
+              <button type="button" class="day-tab is-on" data-day="1">Day 1</button>
+              <button type="button" class="day-tab" data-day="2">Day 2</button>
+            </div>
+            <div data-day-panel="1">
+              <ul class="hour-list">
+                <li class="hour-row">
+                  <span class="hour-time">09:30</span>
+                  <div class="hour-place">
+                    <img class="hour-thumb" src="assets/play-logo.png" alt="" />
+                    <div>
+                      <h3>龙山寺</h3>
+                      <p>开场参拜，避开正午。</p>
+                      <a class="map-link" href="#" target="_blank" rel="noopener noreferrer">详情</a><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">地图</a>
+                    </div>
+                  </div>
+                </li>
+                <li class="hour-row">
+                  <span class="hour-time">18:30</span>
+                  <div class="hour-place">
+                    <img class="hour-thumb" src="assets/play-logo.png" alt="" />
+                    <div>
+                      <h3>宁夏夜市</h3>
+                      <p>晚餐小吃。</p>
+                      <a class="map-link" href="#" target="_blank" rel="noopener noreferrer">详情</a><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">地图</a>
+                    </div>
+                  </div>
+                </li>
+              </ul>
+            </div>
+            <div data-day-panel="2" hidden>
+              <ul class="hour-list">
+                <li class="hour-row">
+                  <span class="hour-time">14:30</span>
+                  <div class="hour-place">
+                    <img class="hour-thumb" src="assets/play-logo.png" alt="" />
+                    <div>
+                      <h3>北投温泉博物馆</h3>
+                      <p>轻松收尾。</p>
+                      <a class="map-link" href="#" target="_blank" rel="noopener noreferrer">详情</a><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">地图</a>
+                    </div>
+                  </div>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel__head">
+            <h2>保存时的对话</h2>
+            <span class="page-meta" style="margin:0">只读自 DB · 续聊请回到规划并再次保存</span>
+          </div>
+          <div class="chat-panel">
+            <div class="chat-transcript" data-testid="chat-transcript">
+              <div class="bubble bubble--agent">已排好台北 2 日。</div>
+              <div class="bubble bubble--user">第二天少走路。</div>
+              <div class="bubble bubble--agent">Day 2 已改为北投集中。</div>
+            </div>
+          </div>
+        </section>
+
+        <div class="plan-actions">
+          <a class="btn btn-quiet" href="08-saved.html">返回列表</a>
+          <button type="button" class="btn" data-testid="plan-export">导出 PDF</button>
+          <button type="button" class="btn btn-danger">取消收藏</button>
+        </div>
+      </div>
+    </main>
+
+        <footer class="family-footer family-footer--app">
+      <div class="family-footer__inner">
+        <nav class="family-footer__row" aria-label="places.family">
+          <span class="family-footer__label">places.family:</span>
+          <span class="family-footer__current"><img src="assets/play-logo.png" alt="" width="18" height="18" /><span>where2play.place</span></span>
+          <span class="family-footer__sep" aria-hidden="true">·</span>
+          <a class="family-footer__link" href="../../../2.what2eat/2eat-specs/ui-mockup/01-home.html" target="_blank" rel="noopener noreferrer"><img src="assets/food-logo.png" alt="" width="18" height="18" /><span>what2eat.food</span></a>
+          <span class="family-footer__sep" aria-hidden="true">·</span>
+          <a class="family-footer__link" href="../../../1.places-agent/agent-specs/ui-mockup/01-home.html" target="_blank" rel="noopener noreferrer"><img src="assets/agent-logo.png" alt="" width="18" height="18" /><span>places.agent-mate.ai</span></a>
+        </nav>
+        <span class="family-footer__copy">copyright © Ethan Huang</span>
+      </div>
+    </footer>
+    <script src="assets/mockup.js"></script>
+  </body>
+</html>

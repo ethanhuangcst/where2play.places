@@ -1,0 +1,14 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Models land with MVP-1 stories — placeholder so `prisma generate` succeeds.
+model SchemaPlaceholder {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+}

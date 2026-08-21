@@ -1,31 +1,40 @@
-# where2play — specs
+# where2play — 规格
 
-Trip / play product (`where2play.place`). Full requirements and stories are TBD; current design reference is the UI mock-up.
+出行 / 游玩产品（`where2play.place`）。
 
-**Deploy (野草云3):** [`6.deployment-plan.md`](./6.deployment-plan.md) — stack `where2play`, host **`3005→3000`**, domain `where2play.place`, upstream `PLACES_AGENT_BASE_URL` / `PLACES_AGENT_CALLER_KEY`.
+**产品规格：** [`2play-prod-specs.md`](./2play-prod-specs.md)  
+**设计规格：** [`2play-design.md`](./2play-design.md)（§1 视觉 + §2 架构/技术设计 + §3 逐页契约；与 mock 同步，实现须 100% 对齐）  
+**用户故事 / AC：** [`2play-stories.md`](./2play-stories.md)（ATDD；格式对齐 2eat）  
+**测试计划：** [`2play-test-plan.md`](./2play-test-plan.md)（质量门、用例矩阵；扩展 common-test-strategy）  
+**部署（野草云3）：** [`2play-deployment-plan.md`](./2play-deployment-plan.md)（入口 [`6.deployment-plan.md`](./6.deployment-plan.md)）— stack `where2play`，宿主机 **`3005→3000`**，域名 `where2play.place`；Postgres **`where2play`**（[ADR-033](../../workspace-specs/adr/ADR-033-where2play-postgres-prisma.md)）；上游 `PLACES_AGENT_BASE_URL` / `PLACES_AGENT_CALLER_KEY`；**无** `OPENAI_*`。
 
 ## Mock-up
 
-| File | Role |
+画廊入口：[`ui-mockup/index.html`](./ui-mockup/index.html)
+
+| 文件 | 作用 |
 | --- | --- |
-| [`ui-mockup/01-home.html`](./ui-mockup/01-home.html) | Public home — plane mark + cruise animation (small contrail), CTAs |
-| [`ui-mockup/assets/`](./ui-mockup/assets/) | `play-logo.png` (600×600 transparent), sister logos, CSS/JS |
+| `01-home` … `05-set-password` | 公开 / Auth |
+| `06-plan` | 规划器 + Day/Hour + Chat + 底栏 + 重新规划对话框 |
+| `07-profile` | 个人信息 + 兴趣 |
+| `08-saved` / `09-saved-detail` | 我的行程多卡 / 详情+DB 对话 |
+| [`ui-mockup/assets/`](./ui-mockup/assets/) | `mockup.css`（tokens + 机翼气流）、`mockup.js`、logos |
 
-## places.family footer (shared with what2eat)
+## places.family footer（与 what2eat 共用约定）
 
-Same row contract as what2eat ([`../../2.what2eat/2eat-specs/2.ui-guidline.md`](../../2.what2eat/2eat-specs/2.ui-guidline.md) §4):
+行级约定对齐 what2eat（[`../../2.what2eat/2eat-specs/2.ui-guidline.md`](../../2.what2eat/2eat-specs/2.ui-guidline.md) §4）：
 
 ```text
 places.family:  [logo] where2play.place  ·  [logo] what2eat.food  ·  [logo] places.agent-mate.ai  ·  copyright © Ethan Huang
 ```
 
-| Rule | Detail |
+| 规则 | 说明 |
 | --- | --- |
-| Label | `places.family:` (colon required) |
-| Order | where2play → what2eat → places.agent-mate → copyright |
-| Current product | On this host: where2play.place as plain mark (no link, no underline) |
-| Sibling links | Underlined; open in a new tab (`target="_blank"` + `rel="noopener noreferrer"`) |
-| Logos | Transparent art; no chip fill / no hover highlight |
-| Type | Figtree + Fredoka label at **12px** (Latin-stable across locales when i18n lands) |
+| 标签 | `places.family:`（须带冒号） |
+| 顺序 | where2play → what2eat → places.agent-mate → copyright |
+| 当前产品 | 本站：where2play.place 为纯文本标记（无链接、无下划线） |
+| 姊妹链接 | 有下划线；新标签打开（`target="_blank"` + `rel="noopener noreferrer"`） |
+| Logo | 透明图；无 chip 底、无 hover 高亮 |
+| 字体 | Figtree + Fredoka 标签 **12px**（i18n 落地后拉丁字宽仍稳定） |
 
-Visual direction: sky / mustard travel palette in `ui-mockup/assets/mockup.css` — not the what2eat picnic cloth, but the footer **interaction** rules match.
+视觉方向：天空登机牌 + **机翼下方气流**（非机尾尾焰）；footer **交互**规则与 what2eat 一致。

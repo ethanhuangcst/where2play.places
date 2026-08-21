@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>我的行程 — where2play.place</title>
+    <link rel="icon" href="assets/favicon.png" type="image/png" />
+    <link rel="stylesheet" href="assets/mockup.css" />
+  </head>
+  <body class="shell-app">
+    <a class="sr-only" href="#content">Skip to content</a>
+    <header class="app-header">
+      <div class="app-header__inner">
+      <a class="logo" href="06-plan.html" aria-label="where2play.place">
+        <span class="mark-host mark-host--plane">
+          <svg class="wing-trail" viewBox="0 0 18 10" fill="none" aria-hidden="true">
+            <path d="M17 2.2c-3.2.9-6.5 2.2-10 3.6C4.2 6.8 2.2 7.6 1 8.2" />
+          </svg>
+          <img class="mark mark--plane" src="assets/play-logo.png" alt="" width="40" height="40" />
+        </span>
+        <span class="logo-word">where2play.place</span>
+      </a>
+      <button type="button" class="menu-toggle btn btn-quiet" data-testid="nav-menu">Menu</button>
+      <nav class="app-nav" aria-label="Primary">
+        <a href="06-plan.html">行程规划</a>
+        <a href="08-saved.html" class="is-active">我的行程</a>
+        <a href="07-profile.html">个人信息</a>
+      </nav>
+      <div class="app-user">
+        <span class="hello">你好，</span>
+        <span class="avatar" aria-hidden="true" title="Mei"><img src="assets/play-logo.png" alt="" /></span>
+        <span class="hello hello--name">Mei</span>
+        <div class="app-user__tools">
+          <div class="locale-switch" role="group" aria-label="Locale">
+            <button type="button">EN</button>
+            <button type="button" class="is-on">CN</button>
+            <button type="button">HK</button>
+            <button type="button">TW</button>
+          </div>
+          <a class="btn btn-quiet" href="01-home.html">登出</a>
+        </div>
+      </div>
+          </div>
+    </header>
+
+    <main id="content" class="app-main">
+      <h1 class="page-title">我的行程</h1>
+      <p class="page-meta">仅显示已保存的行程。点击卡片查看详情与当时的对话。</p>
+
+      <div class="trip-grid">
+        <a class="trip-card" href="09-saved-detail.html" data-testid="trip-card">
+          <img class="trip-card__media" src="assets/play-logo.png" alt="" />
+          <div class="trip-card__body">
+            <h2>台北 2 日 · 情侣节奏</h2>
+            <p class="trip-card__meta">2 days · saved 2026-08-18</p>
+            <p class="page-meta" style="margin:0">西门町起步 · 夜市 · 北投</p>
+            <div class="trip-card__actions">
+              <span class="btn btn-quiet" style="pointer-events:none">打开</span>
+            </div>
+          </div>
+        </a>
+        <a class="trip-card" href="09-saved-detail.html">
+          <img class="trip-card__media" src="assets/play-logo.png" alt="" style="object-fit:contain;padding:1.5rem;background:linear-gradient(135deg,#7eb6ce,#3d7a96)" />
+          <div class="trip-card__body">
+            <h2>京都 3 日 · 轻松</h2>
+            <p class="trip-card__meta">3 days · saved 2026-08-10</p>
+            <p class="page-meta" style="margin:0">寺社 · 岚山半日</p>
+            <div class="trip-card__actions">
+              <span class="btn btn-quiet" style="pointer-events:none">打开</span>
+            </div>
+          </div>
+        </a>
+      </div>
+    </main>
+
+        <footer class="family-footer family-footer--app">
+      <div class="family-footer__inner">
+        <nav class="family-footer__row" aria-label="places.family">
+          <span class="family-footer__label">places.family:</span>
+          <span class="family-footer__current"><img src="assets/play-logo.png" alt="" width="18" height="18" /><span>where2play.place</span></span>
+          <span class="family-footer__sep" aria-hidden="true">·</span>
+          <a class="family-footer__link" href="../../../2.what2eat/2eat-specs/ui-mockup/01-home.html" target="_blank" rel="noopener noreferrer"><img src="assets/food-logo.png" alt="" width="18" height="18" /><span>what2eat.food</span></a>
+          <span class="family-footer__sep" aria-hidden="true">·</span>
+          <a class="family-footer__link" href="../../../1.places-agent/agent-specs/ui-mockup/01-home.html" target="_blank" rel="noopener noreferrer"><img src="assets/agent-logo.png" alt="" width="18" height="18" /><span>places.agent-mate.ai</span></a>
+        </nav>
+        <span class="family-footer__copy">copyright © Ethan Huang</span>
+      </div>
+    </footer>
+    <script src="assets/mockup.js"></script>
+  </body>
+</html>
