@@ -57,12 +57,52 @@ export function firstRegisterField(
   return FIELD_ORDER.find((field) => errors[field]);
 }
 
-export function mapApiErrorToField(key: string): {
+/** Map server-side Zod failures to a field-scoped auth error (avoid generic validation-only). */
+export function registerSchemaFailure(error: {
+  issues: Array<{ path: PropertyKey[]; code: string }>;
+}): { key: string; field?: RegisterField } {
+  const issue = error.issues[0];
+  const path = issue?.path[0];
+  if (path === "name") return { key: "errors.name_required", field: "name" };
+  if (path === "email") {
+    if (issue.code === "invalid_format" || issue.code === "invalid_type") {
+      return { key: "errors.email_invalid", field: "email" };
+    }
+    return { key: "errors.email_required", field: "email" };
+  }
+  if (path === "password") return { key: "errors.password_too_short", field: "password" };
+  if (path === "confirmPassword") {
+    return { key: "errors.password_too_short", field: "password_confirm" };
+  }
+  if (path === "age") return { key: "errors.age_out_of_range", field: "age" };
+  if (path === "photoUrl") return { key: "errors.photo_too_large", field: "photo" };
+  return { key: "errors.validation" };
+}
+
+export function mapApiErrorToField(
+  key: string,
+  apiField?: string,
+): {
   field?: RegisterField;
   errorKey: string;
   formLevel: boolean;
 } {
   const playKey = key.startsWith("errors.") ? `play.errors.${key.slice("errors.".length)}` : key;
+  const registerFields = new Set<RegisterField>([
+    "name",
+    "email",
+    "age",
+    "password",
+    "password_confirm",
+    "photo",
+  ]);
+  if (apiField && registerFields.has(apiField as RegisterField)) {
+    return {
+      field: apiField as RegisterField,
+      errorKey: playKey.startsWith("play.errors.") ? playKey : "play.errors.network",
+      formLevel: false,
+    };
+  }
 
   switch (key) {
     case "errors.name_required":

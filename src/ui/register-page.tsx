@@ -24,11 +24,15 @@ import { notifySessionChanged } from "@/src/ui/session-events";
 
 function focusRegisterField(field: RegisterField) {
   if (field === "photo") {
-    document.querySelector<HTMLElement>("[data-photo-trigger], .register-photo__frame")?.focus();
+    const el = document.querySelector<HTMLElement>("[data-photo-trigger], .register-photo__frame");
+    el?.focus();
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
     return;
   }
   const id = field === "password_confirm" ? "password_confirm" : field;
-  document.getElementById(id)?.focus();
+  const el = document.getElementById(id);
+  el?.focus();
+  el?.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 export default function RegisterPageClient() {
@@ -67,8 +71,8 @@ export default function RegisterPageClient() {
 
   function applyApiError(err: unknown) {
     if (err instanceof AuthApiError) {
-      const mapped = mapApiErrorToField(err.key);
-      const field = (err.field as RegisterField | undefined) ?? mapped.field;
+      const mapped = mapApiErrorToField(err.key, err.field);
+      const field = mapped.field;
       if (mapped.formLevel || !field) {
         setFieldErrors({});
         setFormError(mapped.errorKey);

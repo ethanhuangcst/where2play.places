@@ -4,8 +4,8 @@ import { readSession } from "./session";
 import { csrfOk } from "./csrf";
 import { prisma } from "../db/client";
 
-export function authError(key: string, status = 400) {
-  return NextResponse.json({ error: { key } }, { status });
+export function authError(key: string, status = 400, field?: string) {
+  return NextResponse.json({ error: { key, ...(field ? { field } : {}) } }, { status });
 }
 
 export async function requireUser(request: Request) {

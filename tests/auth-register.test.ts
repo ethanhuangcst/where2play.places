@@ -74,6 +74,8 @@ describe("POST /api/auth/register", () => {
       }),
     );
     expect(res.status).toBe(400);
+    const body = await readJson<{ error: { key: string; field?: string } }>(res);
+    expect(body.error.field).toBe("name");
   });
 
   it("should_reject_age_out_of_range", async () => {
@@ -90,6 +92,8 @@ describe("POST /api/auth/register", () => {
       }),
     );
     expect(res.status).toBe(400);
+    const body = await readJson<{ error: { field?: string } }>(res);
+    expect(body.error.field).toBe("age");
   });
 
   it("should_reject_password_mismatch", async () => {
@@ -105,6 +109,9 @@ describe("POST /api/auth/register", () => {
       }),
     );
     expect(res.status).toBe(400);
+    const body = await readJson<{ error: { key: string; field?: string } }>(res);
+    expect(body.error.key).toBe("errors.password_mismatch");
+    expect(body.error.field).toBe("password_confirm");
   });
 
   it("should_reject_duplicate_email", async () => {

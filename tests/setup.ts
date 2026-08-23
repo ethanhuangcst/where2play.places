@@ -31,6 +31,7 @@ export function getTestCookie(name: string): string | undefined {
 }
 
 async function resetDb() {
+  await prisma.planSessionCache.deleteMany();
   await prisma.passwordResetToken.deleteMany();
   await prisma.interestProfile.deleteMany();
   await prisma.user.deleteMany();

@@ -166,23 +166,35 @@ places.family:  [logo] where2play.place  ·  [logo] what2eat.food  ·  [logo] pl
 
 | 目标 | 非目标 |
 | --- | --- |
-| Thin client + 同源 BFF；每次一条 `plan_itinerary`（`detail: "timed"`） | 一次多行程短名单；浏览器 MCP / map key / LLM key |
+| Thin client + 同源 BFF；主路径 **一条**行程；规划经 ADR-032 拆分：**discover（agent）→ arrange L2（本应用 OPENAI_CN，[ADR-037](../../workspace-specs/adr/ADR-037-where2play-plan-l2-quanzil.md)）** | 一次多行程短名单；浏览器 MCP / map key / LLM key；chip 条作为候选主展示 |
 | Plan 单页 + 单一 Chat + 底栏 | 双 Chat / FAB 全局 Chat |
 | Chat：local 草稿 + **保存时** DB 快照 | 每轮 chat 写库；未保存跨设备同步 |
 | 我的行程多卡读 DB | MVP 未保存 History 列表 |
 | 四 locale 独立 catalog；账号独立 | 与 what2eat SSO；OpenCC；HK↔TW 共文件 |
-| BFF HTTP-only → places-agent（ADR-020 同族） | 本应用直接调 Quanzil / map vendors |
+| BFF → places-agent（**仅**地图 discover / search / geocode / navigate）；**初排 L2 + 行程助手** BFF → 本应用 OPENAI_CN（[ADR-036](../../workspace-specs/adr/ADR-036-where2play-assistant-quanzil.md)、[ADR-037](../../workspace-specs/adr/ADR-037-where2play-plan-l2-quanzil.md)） | 初排 L2 默认再调 agent `arrange_day`/`plan_itinerary`；浏览器直连 OPENAI_CN / map vendors |
 
 ```text
-Browser → where2play /api/* → places-agent /v1/*
+Browser → where2play /api/*
+  ├─ /api/plan* → BFF：agent discover_places → 本应用 OPENAI_CN arrange×N（NDJSON）
+  ├─ search/geocode 类 → places-agent /v1/*
+  └─ /api/chat → where2play BFF → OPENAI_CN（流式）；可选再调 agent search_*
 Browser localStorage ← w2p.chat.draft | w2p.chat.itinerary.{id}
 App DB ← User, InterestProfile, SavedItinerary + ItineraryChatMessage (commit only)
            (+ optional PlanSessionCache for refresh hydrate)
 ```
 
-**LLM 决策（定稿）：** where2play **不含** `OPENAI_*`。规划与对话均经 places-agent（与 what2eat 一致）。workspace `3.tech-specs.md` 中「where2play 可有 product Quanzil」视为过时；以本文件 + [`2play-prod-specs.md`](./2play-prod-specs.md) 为准。若将来需要本机产品文案模型，另开 ADR。
+**LLM 决策（[ADR-036](../../workspace-specs/adr/ADR-036-where2play-assistant-quanzil.md) + [ADR-037](../../workspace-specs/adr/ADR-037-where2play-plan-l2-quanzil.md)）：**
 
-职责划分详见 [`2play-prod-specs.md`](./2play-prod-specs.md) 与 [`../../workspace-specs/2.architecture.md`](../../workspace-specs/2.architecture.md)。行程引擎归属 [ADR-008](../../workspace-specs/adr/ADR-008-itinerary-ownership.md)。
+| 能力 | 谁调 LLM / 引擎 |
+| --- | --- |
+| **初排 / 重新规划 L1** | places-agent `discover_places`（地图，无 LLM） |
+| **初排 / 重新规划 L2** | **where2play BFF 本应用 OPENAI_CN（gpt-5.4）** 按天排程；密钥仅服务端 |
+| **行程助手**（页内 Chat） | **同一产品 OPENAI_CN**，流式回复 + patch |
+| 地图 search / geocode / navigate | 仍 places-agent（2play **不含** `AMAP_*` / `GOOGLE_MAPS_*`） |
+
+助手小改：流式 `reply` + `itineraryPatch`（或完整 `itinerary`）更新中部时间轴。**禁止**助手默认触发整单 `plan_itinerary`；整单重做走 `/api/plan/replan`（同 §2.4.1：discover + BFF OPENAI_CN arrange）。what2eat 默认仍经 agent chat，除非另开 ADR。
+
+职责划分详见 [`2play-prod-specs.md`](./2play-prod-specs.md) 与 [`../../workspace-specs/2.architecture.md`](../../workspace-specs/2.architecture.md)。行程**候选与地图**归属 [ADR-008](../../workspace-specs/adr/ADR-008-itinerary-ownership.md) / agent；**2play 产品排程 L2 + 助手对话**见 ADR-036/037。
 
 ### 2.2 技术栈
 
@@ -196,7 +208,7 @@ App DB ← User, InterestProfile, SavedItinerary + ItineraryChatMessage (commit 
 | Resend | 重置密码邮件 |
 | PDF | 服务端生成（优先 `pdf-lib` 或轻量 HTML→PDF；**不**在浏览器拼 vendor 密钥） |
 | Vitest + Python Playwright | 单测/契约 + E2E |
-| places-agent `fetch` 客户端 | **无** MCP、**无** 浏览器 Quanzil |
+| places-agent `fetch` 客户端 | **L1 discover** / 地图；**L2 + 助手** 用产品 OPENAI_CN（ADR-036/037） |
 
 入口：`next dev` / standalone `node server.js`（同 what2eat）。
 
@@ -213,10 +225,10 @@ App DB ← User, InterestProfile, SavedItinerary + ItineraryChatMessage (commit 
 | `/api/auth/reset-password` | POST | 发重置邮件 |
 | `/api/auth/set-password` | POST | 凭 token 设新密码 |
 | `/api/profile/personal` | GET/PUT | 个人信息 + **出行兴趣**（单卡一次保存；兴趣可为同 payload 字段） |
-| `/api/plan` | POST | 边界 → `plan_itinerary` → **一条** `ItineraryDto` |
+| `/api/plan` | POST | 边界 → agent **discover** + **BFF OPENAI_CN arrange×N**（NDJSON，见 §2.4.1 / ADR-037）；JSON 兼容返回最终 `ItineraryDto` |
 | `/api/plan/current` | GET | 读取未过期 PlanSessionCache（刷新恢复中部行程 + 表单 criteria） |
-| `/api/plan/replan` | POST | 新一条；body 含截断 chat 上下文；**不**清 local transcript |
-| `/api/chat` | POST | 组装行程上下文 → `POST /v1/chat`；返回 assistant + 可选 `itineraryPatch` |
+| `/api/plan/replan` | POST | 新一条（同 §2.4.1 编排）；body 含截断 chat 上下文；**不**清 local transcript |
+| `/api/chat` | POST | 行程助手：BFF → **本应用 OPENAI_CN 流式**；可选 agent `search_*`；返回 assistant + `itineraryPatch`/`itinerary`（[ADR-036](../../workspace-specs/adr/ADR-036-where2play-assistant-quanzil.md)） |
 | `/api/saved` | GET | 已保存行程卡列表 |
 | `/api/saved` | POST | **提交点**：行程快照 + messages[] → DB |
 | `/api/saved/[id]` | DELETE | 取消收藏 |
@@ -228,48 +240,73 @@ App DB ← User, InterestProfile, SavedItinerary + ItineraryChatMessage (commit 
 
 ### 2.4 Plan / Replan / Chat 流程
 
-#### 2.4.1 生成行程（`POST /api/plan`）
+#### 2.4.1 生成行程（`POST /api/plan`）— ADR-037
+
+**Progressive UX 与四段 UI（行程日提示 / 行程细节提示 / 行程 / 加载中提示）专项设计：** [`itinerary-design.md`](./itinerary-design.md)。
+
+对齐 [ADR-032](../../workspace-specs/adr/ADR-032-llm-itinerary-mcp-tool-split.md)：**先发现、再按天安排**。where2play 负责 progressive UX 与 **L2 OPENAI_CN**；places-agent 提供 **L1** `discover_places`（HTTP 可 NDJSON）。**主路径不再**调用 agent `arrange_day` / 整单 `plan_itinerary`（[ADR-037](../../workspace-specs/adr/ADR-037-where2play-plan-l2-quanzil.md)）。
 
 ```text
 1. requireUser + CSRF
-2. Zod 校验 PlanBoundaries（目的地*、天数* 1–14；可选人数/类型/预算/节奏/交通/起终点/时段/兴趣/限制）
+2. Zod 校验 PlanBoundaries（目的地*、天数* 1–14、起始日期* `YYYY-MM-DD`；可选人数/类型/预算/节奏/交通/起终点/时段/兴趣/限制）
 3. 读 InterestProfile（若表单未带兴趣，可用作默认 chips）
-4. BFF 组装 places-agent 请求：
-     - tool/path: POST /v1/plan_itinerary
-     - detail: "timed"
-     - providers[]: caller-driven（大陆倾向 ["AMAP","GOOGLE_MAPS"]；海外 ["GOOGLE_MAPS"]；ADR-005）
-     - locale: 当前用户 locale
-5. 映射 agent 响应 → ItineraryDto（一天一条 days[]；blocks → slots）
-6. 写入 PlanSessionCache（userId, criteriaJson, itineraryJson, updatedAt；TTL 建议 24h）
-7. 返回 { itinerary, updatedAt } — **不得**在 agent 失败时返回 canned 景点名
+4. providers[]: caller-driven（大陆倾向 ["AMAP","GOOGLE_MAPS"]；海外 ["GOOGLE_MAPS"]；ADR-005）
+5. Phase Discover — POST places-agent /v1/discover_places（numDays = N；locale；city；bounds 自 startDate）
+     - Accept: application/x-ndjson → 每找到一个 POI 推一条 candidate
+     - BFF 转发给浏览器：同态 slot 预览（见 §3.5.2 / §3.5.5）
+6. Phase Arrange — 对 dayIndex = 1…N（**逐条 slot** 揭示，见 [`itinerary-design.md`](./itinerary-design.md)）：
+     - 发 `phase` arranging（含 dayIndex / daysTotal）→ **行程日提示**
+     - 发 `arrange_day_start`（预建 Day tabs；`poolTotal`/`usedCount` 可保留作调试，**不作** UI 主文案）
+     - **BFF 本应用 OPENAI_CN**：slim 候选（每池最多约 16）+ 日约束 → 结构化单日 blocks（P0：`stream: false` 等满日 JSON 后解析；P2：流式增量 parse）
+     - **Prompt 来源（as-built）：** agent `POST /v1/arrange_day` `execution=host`（Feature **35**）；本地 `buildArrangeDayMessages` **仅单测**
+     - **交通（as-built）：** `POST /v1/enrich_arrange_transit` → `legs_to_here`（Feature **37**）
+     - 发 `day_highlights`（优先用模型 `theme`）→ Highlights 骨架
+     - 对每条落地站：发 `slot_preview`（kind=place|transit|meal）→ **行程细节提示**；再发 `slot`（`place` 为 deprecated alias）→ **行程** +1；下一条前 **加载中提示** `.slot--pending` 同构 skeleton
+     - **不**默认 POST agent `/v1/arrange_day` **execution=agent**（ChatBox MCP 强制 agent 见 ADR-043；2play 仍 Mode H）
+     - `day_done` / `progress`；自动切下一 Day tab（未排日 `· 排队`）
+7. `done` → 最终 ItineraryDto；头栏 Updated；**不得**在失败时返回 canned 景点名
+8. 无 Accept NDJSON 时：服务端仍跑同编排，结束后 JSON { itinerary, updatedAt }
+9. 缺 `OPENAI_API_KEY` → 明确 outcome key（与助手同源）；可选开关才回退 agent arrange execution=agent（默认关）
 ```
+
+**流事件（BFF → UI）：** `phase` · `candidate_place` · `discover_done`（**不作** arrange 主文案）· `arrange_day_start` · `day_highlights` · **`slot_preview`** · **`slot`**（`place` alias）· `day_done` · `progress` · `done` · `error`。单日顺序：`arrange_day_start` → `day_highlights` → (`slot_preview` → `slot`)\* → `day_done`。细节与 i18n 见 [`itinerary-design.md`](./itinerary-design.md) §3–§4；用户故事见 [`2play-stories.md`](./2play-stories.md) `plan-10`。
+
+**L2 安排约束（[ADR-038](../../workspace-specs/adr/ADR-038-discover-places-quality.md) P0）：** 一日一主题；同区连游；禁止同日堆同一地标 cluster；理由可含估计步行/打车（**不**调 navigate）。L1 须已做 cluster 去重与多样性，避免城墙碎片占满候选头。  
+**可行性：** L2 目标为 **按 block 尽早推送**（真流式或增量 parse）；不得以「整日等满再首次出站」为验收通过标准。  
+**多样性：** 跨天 `usedNames` 收缩候选；各日不得简单复制 Day 1。  
+**日历 bounds：** 仍传 agent discover；BFF 自算各日 `date = startDate + (dayIndex - 1)`。  
+**Fallback：** discover 失败 → 诚实 error（不得假景点）。OPENAI_CN 单日失败且已有 ≥1 日 → 以已完成日结束；全日失败 → `error`。显式开关下可选 agent `arrange_day` execution=agent 降级。  
+**Agent 搜词（QLP）：** 仅 discover 路径；BFF **不**组地图关键词。  
+**现状（2026-08-23）：** L1 = agent `discover_places`；L2 = **本应用 OPENAI_CN**（本地拼 prompt，ADR-037）。Agent Mode H（`execution=host`）**已交付**；2play 改拉该 prompt 见 `plan-11` / [`itinerary-design.md`](./itinerary-design.md) §1。Mock 仍见 `06-plan-*.html`。
 
 #### 2.4.2 刷新恢复（`GET /api/plan/current`）
 
 对齐 what2eat `GET /api/decide/current`：mount 时恢复未过期 cache；表单 criteria 与中部行程一并 hydrate。无 cache → 空态（规划器可编辑，详情区引导生成）。
 
-#### 2.4.3 页内 Chat（`POST /api/chat`）
+#### 2.4.3 页内 Chat（`POST /api/chat`）— ADR-036 方案 B
 
 ```text
 1. requireUser + CSRF
 2. Body: { messages[], itineraryId?: "draft"|savedId, locale }
 3. BFF 截断 transcript（长度上限，保留 system 分隔后尾部）
-4. 附带当前 ItineraryDto 摘要（天数、slot ids/names、约束）→ POST /v1/chat
-5. 响应：
-   - reply: { role, content } 或 rich blocks（若 agent 支持；MVP-3 可先 plain）
-   - itinerary?: 完整替换 DTO（随动改中部）— 或以 patch 约定；实现选一种并写契约测试
-6. 客户端 append 到 localStorage；若返回新 itinerary，更新中部 + PlanSessionCache（可选再 PUT）
+4. 组装：当前 ItineraryDto 摘要（天数、slot ids/names、约束）+ messages
+5. BFF 调用本应用 OPENAI_CN（流式 chat/completions）：
+   - 流式 token → 客户端助手气泡（SSE 或 NDJSON，实现选定一种）
+   - 模型输出约定：自然语言回复 + 可选结构化 itineraryPatch / 完整 itinerary JSON
+6. 若本轮需要换店/查点：BFF 先 HTTP 调 places-agent search_* / geocode（可选），再注入上下文；**不**把助手默认路由到 /v1/chat 或 plan_itinerary
+7. 客户端：append 聊天；若有 patch/itinerary → 更新中部时间轴 + PlanSessionCache
 ```
 
-**不做：** 每轮 INSERT chat 表。
+**不做：** 每轮 INSERT chat 表；助手路径默认整单 `plan_itinerary`。  
+**整单重做：** §2.4.4 replan → 同 §2.4.1（agent discover + BFF OPENAI_CN arrange）。
 
 #### 2.4.4 重新规划（`POST /api/plan/replan`）
 
 ```text
-1. 客户端先弹 alertdialog（文案见 §3.5.4）；取消则不请求
+1. 客户端先弹 alertdialog（文案见 §3.5.5）；取消则不请求
 2. 确认后 POST：boundaries + messages[]（截断）+ locale
-3. BFF 调 plan_itinerary（同 §2.4.1）；替换 PlanSessionCache
-4. 客户端：替换中部行程；**保留** local transcript；插入 system 泡 play.chat.replan_divider
+3. BFF 按 §2.4.1 重新 **discover（agent）→ OPENAI_CN arrange×N**（可复用截断 chat 作偏好上下文）；替换 PlanSessionCache
+4. 客户端：清空中部后走 progressive 渲染；**保留** local transcript；插入 system 泡 play.chat.replan_divider
 5. 已保存 DB 行不受影响
 ```
 
@@ -293,6 +330,7 @@ App DB ← User, InterestProfile, SavedItinerary + ItineraryChatMessage (commit 
 | --- | --- | --- |
 | `destination` | string | 是 |
 | `days` | number 1–14 | 是 |
+| `startDate` | `YYYY-MM-DD`（本地日历日） | **是** |
 | `partySize` | number 1–20 | 否 |
 | `tripType` | string | 否 |
 | `budget` | string | 否 |
@@ -390,7 +428,7 @@ type ChatMessage = {
 
 ### 2.8 环境变量（名称）
 
-键名真源：仓库根 `.env.example`（与 `.env.local` / `.env.production` 同键；**protect-eng**：未确认不改用户已填值）。where2play **不含** `OPENAI_*`、`AMAP_*`、`GOOGLE_MAPS_*`。
+键名真源：仓库根 `.env.example`（与 `.env.local` / `.env.production` 同键；**protect-eng**：未确认不改用户已填值）。where2play **不含** `AMAP_*`、`GOOGLE_MAPS_*`。**初排 L2 + 行程助手**均需产品侧 OPENAI_CN（[ADR-036](../../workspace-specs/adr/ADR-036-where2play-assistant-quanzil.md)、[ADR-037](../../workspace-specs/adr/ADR-037-where2play-plan-l2-quanzil.md)）；**L1 discover / 地图**仍依赖 `PLACES_AGENT_*`。
 
 | 变量 | 用途 |
 | --- | --- |
@@ -398,7 +436,10 @@ type ChatMessage = {
 | `PUBLIC_BASE_URL` | `http://localhost:3030` / `https://where2play.place` |
 | `DATABASE_URL` / `TEST_DATABASE_URL` | PostgreSQL |
 | `SESSION_SECRET` | Session cookie |
-| `PLACES_AGENT_BASE_URL` / `PLACES_AGENT_CALLER_KEY` | MVP-2+ BFF → agent |
+| `PLACES_AGENT_BASE_URL` / `PLACES_AGENT_CALLER_KEY` | MVP-2+ BFF → agent（**discover** / 地图） |
+| `PLACES_AGENT_PLAN_TIMEOUT_MS` | 可选；单次 agent 调用超时（discover 等），默认 **120000** |
+| `PLACES_AGENT_DISCOVER_TIMEOUT_MS` / `PLACES_AGENT_ARRANGE_TIMEOUT_MS` | 可选；discover 超时；arrange 仅在显式降级开关启用时有意义 |
+| `OPENAI_API_KEY` / `OPENAI_BASE_URL` / `OPENAI_CHAT_MODEL` | **初排 L2 + 行程助手** BFF→OPENAI_CN（建议 model 默认 `gpt-5.4`） |
 | `RESEND_*` / `FEATURE_EMAIL` | MVP-1 邮件 |
 | `CHAT_CONTEXT_MAX_CHARS` | 可选；replan/chat 截断上限 |
 
@@ -419,9 +460,9 @@ type ChatMessage = {
 
 | 项 | 约定 |
 | --- | --- |
-| 延迟 | `plan_itinerary` 可能数秒–十余秒；UI 须有 pending；超时可配置并诚实报错 |
-| 日志 | BFF 记 `requestId`、userId hash、agent status、latency；无 PII 密码 |
-| 成本 | 不在 where2play 直接调 LLM；控制 replan/chat 频率（可选轻量 rate limit） |
+| 延迟 | discover ~数秒–二十秒；**L2 OPENAI_CN** 目标首日首站尽早可见；UI 须 **同态实时** 与 **逐 place** 反馈（§2.4.1 / §3.5.5）；超时可配置并诚实报错 |
+| 日志 | BFF 记 `requestId`、userId hash、agent/discover status、OPENAI_CN latency；无 PII 密码 |
+| 成本 | 初排 L2 + 助手均走本应用 OPENAI_CN：控制频率（可选 rate limit）；discover 成本仍在 agent |
 | 缓存 | PlanSessionCache 短 TTL；不把 live vendor 结果当永久真源 |
 
 ### 2.11 MVP 实现顺序
@@ -461,7 +502,7 @@ type ChatMessage = {
 | `/login` | `03-login.html` | email/password | `login-submit` | account-02 |
 | `/reset-password` | `04-reset.html` | 发信 / sent | `reset-sent` | account-03 |
 | `/set-password` | `05-set-password.html` | 新密码 | — | account-04 |
-| `/plan` | `06-plan.html` | 三列规划器、Day/Hour、Chat、底栏、replan | `plan-form`, `plan-dest`, `plan-submit`, `plan-updated`, `chat-shell`, `chat-transcript`, `chat-input`, `chat-send`, `chat-resize`, `replan-open`, `replan-dialog`, `replan-cancel`, `replan-confirm`, `plan-save`, `plan-export`, `nav-menu` | plan-*, chat-*, header-* |
+| `/plan` | `06-plan.html`；`06-plan-discover.html`；`06-plan-arrange-highlights.html`；`06-plan-arrange.html`；`06-plan-arrange-day2.html` | 双行规划器、Discover、Arrange 行 by 行、等待动效 | `plan-form`, `plan-dest`, `plan-start-date`, `plan-days`, `plan-submit`, `plan-phase`, `plan-candidates`, `plan-cand-summary`, `plan-slot-pending`, `plan-updated`, … | plan-* |
 | `/profile` | `07-profile.html` | 单列用户资料（含兴趣） | `profile-save` | profile-01 |
 | `/saved` | `08-saved.html` | 行程卡网格 | `trip-card`（实现时加） | saved-01 |
 | `/saved/[id]` | `09-saved-detail.html` | Day/Hour + DB 对话只读 | `chat-transcript`, `plan-export` | saved-02 |
@@ -542,11 +583,18 @@ type ChatMessage = {
 
 ### 3.5 Plan — `06-plan.html`（核心）
 
+**Accepted mock states：** 完成态 `06-plan.html` · Discover `06-plan-discover.html` · Arrange Highlights / slots / Day2（画廊 tabs；产品路由仍为 `/plan`）。
+
 ```text
 ┌─ page-title: 行程规划 ─────────────────────┐
-│ panel: plan-board（三列，无分区大标题）      │
-│ panel: 行程详情（Day tabs + Highlights + slots）│
-│ panel: 行程助手（chat-shell）                 │
+│ panel: plan-board（双行栅格，无分区大标题）  │
+│   Row1: 目的地 | 起始日期 | 天数 人数 起终点 时段
+│   Row2: 类型/预算 | 节奏/交通 | 偏好与限制
+│ plan-board__actions + plan-phase.is-busy + btn.is-generating │
+│ panel: 候选地点（仅 discover；同态 .slot）    │  ← 06-plan-discover
+│ 摘要 + panel: Highlights → slots → pending   │  ← arrange mocks
+│   · 行程细节提示 `.plan-slot-preview`（非候选池摘要） │
+│ panel: 行程助手（chat-shell；MVP 可后置）     │
 │ plan-actions: 重新规划 · 保存 · 导出 PDF     │
 └──────────────────────────────────────────────┘
 + replan alertdialog（默认隐藏）
@@ -554,25 +602,29 @@ type ChatMessage = {
 
 #### 3.5.1 规划器 `plan-board`
 
-`.plan-board__grid`：
+`.plan-board__grid`（三列 × 两行，子节点按行主序）：
 
 ```text
 grid-template-columns: var(--plan-col) var(--plan-col) minmax(0, 1fr);
 gap: var(--plan-gap);
+/* days / party 窄列 */
+--plan-num: 2.85rem;
 ```
 
-| 列 | 纵向字段（上→下，`space-between` 等分） |
-| --- | --- |
-| **A** `.plan-board__stack` | 目的地* → 类型(combo) → 预算(combo) |
-| **B** `.plan-board__stack` | 天数*+人数(`.plan-pair`) → 节奏(combo) → 交通偏好(combo) |
-| **C** `.plan-board__right` | 每日起点\|终点\|开始\|到\|结束 → **偏好与限制**块 |
+| 行 | 栅格子 | 内容 |
+| --- | --- | --- |
+| **1** | `dest` · `start_date` · `.plan-when` | 目的地*；起始日期*（宽=`--plan-col`，与下方「节奏」同 x/宽）；天数*+人数+每日起点+每日终点+开始+到+结束（天数左缘 = 偏好块左缘；结束右缘贴齐板右缘） |
+| **2** | stack A · stack B · `.plan-prefs-block` | 类型→预算；节奏→交通（与类型列对齐）；**偏好与限制** |
+
+**对齐约定（已接受）：** 起始日期 ≡ 节奏；天数左缘 ≡ 偏好与限制左缘；类型 ≡ 节奏；天数与人数同宽（`--plan-num`，可显示两位数 99）。
 
 | 字段 | 必填 | 备注 |
 | --- | --- | --- |
-| 目的地 | **是** | `plan-dest`；placeholder `城市 / 区域` |
-| 天数 | **是** | 1–14；与人数并排 |
-| 人数 | 否 | 1–20 |
-| 类型 | 否 | combo 选项：城市漫游 / 情侣出游 / 家庭度假 / 个人放松 / 美食之旅；可自填 |
+| 目的地 | **是** | `plan-dest`；placeholder `城市 / 区域`；第一行第一项 |
+| 起始日期 | **是** | `type=date`；`plan-start-date`；本地 `YYYY-MM-DD`；第一行第二项；传 agent 作 `bounds.start` |
+| 天数 | **是** | 1–14；`plan-days`；`.plan-when` 首项 |
+| 人数 | 否 | 1–20；紧随天数，同宽 |
+| 类型 | 否 | combo：城市漫游 / 情侣出游 / 家庭度假 / 个人放松 / 美食之旅；可自填 |
 | 预算 | 否 | 经济 / 中等 / 舒适 |
 | 节奏 | 否 | 紧凑 / 适中 / 轻松 |
 | 交通偏好 | 否 | 捷运 + 步行 / 步行优先 / 打车 / 公交 + 步行 |
@@ -584,7 +636,7 @@ gap: var(--plan-gap);
 块标题：**偏好与限制**（唯一小标题，非「规划器」）。  
 生成：`生成行程`（`plan-submit`），`form="plan-form"` 可放在板外 `.plan-board__actions`。
 
-**校验：** 仅目的地、天数必填；天数 1–14；时间成对则结束>开始；错误用 `.field.is-invalid` + `.field-error`。
+**校验：** 目的地、天数、起始日期必填；天数 1–14；起始日期须为合法 `YYYY-MM-DD`；时间成对则结束>开始；错误用 `.field.is-invalid` + `.field-error`。
 
 **Combo：** 打开列表 = 全部选项（`mockup.js`）；黑倒三角 toggle。
 
@@ -599,7 +651,26 @@ gap: var(--plan-gap);
   - 场所：`.slot-time`（宽=`--plan-col`）+ thumb（`slot-thumb-link`）+ `.slot-copy`（kind / h3 / p）+ `.slot-actions`（详情｜地图，新标签）
 - 缩略图**左缘**与列 B 输入左缘对齐（时间列 = `--plan-col`）
 
-#### 3.5.3 Chat
+#### 3.5.3 Progressive generate（发现 → 安排）— **accepted**（四段 UI + 逐条 slot）
+
+Mock SoT：[`06-plan-discover.html`](./ui-mockup/06-plan-discover.html)（图1）、[`06-plan-arrange-highlights.html`](./ui-mockup/06-plan-arrange-highlights.html)（图3）、[`06-plan-arrange.html`](./ui-mockup/06-plan-arrange.html)（图2/4/5）、[`06-plan-arrange-day2.html`](./ui-mockup/06-plan-arrange-day2.html)（图6）。技术流见 §2.4.1；专项契约 [`itinerary-design.md`](./itinerary-design.md)。
+
+| 段 / 步骤 | DOM / 事件 | UI（与图对齐） | 禁止 |
+| --- | --- | --- | --- |
+| **行程日提示** | `.plan-phase.is-busy` · `phase` arranging | 「正在安排第 d/N 天…」；钮 `.is-generating` | 用候选池统计替换日提示 |
+| **1 Discover** | `candidate_place` | 「正在搜索… 已找到 N 处」；`.slot--candidate`；表单 `.is-dimmed` | chip 主展示；等整包再刷 |
+| **2.0 Arrange 日初** | `arrange_day_start` · `day_highlights` | Day tabs 预建（未排日 `· 排队`）；Highlights 骨架；细节提示 `play.plan.arrange_planning_day`（尚无 `slot_preview` 时） | **`候选池 P/U` 作主文案**（`arrange_pool_summary` 默认隐藏） |
+| **2.1 细节提示** | `slot_preview` | `.plan-slot-preview`：按 kind 插值 `preview_place` / `preview_transit` / `preview_meal` | 整日同 tick 刷屏 |
+| **2.2 行程 + 加载中** | `slot` · pending | 每 `slot` +1 行；底栏 `plan-slot-pending` **同构 skeleton**（非虚线框） | 等整天 JSON 再整日替换 |
+| **2.x 切日** | `day_done` | 自动高亮下一日 tab，重复 2.0–2.2 | 须手动点 tab 才继续 |
+| **完成态** | `done` | Updated；无候选主面板 / 无 pending | — |
+
+**再生成：** 再次「生成行程」时立即清空中部行程，再进入 progressive。
+
+**同态：** 候选与行程场所共用 `.slot` 结构。  
+**动效：** slot 入场 + phase/钮/pending 等待动画；尊重 `prefers-reduced-motion`。
+
+#### 3.5.4 Chat
 
 - 标题：行程助手
 - `.chat-shell` 高 `--chat-h`，最小 `--chat-min-h`
@@ -608,7 +679,7 @@ gap: var(--plan-gap);
 - `.chat-resize`：仅高度；`chat-resize`；`aria-label` 拖动调整高度
 - Replan 后：系统分隔泡（`chat-replan-divider`）
 
-#### 3.5.4 底栏与对话框
+#### 3.5.5 底栏与对话框
 
 | 控件 | 样式 | testid |
 | --- | --- | --- |
@@ -664,7 +735,7 @@ Profile / Register 标签固定为 **出行兴趣（多选）**。Plan 块标题
 - [ ] Header：行程规划 / 我的行程 / 个人信息；中文 weight 400
 - [ ] Footer：三列栅格 + 12px 拉丁；当前产品非链
 - [ ] Register / Profile：单列卡；兴趣合并；标签「出行兴趣（多选）」；无禁用长说明
-- [ ] Plan：三列板；无分区大标题；combo 全量选项；slot 时间列 = `--plan-col`
+- [ ] Plan：双行栅格（目的地/起始日期列 + `.plan-when` 行 + prefs）；无分区大标题；combo 全量选项；slot 时间列 = `--plan-col`；Discover/Arrange 同态 progressive
 - [ ] Chat 内嵌非 FAB；resize 仅高
 - [ ] Replan 确认 + 分隔泡；保存提交行程+对话；Saved 多卡；详情只读 DB 对话
 - [ ] 四 locale catalogs；reduced-motion 关闭飞行动画

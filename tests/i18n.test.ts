@@ -31,4 +31,24 @@ describe("i18n catalogs", () => {
       }
     }
   });
+
+  it("should_define_plan_progressive_preview_keys_in_all_locales", () => {
+    const keys = [
+      "play.plan.arrange_planning_day",
+      "play.plan.preview_place",
+      "play.plan.preview_transit",
+      "play.plan.preview_meal",
+      "play.plan.meal_lunch",
+      "play.plan.meal_afternoon_tea",
+      "play.plan.meal_dinner",
+    ] as const;
+    for (const locale of ["EN", "CN", "HK", "TW"] as const) {
+      for (const key of keys) {
+        expect(catalogs[locale][key], `${locale} missing ${key}`).toBeTruthy();
+      }
+    }
+    expect(t("CN", "play.plan.preview_place", { name: "大雁塔", reason: "地标", window: "09:30–11:00" })).toContain(
+      "大雁塔",
+    );
+  });
 });

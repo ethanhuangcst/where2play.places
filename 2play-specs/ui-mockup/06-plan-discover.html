@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>行程规划 · Discover — where2play.place</title>
+    <link rel="icon" href="assets/favicon.png" type="image/png" />
+    <link rel="stylesheet" href="assets/mockup.css" />
+  </head>
+  <body class="shell-app">
+    <a class="sr-only" href="#content">Skip to content</a>
+    <header class="app-header">
+      <div class="app-header__inner">
+      <a class="logo" href="06-plan.html" aria-label="where2play.place">
+        <span class="mark-host mark-host--plane">
+          <svg class="wing-trail" viewBox="0 0 18 10" fill="none" aria-hidden="true">
+            <path d="M17 2.2c-3.2.9-6.5 2.2-10 3.6C4.2 6.8 2.2 7.6 1 8.2" />
+          </svg>
+          <img class="mark mark--plane" src="assets/play-logo.png" alt="" width="40" height="40" />
+        </span>
+        <span class="logo-word">where2play.place</span>
+      </a>
+      <button type="button" class="menu-toggle btn btn-quiet" data-testid="nav-menu">Menu</button>
+      <nav class="app-nav" aria-label="Primary">
+        <a href="06-plan.html" class="is-active">行程规划</a>
+        <a href="08-saved.html">我的行程</a>
+        <a href="07-profile.html">个人信息</a>
+      </nav>
+      <div class="app-user">
+        <span class="hello">你好，</span>
+        <span class="avatar" aria-hidden="true" title="Mei"><img src="assets/play-logo.png" alt="" /></span>
+        <span class="hello hello--name">Mei</span>
+        <div class="app-user__tools">
+          <div class="locale-switch" role="group" aria-label="Locale">
+            <button type="button">EN</button>
+            <button type="button" class="is-on">CN</button>
+            <button type="button">HK</button>
+            <button type="button">TW</button>
+          </div>
+          <a class="btn btn-quiet" href="01-home.html">登出</a>
+        </div>
+      </div>
+          </div>
+    </header>
+
+    <main id="content" class="app-main">
+      <h1 class="page-title">行程规划</h1>
+                <p class="plan-mock-states" role="navigation" aria-label="Mock generate states">
+          <a href="06-plan.html">完成态</a>
+          <a href="06-plan-discover.html" class="is-on">Discover</a>
+          <a href="06-plan-arrange-highlights.html">Arrange · Highlights</a>
+          <a href="06-plan-arrange.html">Arrange · slots</a>
+          <a href="06-plan-arrange-day2.html">Arrange · Day2</a>
+        </p>
+
+<div class="plan-stack">
+        <!-- Compact planner: no section titles -->
+                <section class="panel planner-card is-dimmed" aria-label="Plan form" aria-disabled="true">
+          <div class="panel__body">
+<form class="plan-form plan-board" id="plan-form" inert action="06-plan.html" method="get" novalidate data-testid="plan-form">
+              <div class="plan-board__grid">
+                <!-- Row 1: 目的地 | 起始日期 | 天数+人数+每日起终点+时段 -->
+                <div class="field" data-field="dest">
+                  <div class="field-label-row">
+                    <label for="dest">目的地</label>
+                    <span class="req" aria-hidden="true">*</span>
+                  </div>
+                  <input id="dest" name="dest" value="台北" required data-testid="plan-dest" aria-required="true" placeholder="城市 / 区域" />
+                  <p class="field-error" hidden role="alert"></p>
+                </div>
+
+                <div class="field" data-field="start_date">
+                  <div class="field-label-row">
+                    <label for="start_date">起始日期</label>
+                    <span class="req" aria-hidden="true">*</span>
+                  </div>
+                  <input id="start_date" name="start_date" type="date" value="2026-08-22" required aria-required="true" data-testid="plan-start-date" />
+                  <p class="field-error" hidden role="alert"></p>
+                </div>
+
+                <div class="plan-when">
+                  <div class="field" data-field="days">
+                    <div class="field-label-row">
+                      <label for="days">天数</label>
+                      <span class="req" aria-hidden="true">*</span>
+                    </div>
+                    <input id="days" name="days" type="number" min="1" max="14" value="3" required aria-required="true" data-testid="plan-days" />
+                    <p class="field-error" hidden role="alert"></p>
+                  </div>
+                  <div class="field" data-field="party">
+                    <label for="party">人数</label>
+                    <input id="party" name="party" type="number" min="1" max="20" value="2" />
+                  </div>
+                  <div class="field" data-field="daily_start">
+                    <label for="daily_start">每日起点</label>
+                    <input id="daily_start" name="daily_start" value="西门町旅馆" placeholder="可选 · 酒店或地标" />
+                  </div>
+                  <div class="field" data-field="daily_end">
+                    <label for="daily_end">每日终点</label>
+                    <input id="daily_end" name="daily_end" placeholder="可选，不填默认与起点同" />
+                  </div>
+                  <div class="field" data-field="time_from">
+                    <label for="time_from">开始</label>
+                    <input id="time_from" name="time_from" type="time" value="09:00" />
+                  </div>
+                  <span class="plan-to" aria-hidden="true">到</span>
+                  <div class="field" data-field="time_to">
+                    <label for="time_to">结束</label>
+                    <input id="time_to" name="time_to" type="time" value="21:00" />
+                  </div>
+                </div>
+
+                <!-- Row 2: 类型+预算 | 节奏+交通 | 偏好与限制 -->
+                <div class="plan-board__stack">
+                  <div class="field">
+                    <label for="trip_type">类型</label>
+                    <div class="combo" data-combo>
+                      <input id="trip_type" name="trip_type" value="城市漫游" placeholder="可选或自填" autocomplete="off" />
+                      <button type="button" class="combo__toggle" aria-label="打开类型选项" aria-expanded="false"></button>
+                      <ul class="combo__list" role="listbox" hidden>
+                        <li><button type="button" role="option">城市漫游</button></li>
+                        <li><button type="button" role="option">情侣出游</button></li>
+                        <li><button type="button" role="option">家庭度假</button></li>
+                        <li><button type="button" role="option">个人放松</button></li>
+                        <li><button type="button" role="option">美食之旅</button></li>
+                      </ul>
+                    </div>
+                  </div>
+                  <div class="field" data-field="budget">
+                    <label for="budget">预算</label>
+                    <div class="combo" data-combo>
+                      <input id="budget" name="budget" value="中等" autocomplete="off" />
+                      <button type="button" class="combo__toggle" aria-label="打开预算选项" aria-expanded="false"></button>
+                      <ul class="combo__list" role="listbox" hidden>
+                        <li><button type="button" role="option">经济</button></li>
+                        <li><button type="button" role="option">中等</button></li>
+                        <li><button type="button" role="option">舒适</button></li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="plan-board__stack">
+                  <div class="field">
+                    <label for="pace">节奏</label>
+                    <div class="combo" data-combo>
+                      <input id="pace" name="pace" value="轻松" autocomplete="off" />
+                      <button type="button" class="combo__toggle" aria-label="打开节奏选项" aria-expanded="false"></button>
+                      <ul class="combo__list" role="listbox" hidden>
+                        <li><button type="button" role="option">紧凑</button></li>
+                        <li><button type="button" role="option">适中</button></li>
+                        <li><button type="button" role="option">轻松</button></li>
+                      </ul>
+                    </div>
+                  </div>
+                  <div class="field" data-field="transport">
+                    <label for="transport">交通偏好</label>
+                    <div class="combo" data-combo>
+                      <input id="transport" name="transport" value="捷运 + 步行" autocomplete="off" />
+                      <button type="button" class="combo__toggle" aria-label="打开交通偏好选项" aria-expanded="false"></button>
+                      <ul class="combo__list" role="listbox" hidden>
+                        <li><button type="button" role="option">捷运 + 步行</button></li>
+                        <li><button type="button" role="option">步行优先</button></li>
+                        <li><button type="button" role="option">打车</button></li>
+                        <li><button type="button" role="option">公交 + 步行</button></li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="plan-prefs-block">
+                  <h3 class="plan-prefs-block__title">偏好与限制</h3>
+                  <div class="pref-scroll" role="group" aria-label="Preferences">
+                    <button type="button" class="chip is-on" data-interest="tourist_attraction">景点</button>
+                    <button type="button" class="chip is-on" data-interest="restaurant">美食</button>
+                    <button type="button" class="chip" data-interest="museum">博物馆</button>
+                    <button type="button" class="chip" data-interest="park">公园</button>
+                    <button type="button" class="chip" data-interest="place_of_worship">寺庙</button>
+                    <button type="button" class="chip is-on" data-interest="night_market">夜市</button>
+                    <button type="button" class="chip" data-interest="shopping_mall">购物</button>
+                    <button type="button" class="chip" data-interest="spa">温泉</button>
+                    <button type="button" class="chip" data-interest="natural_feature">户外</button>
+                    <div class="pref-custom">
+                      <label class="sr-only" for="interest_custom">自定义偏好</label>
+                      <input id="interest_custom" name="interest_custom" placeholder="自定义 / Custom" />
+                    </div>
+                  </div>
+                  <div class="field field--constraints">
+                    <label for="constraints">其他限制</label>
+                    <input id="constraints" name="constraints" maxlength="500" placeholder="轮椅友好、有婴儿、避免长时间步行…" />
+                  </div>
+                </div>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        
+        <div class="plan-board__actions">
+          <p class="plan-phase is-busy" data-testid="plan-phase" aria-live="polite">正在搜索台北的景点与餐厅… 已找到 5 处</p>
+          <button class="btn is-generating" type="submit" form="plan-form" data-testid="plan-submit" disabled>搜寻中…</button>
+        </div>
+
+        <section class="panel" aria-labelledby="cand-title" data-testid="plan-candidates">
+          <div class="panel__head">
+            <h2 id="cand-title">候选地点</h2>
+            <span class="page-meta" style="margin:0">与行程同形态 · 实时追加</span>
+          </div>
+          <div class="panel__body">
+            <div class="slot slot--candidate is-entering" data-testid="cand-slot-1">
+              <div class="slot-time">待安排</div>
+              <div class="slot-body">
+                <a class="slot-thumb-link" href="#" tabindex="-1"><img class="slot-thumb" src="assets/play-logo.png" alt="" /></a>
+                <div class="slot-main">
+                  <div class="slot-copy">
+                    <span class="slot-kind">Attraction</span>
+                    <h3>国立故宫博物院</h3>
+                    <p>刚搜到 · 将进入行程候选池</p>
+                  </div>
+                  <div class="slot-actions"><a class="map-link" href="#">详情</a><a class="map-link" href="#">地图</a></div>
+                </div>
+              </div>
+            </div>
+            <div class="slot slot--candidate is-entering" style="animation-delay:0.08s">
+              <div class="slot-time">待安排</div>
+              <div class="slot-body">
+                <a class="slot-thumb-link" href="#" tabindex="-1"><img class="slot-thumb" src="assets/play-logo.png" alt="" /></a>
+                <div class="slot-main">
+                  <div class="slot-copy">
+                    <span class="slot-kind">Attraction</span>
+                    <h3>国立中正纪念堂</h3>
+                    <p>刚搜到 · 将进入行程候选池</p>
+                  </div>
+                  <div class="slot-actions"><a class="map-link" href="#">详情</a><a class="map-link" href="#">地图</a></div>
+                </div>
+              </div>
+            </div>
+            <div class="slot slot--candidate is-entering" style="animation-delay:0.16s">
+              <div class="slot-time">待安排</div>
+              <div class="slot-body">
+                <a class="slot-thumb-link" href="#" tabindex="-1"><img class="slot-thumb" src="assets/play-logo.png" alt="" /></a>
+                <div class="slot-main">
+                  <div class="slot-copy">
+                    <span class="slot-kind">Attraction</span>
+                    <h3>艋舺龙山寺</h3>
+                    <p>刚搜到 · 将进入行程候选池</p>
+                  </div>
+                  <div class="slot-actions"><a class="map-link" href="#">详情</a><a class="map-link" href="#">地图</a></div>
+                </div>
+              </div>
+            </div>
+            <div class="slot slot--candidate is-entering" style="animation-delay:0.24s">
+              <div class="slot-time">待安排</div>
+              <div class="slot-body">
+                <a class="slot-thumb-link" href="#" tabindex="-1"><img class="slot-thumb" src="assets/play-logo.png" alt="" /></a>
+                <div class="slot-main">
+                  <div class="slot-copy">
+                    <span class="slot-kind">Food</span>
+                    <h3>鼎泰丰（信义店）</h3>
+                    <p>刚搜到 · 餐厅候选</p>
+                  </div>
+                  <div class="slot-actions"><a class="map-link" href="#">详情</a><a class="map-link" href="#">地图</a></div>
+                </div>
+              </div>
+            </div>
+            <div class="slot slot--candidate is-entering" style="animation-delay:0.32s">
+              <div class="slot-time">待安排</div>
+              <div class="slot-body">
+                <a class="slot-thumb-link" href="#" tabindex="-1"><img class="slot-thumb" src="assets/play-logo.png" alt="" /></a>
+                <div class="slot-main">
+                  <div class="slot-copy">
+                    <span class="slot-kind">Night market</span>
+                    <h3>饶河街夜市</h3>
+                    <p>搜寻仍在继续…</p>
+                  </div>
+                  <div class="slot-actions"><a class="map-link" href="#">详情</a><a class="map-link" href="#">地图</a></div>
+                </div>
+              </div>
+            </div>
+            <p class="plan-phase plan-phase--quiet" aria-hidden="true">下一条候选即将落入…</p>
+          </div>
+        </section>
+
+
+        <div class="plan-actions">
+          <button type="button" class="btn btn-danger" data-testid="replan-open">重新规划</button>
+          <button type="button" class="btn btn-quiet" data-testid="plan-save">保存</button>
+          <button type="button" class="btn" data-testid="plan-export">导出 PDF</button>
+        </div>
+      </div>
+    </main>
+
+    <div class="dialog-backdrop" data-testid="replan-dialog" aria-hidden="true" role="presentation">
+      <div class="dialog" role="alertdialog" aria-labelledby="replan-title" aria-describedby="replan-desc">
+        <h2 id="replan-title">重新规划？</h2>
+        <p id="replan-desc">将删除当前未保存的行程，并生成一条新行程。本机对话会保留，并在聊天中加入分隔提示。</p>
+        <div class="dialog__actions">
+          <button type="button" class="btn btn-quiet" data-testid="replan-cancel">取消</button>
+          <button type="button" class="btn" data-testid="replan-confirm">确定重新规划</button>
+        </div>
+      </div>
+    </div>
+
+        <footer class="family-footer family-footer--app">
+      <div class="family-footer__inner">
+        <nav class="family-footer__row" aria-label="places.family">
+          <span class="family-footer__label">places.family:</span>
+          <span class="family-footer__current"><img src="assets/play-logo.png" alt="" width="18" height="18" /><span>where2play.place</span></span>
+          <span class="family-footer__sep" aria-hidden="true">·</span>
+          <a class="family-footer__link" href="../../../2.what2eat/2eat-specs/ui-mockup/01-home.html" target="_blank" rel="noopener noreferrer"><img src="assets/food-logo.png" alt="" width="18" height="18" /><span>what2eat.food</span></a>
+          <span class="family-footer__sep" aria-hidden="true">·</span>
+          <a class="family-footer__link" href="../../../1.places-agent/agent-specs/ui-mockup/01-home.html" target="_blank" rel="noopener noreferrer"><img src="assets/agent-logo.png" alt="" width="18" height="18" /><span>places.agent-mate.ai</span></a>
+        </nav>
+        <span class="family-footer__copy">copyright © Ethan Huang</span>
+      </div>
+    </footer>
+    <script src="assets/mockup.js"></script>
+  </body>
+</html>

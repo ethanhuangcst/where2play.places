@@ -58,6 +58,9 @@ describe("validateRegisterClient", () => {
     expect(mapApiErrorToField("errors.email_invalid").field).toBe("email");
     expect(mapApiErrorToField("errors.password_required").field).toBe("password");
     expect(mapApiErrorToField("errors.photo_too_large").field).toBe("photo");
+    expect(mapApiErrorToField("errors.password_mismatch", "password_confirm").field).toBe(
+      "password_confirm",
+    );
     expect(mapApiErrorToField("errors.session_expired").formLevel).toBe(true);
     expect(mapApiErrorToField("errors.unknown").errorKey).toBe("play.errors.unknown");
   });

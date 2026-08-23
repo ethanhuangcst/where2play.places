@@ -94,7 +94,7 @@ export function LocationField({
         void applyCoords(pos.coords.latitude, pos.coords.longitude);
       },
       () => setStatus("failed"),
-      { timeout: 8000 },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-time detect only
   }, [initialStatus, value]);
@@ -124,7 +124,7 @@ export function LocationField({
         setLoading(false);
         setStatus("failed");
       },
-      { timeout: 8000 },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
     );
   }
 
@@ -162,41 +162,37 @@ export function LocationField({
     </div>
   );
 
-  return (
-    <>
-      {showStatus ? (
-        <>
-          <p
-            className={`hint location-status${status === "ok" ? " is-ok" : ""}`}
-            role="status"
-            hidden={status === "failed"}
-          >
-            {status === "detecting"
-              ? t("play.register.location_detecting")
-              : status === "ok"
-                ? t("play.register.location_detected")
-                : t("play.register.location_failed")}
-          </p>
-          {labelFailed ? (
-            <p className="hint location-status" role="status">
-              {t("play.register.location_label_failed")}
-            </p>
-          ) : null}
-          {status === "failed" ? (
-            <p className="hint location-status" data-location-failed role="status">
-              {t("play.register.location_failed")}
-            </p>
-          ) : null}
-        </>
-      ) : null}
-      {action ? (
-        <div className="location-with-action">
-          {inputRow}
-          {action}
-        </div>
-      ) : (
-        inputRow
-      )}
-    </>
+  const sideHint = showStatus ? (
+    <p
+      className={`location-hint${status === "ok" && !labelFailed ? "" : " location-hint--status"}`}
+      role="status"
+      data-testid="location-hint"
+    >
+      {status === "detecting"
+        ? t("play.register.location_detecting")
+        : status === "failed"
+          ? t("play.register.location_failed")
+          : labelFailed
+            ? t("play.register.location_label_failed")
+            : t("play.register.location_source_hint")}
+    </p>
+  ) : null;
+
+  const fieldRow = (
+    <div className="location-row">
+      {inputRow}
+      {sideHint}
+    </div>
   );
+
+  if (action) {
+    return (
+      <div className="location-with-action">
+        {fieldRow}
+        {action}
+      </div>
+    );
+  }
+
+  return fieldRow;
 }

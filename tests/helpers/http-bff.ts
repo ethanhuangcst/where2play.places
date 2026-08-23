@@ -11,15 +11,17 @@ export function bffRequest(
     origin?: string;
     host?: string;
     cookie?: string;
+    headers?: Record<string, string>;
   } = {},
 ): NextRequest {
   const method = init.method ?? "GET";
   const headers: Record<string, string> = {
     host: init.host ?? DEFAULT_HOST,
+    ...(init.headers ?? {}),
   };
   if (method !== "GET") {
     headers.origin = init.origin ?? DEFAULT_ORIGIN;
-    headers["content-type"] = "application/json";
+    headers["content-type"] = headers["content-type"] ?? "application/json";
   }
   if (init.cookie) headers.cookie = init.cookie;
 

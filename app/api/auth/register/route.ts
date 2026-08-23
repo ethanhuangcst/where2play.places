@@ -7,7 +7,7 @@ import { csrfOk } from "@/src/auth/csrf";
 import { authError, normalizeEmail } from "@/src/auth/user";
 import { normalizeLocale } from "@/src/core/locales";
 import { normalizeInterests } from "@/src/core/interests";
-import { PHOTO_MAX_BYTES } from "@/src/auth/register-validation";
+import { PHOTO_MAX_BYTES, registerSchemaFailure } from "@/src/auth/register-validation";
 
 const registerSchema = z.object({
   name: z.string().min(1),
@@ -46,26 +46,18 @@ function photoUrlTooLarge(url: string | undefined): boolean {
   return Math.ceil(base64.length * 0.75) > PHOTO_MAX_BYTES;
 }
 
-function registerSchemaErrorKey(error: z.ZodError): string {
-  const issue = error.issues[0];
-  const path = issue?.path[0];
-  if (path === "name") return "errors.name_required";
-  if (path === "email") {
-    if (issue.code === "invalid_format" || issue.code === "invalid_type") return "errors.email_invalid";
-    return "errors.email_required";
-  }
-  if (path === "password" || path === "confirmPassword") return "errors.password_too_short";
-  if (path === "age") return "errors.age_out_of_range";
-  return "errors.validation";
-}
-
 export async function POST(request: NextRequest) {
   if (!csrfOk(request)) return authError("errors.csrf", 403);
   const body = await request.json().catch(() => ({}));
   const parsed = registerSchema.safeParse(body);
-  if (!parsed.success) return authError(registerSchemaErrorKey(parsed.error), 400);
+  if (!parsed.success) {
+    const failure = registerSchemaFailure(parsed.error);
+    return authError(failure.key, 400, failure.field);
+  }
   const data = parsed.data;
-  if (data.password !== data.confirmPassword) return authError("errors.password_mismatch", 400);
+  if (data.password !== data.confirmPassword) {
+    return authError("errors.password_mismatch", 400, "password_confirm");
+  }
   if (photoUrlTooLarge(data.photoUrl)) return authError("errors.photo_too_large", 400);
   const email = normalizeEmail(data.email);
   const existing = await prisma.user.findUnique({ where: { email } });

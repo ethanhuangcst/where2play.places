@@ -1,4 +1,4 @@
-.PHONY: help dev up down db-bootstrap db-migrate db-migrate-test test test-coverage lint quality test-e2e-mvp1
+.PHONY: help dev up down db-bootstrap db-migrate db-migrate-test test test-coverage lint quality test-e2e-mvp1 test-e2e-mvp2-live test-e2e-mvp3-live test-e2e-chat02
 
 .DEFAULT_GOAL := help
 
@@ -46,5 +46,14 @@ test-coverage: db-migrate-test ## Unit/integration tests with coverage threshold
 
 test-e2e-mvp1: up db-migrate ## MVP-1 Playwright journey
 	python3 e2e/run.py mvp1
+
+test-e2e-mvp2-live: up db-migrate ## MVP-2 live Plan + save journey
+	python3 e2e/run.py mvp2-live
+
+test-e2e-mvp3-live: up db-migrate ## MVP-3 live Mode H + transit + must-see probe
+	PLAN_SLOT_STAGE_MS=0 python3 e2e/run.py mvp3-live
+
+test-e2e-chat02: up db-migrate ## MVP-4 chat-02 local draft (refresh + logout)
+	python3 e2e/run.py chat02
 
 quality: lint test-coverage test-e2e-mvp1 ## MVP-1 quality gate

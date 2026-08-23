@@ -4,9 +4,10 @@
 
 **产品规格：** [`2play-prod-specs.md`](./2play-prod-specs.md)  
 **设计规格：** [`2play-design.md`](./2play-design.md)（§1 视觉 + §2 架构/技术设计 + §3 逐页契约；与 mock 同步，实现须 100% 对齐）  
+**行程生成 / Progressive UX：** [`itinerary-design.md`](./itinerary-design.md)（MVP-2 as-built：discover + 本地 prompt + OPENAI_CN；**MVP-3** 目标：Mode H host prompt + 真交通 + 地标）  
 **用户故事 / AC：** [`2play-stories.md`](./2play-stories.md)（ATDD；格式对齐 2eat）  
 **测试计划：** [`2play-test-plan.md`](./2play-test-plan.md)（质量门、用例矩阵；扩展 common-test-strategy）  
-**部署（野草云3）：** [`2play-deployment-plan.md`](./2play-deployment-plan.md)（入口 [`6.deployment-plan.md`](./6.deployment-plan.md)）— stack `where2play`，宿主机 **`3005→3000`**，域名 `where2play.place`；Postgres **`where2play`**（[ADR-033](../../workspace-specs/adr/ADR-033-where2play-postgres-prisma.md)）；上游 `PLACES_AGENT_BASE_URL` / `PLACES_AGENT_CALLER_KEY`；**无** `OPENAI_*`。
+**部署（野草云3）：** [`2play-deployment-plan.md`](./2play-deployment-plan.md)（入口 [`6.deployment-plan.md`](./6.deployment-plan.md)）— stack `where2play`，宿主机 **`3005→3000`**，域名 `where2play.place`；Postgres **`where2play`**（[ADR-033](../../workspace-specs/adr/ADR-033-where2play-postgres-prisma.md)）；上游 `PLACES_AGENT_BASE_URL` / `PLACES_AGENT_CALLER_KEY`；L2/助手 `OPENAI_*` **仅 BFF 服务端**（ADR-036/037）。
 
 ## Mock-up
 

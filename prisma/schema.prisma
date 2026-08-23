@@ -23,6 +23,8 @@ model User {
   updatedAt       DateTime             @updatedAt
   interestProfile InterestProfile?
   passwordResets  PasswordResetToken[]
+  planSession     PlanSessionCache?
+  savedItineraries SavedItinerary[]
 }
 
 model InterestProfile {
@@ -44,4 +46,43 @@ model PasswordResetToken {
 
   @@index([tokenHash])
   @@index([userId])
+}
+
+model PlanSessionCache {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  criteriaJson   Json
+  itineraryJson  Json
+  updatedAt      DateTime @updatedAt
+  expiresAt      DateTime
+
+  @@index([expiresAt])
+}
+
+model SavedItinerary {
+  id          String                 @id @default(cuid())
+  userId      String
+  user        User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  destination String
+  daysCount   Int
+  coverUrl    String?
+  snapshot    Json
+  savedAt     DateTime               @default(now())
+  messages    ItineraryChatMessage[]
+
+  @@index([userId, savedAt])
+}
+
+model ItineraryChatMessage {
+  id          String         @id @default(cuid())
+  itineraryId String
+  itinerary   SavedItinerary @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+  role        String
+  content     String
+  ord         Int
+  createdAt   DateTime       @default(now())
+
+  @@index([itineraryId, ord])
 }

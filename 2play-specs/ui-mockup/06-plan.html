@@ -45,23 +45,73 @@
 
     <main id="content" class="app-main">
       <h1 class="page-title">行程规划</h1>
+                <p class="plan-mock-states" role="navigation" aria-label="Mock generate states">
+          <a href="06-plan.html" class="is-on">完成态</a>
+          <a href="06-plan-discover.html">Discover</a>
+          <a href="06-plan-arrange-highlights.html">Arrange · Highlights</a>
+          <a href="06-plan-arrange.html">Arrange · slots</a>
+          <a href="06-plan-arrange-day2.html">Arrange · Day2</a>
+        </p>
 
-      <div class="plan-stack">
+<div class="plan-stack">
         <!-- Compact planner: no section titles -->
                 <section class="panel planner-card" aria-label="Plan form">
           <div class="panel__body">
 <form class="plan-form plan-board" id="plan-form" action="06-plan.html" method="get" novalidate data-testid="plan-form">
               <div class="plan-board__grid">
-                <!-- Col A: 目的地 / 类型 / 预算 — equal gaps, last bottom-aligned with constraints -->
-                <div class="plan-board__stack">
-                  <div class="field" data-field="dest">
+                <!-- Row 1: 目的地 | 起始日期 | 天数+人数+每日起终点+时段 -->
+                <div class="field" data-field="dest">
+                  <div class="field-label-row">
+                    <label for="dest">目的地</label>
+                    <span class="req" aria-hidden="true">*</span>
+                  </div>
+                  <input id="dest" name="dest" value="台北" required data-testid="plan-dest" aria-required="true" placeholder="城市 / 区域" />
+                  <p class="field-error" hidden role="alert"></p>
+                </div>
+
+                <div class="field" data-field="start_date">
+                  <div class="field-label-row">
+                    <label for="start_date">起始日期</label>
+                    <span class="req" aria-hidden="true">*</span>
+                  </div>
+                  <input id="start_date" name="start_date" type="date" value="2026-08-22" required aria-required="true" data-testid="plan-start-date" />
+                  <p class="field-error" hidden role="alert"></p>
+                </div>
+
+                <div class="plan-when">
+                  <div class="field" data-field="days">
                     <div class="field-label-row">
-                      <label for="dest">目的地</label>
+                      <label for="days">天数</label>
                       <span class="req" aria-hidden="true">*</span>
                     </div>
-                    <input id="dest" name="dest" value="台北" required data-testid="plan-dest" aria-required="true" placeholder="城市 / 区域" />
+                    <input id="days" name="days" type="number" min="1" max="14" value="3" required aria-required="true" data-testid="plan-days" />
                     <p class="field-error" hidden role="alert"></p>
                   </div>
+                  <div class="field" data-field="party">
+                    <label for="party">人数</label>
+                    <input id="party" name="party" type="number" min="1" max="20" value="2" />
+                  </div>
+                  <div class="field" data-field="daily_start">
+                    <label for="daily_start">每日起点</label>
+                    <input id="daily_start" name="daily_start" value="西门町旅馆" placeholder="可选 · 酒店或地标" />
+                  </div>
+                  <div class="field" data-field="daily_end">
+                    <label for="daily_end">每日终点</label>
+                    <input id="daily_end" name="daily_end" placeholder="可选，不填默认与起点同" />
+                  </div>
+                  <div class="field" data-field="time_from">
+                    <label for="time_from">开始</label>
+                    <input id="time_from" name="time_from" type="time" value="09:00" />
+                  </div>
+                  <span class="plan-to" aria-hidden="true">到</span>
+                  <div class="field" data-field="time_to">
+                    <label for="time_to">结束</label>
+                    <input id="time_to" name="time_to" type="time" value="21:00" />
+                  </div>
+                </div>
+
+                <!-- Row 2: 类型+预算 | 节奏+交通 | 偏好与限制 -->
+                <div class="plan-board__stack">
                   <div class="field">
                     <label for="trip_type">类型</label>
                     <div class="combo" data-combo>
@@ -90,22 +140,7 @@
                   </div>
                 </div>
 
-                <!-- Col B: 天数+人数 / 节奏 / 交通偏好 -->
                 <div class="plan-board__stack">
-                  <div class="plan-pair">
-                    <div class="field" data-field="days">
-                      <div class="field-label-row">
-                        <label for="days">天数</label>
-                        <span class="req" aria-hidden="true">*</span>
-                      </div>
-                      <input id="days" name="days" type="number" min="1" max="14" value="3" required aria-required="true" />
-                      <p class="field-error" hidden role="alert"></p>
-                    </div>
-                    <div class="field" data-field="party">
-                      <label for="party">人数</label>
-                      <input id="party" name="party" type="number" min="1" max="20" value="2" />
-                    </div>
-                  </div>
                   <div class="field">
                     <label for="pace">节奏</label>
                     <div class="combo" data-combo>
@@ -133,49 +168,26 @@
                   </div>
                 </div>
 
-                <!-- Col C: when row + prefs (constraints bottom-aligned with budget/transport) -->
-                <div class="plan-board__right">
-                  <div class="plan-when">
-                    <div class="field" data-field="daily_start">
-                      <label for="daily_start">每日起点</label>
-                      <input id="daily_start" name="daily_start" value="西门町旅馆" placeholder="可选 · 酒店或地标" />
-                    </div>
-                    <div class="field" data-field="daily_end">
-                      <label for="daily_end">每日终点</label>
-                      <input id="daily_end" name="daily_end" placeholder="可选，不填默认与起点同" />
-                    </div>
-                    <div class="field" data-field="time_from">
-                      <label for="time_from">开始</label>
-                      <input id="time_from" name="time_from" type="time" value="09:00" />
-                    </div>
-                    <span class="plan-to" aria-hidden="true">到</span>
-                    <div class="field" data-field="time_to">
-                      <label for="time_to">结束</label>
-                      <input id="time_to" name="time_to" type="time" value="21:00" />
+                <div class="plan-prefs-block">
+                  <h3 class="plan-prefs-block__title">偏好与限制</h3>
+                  <div class="pref-scroll" role="group" aria-label="Preferences">
+                    <button type="button" class="chip is-on" data-interest="tourist_attraction">景点</button>
+                    <button type="button" class="chip is-on" data-interest="restaurant">美食</button>
+                    <button type="button" class="chip" data-interest="museum">博物馆</button>
+                    <button type="button" class="chip" data-interest="park">公园</button>
+                    <button type="button" class="chip" data-interest="place_of_worship">寺庙</button>
+                    <button type="button" class="chip is-on" data-interest="night_market">夜市</button>
+                    <button type="button" class="chip" data-interest="shopping_mall">购物</button>
+                    <button type="button" class="chip" data-interest="spa">温泉</button>
+                    <button type="button" class="chip" data-interest="natural_feature">户外</button>
+                    <div class="pref-custom">
+                      <label class="sr-only" for="interest_custom">自定义偏好</label>
+                      <input id="interest_custom" name="interest_custom" placeholder="自定义 / Custom" />
                     </div>
                   </div>
-
-                  <div class="plan-prefs-block">
-                    <h3 class="plan-prefs-block__title">偏好与限制</h3>
-                    <div class="pref-scroll" role="group" aria-label="Preferences">
-                      <button type="button" class="chip is-on" data-interest="tourist_attraction">景点</button>
-                      <button type="button" class="chip is-on" data-interest="restaurant">美食</button>
-                      <button type="button" class="chip" data-interest="museum">博物馆</button>
-                      <button type="button" class="chip" data-interest="park">公园</button>
-                      <button type="button" class="chip" data-interest="place_of_worship">寺庙</button>
-                      <button type="button" class="chip is-on" data-interest="night_market">夜市</button>
-                      <button type="button" class="chip" data-interest="shopping_mall">购物</button>
-                      <button type="button" class="chip" data-interest="spa">温泉</button>
-                      <button type="button" class="chip" data-interest="natural_feature">户外</button>
-                      <div class="pref-custom">
-                        <label class="sr-only" for="interest_custom">自定义偏好</label>
-                        <input id="interest_custom" name="interest_custom" placeholder="自定义 / Custom" />
-                      </div>
-                    </div>
-                    <div class="field field--constraints">
-                      <label for="constraints">其他限制</label>
-                      <input id="constraints" name="constraints" maxlength="500" placeholder="轮椅友好、有婴儿、避免长时间步行…" />
-                    </div>
+                  <div class="field field--constraints">
+                    <label for="constraints">其他限制</label>
+                    <input id="constraints" name="constraints" maxlength="500" placeholder="轮椅友好、有婴儿、避免长时间步行…" />
                   </div>
                 </div>
               </div>

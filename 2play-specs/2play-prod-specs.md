@@ -1,14 +1,14 @@
 # where2play — 产品规格
 
-**where2play**（`where2play.place`）产品需求。地图工具、vendor 密钥、行程引擎（`plan_itinerary`）在 **places-agent**。家族架构见 [`workspace-specs/2.architecture.md`](../../workspace-specs/2.architecture.md)；agent 能力见 [`1.places-agent/agent-specs/`](../../1.places-agent/agent-specs/)；行程引擎归属见 [ADR-008](../../workspace-specs/adr/ADR-008-itinerary-ownership.md)。设计规格见 [`2play-design.md`](./2play-design.md)。用户故事与 AC 见 [`2play-stories.md`](./2play-stories.md)。测试与质量门见 [`2play-test-plan.md`](./2play-test-plan.md)。持久化见 [ADR-033](../../workspace-specs/adr/ADR-033-where2play-postgres-prisma.md)。
+**where2play**（`where2play.place`）产品需求。地图工具、vendor 密钥、**L1 候选发现**在 **places-agent**；**L2 按天排程与行程助手**在 where2play BFF 本应用 OPENAI_CN（[ADR-036](../../workspace-specs/adr/ADR-036-where2play-assistant-quanzil.md)、[ADR-037](../../workspace-specs/adr/ADR-037-where2play-plan-l2-quanzil.md)）。家族架构见 [`workspace-specs/2.architecture.md`](../../workspace-specs/2.architecture.md)；agent 能力见 [`1.places-agent/agent-specs/`](../../1.places-agent/agent-specs/)；地图/引擎边界见 [ADR-008](../../workspace-specs/adr/ADR-008-itinerary-ownership.md)。设计规格见 [`2play-design.md`](./2play-design.md)。用户故事与 AC 见 [`2play-stories.md`](./2play-stories.md)。测试与质量门见 [`2play-test-plan.md`](./2play-test-plan.md)。持久化见 [ADR-033](../../workspace-specs/adr/ADR-033-where2play-postgres-prisma.md)。
 
 ## 产品定义
 
-帮助「不知道去哪玩」的用户：在 **个人信息（Profile）** 保存轻量出行兴趣偏好；在 **行程规划（Plan）** 填写边界后，经 places-agent **一次推荐一条行程**，同页展示 **Day-by-Day / Hour-by-hour**；页内 **单一 Chat** 随动修改当前行程；支持 **重新规划**、**保存** 到 **我的行程（Saved）**、以及 **PDF 导出**。
+帮助「不知道去哪玩」的用户：在 **个人信息（Profile）** 保存轻量出行兴趣偏好；在 **行程规划（Plan）** 填写边界后，经 BFF **一次推荐一条行程**（discover→OPENAI_CN arrange），同页展示 **Day-by-Day / Hour-by-hour**；页内 **单一 Chat** 随动修改当前行程；支持 **重新规划**、**保存** 到 **我的行程（Saved）**、以及 **PDF 导出**。
 
-**性能取舍：** 不一次生成多条行程、Plan 主路径不展示多卡短名单，以降低规划延迟与 agent 负载。
+**性能取舍：** 不一次生成多条行程、Plan 主路径不展示多卡短名单；L2 走产品 OPENAI_CN（Mode H 拉 agent prompt）+ `enrich_arrange_transit`，避免堵在 agent `execution=agent`。契约真源：[ADR-043](../../workspace-specs/adr/ADR-043-chatbox-mcp-and-cross-product-closure.md)、[`itinerary-design.md`](./itinerary-design.md)。
 
-场所与行程数据经 BFF 以 **HTTP + caller API key** 调用 places-agent。浏览器不持有 map vendor 密钥、caller key 或 LLM 密钥。
+场所与地图经 BFF 以 **HTTP + caller API key** 调用 places-agent（**discover** / search / geocode / navigate）。**初排 L2 与行程助手**由 where2play BFF 调用本应用 OPENAI_CN。浏览器不持有 map vendor 密钥、caller key 或 LLM 密钥。
 
 **不做：** 下单与支付、票务/酒店实时库存权威、与 what2eat 的 SSO、双 Chat / FAB 全局 Chat、一次多行程推荐、MVP 未保存规划 History 列表、多人实时协作、离线地图包、places-agent 管理 UI、餐厅决策（归 what2eat）。
 
@@ -20,18 +20,19 @@
 
 | 层级 | 负责 | 不负责 |
 | --- | --- | --- |
-| **Web 应用** | 账号、轻量 Profile、Plan 单页、我的行程多卡、页内 Chat UX、**localStorage 草稿 transcript**、旅行风 UI | Map adapter、agent 管理 UI、行程引擎算法 |
-| **BFF（同源）** | Session、`providers[]`、deeplink 选择、聊天编排、**保存时**将行程 + 对话快照写入 DB、PDF 导出 | Vendor 密钥；聊天每一回合强制写库 |
-| **places-agent** | `plan_itinerary`（单次一条）、`search_places`、详情、geocode、`navigate`、`sources[]`、配图、chat 工具循环 | 消费者界面、用户 Profile |
+| **Web 应用** | 账号、轻量 Profile、Plan 单页、我的行程多卡、页内 Chat UX、**localStorage 草稿 transcript**、旅行风 UI | Map adapter、agent 管理 UI |
+| **BFF（同源）** | Session、`providers[]`、deeplink 选择、**初排 L2→OPENAI_CN**、**行程助手→OPENAI_CN 流式**、可选 agent search、**保存时**将行程 + 对话快照写入 DB、PDF 导出 | Vendor 地图密钥；聊天每一回合强制写库 |
+| **places-agent** | **L1** `discover_places`、`search_*`、详情、geocode、`navigate`、`sources[]`、配图；以及 MCP/其他调用方的 `arrange_day`（含 Mode H `execution=host`）/`plan_itinerary` | 消费者界面、用户 Profile、**2play 主初排 L2 LLM 与助手**（改由 BFF OPENAI_CN） |
 
 ```text
-Browser → where2play /api/* → places-agent HTTP (/v1)
+Browser → where2play /api/plan* → BFF：agent discover → OPENAI_CN arrange×N
+Browser → where2play /api/chat → BFF OPENAI_CN（流式）；可选 agent search
 Browser localStorage ← Plan 会话 chat 草稿（未保存真源）
 App DB ← users, interest profile, 已保存行程 + 提交时的 chat 快照
 ```
 
-- BFF 仅用 **HTTP**，不用 MCP。
-- **Caller-driven vendors：** BFF 传 `providers[]`。
+- BFF 仅用 **HTTP** 调 agent（不用 MCP）。
+- **Caller-driven vendors：** BFF 传 `providers[]`（discover）。
 - **主规划路径：** 每次规划 / 重新规划返回 **一条** 行程。
 - **Chat 双存储：** 见下方「Chat」；**草稿真源 = localStorage**；**已保存快照真源 = App DB**（仅在用户点「保存」时提交）。
 

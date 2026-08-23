@@ -138,7 +138,7 @@ Do **not** add `AMAP_*`, `GOOGLE_MAPS_*`, `GMAPS_MCP_*`, `TRIPADVISOR_*`. Do **n
 | `SESSION_SECRET` | **yes** | Consumer session cookie |
 | `PLACES_AGENT_TIMEOUT_MS` | no | Default 25000 |
 
-**Not used:** `OPENAI_*` (no product Quanzil on where2play; chat/plan via places-agent).  
+**Not used:** `OPENAI_*` (no product OPENAI_CN on where2play; chat/plan via places-agent).  
 
 **Forbidden:** map vendor keys; `NEXT_PUBLIC_PLACES_AGENT_*`; reusing DB names `what2eat` / `places_agent`.
 
