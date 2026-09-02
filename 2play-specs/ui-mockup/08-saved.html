@@ -5,13 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>我的行程 — where2play.place</title>
     <link rel="icon" href="assets/favicon.png" type="image/png" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="assets/mockup.css" />
+    <link rel="stylesheet" href="assets/mockup-travor.css" />
   </head>
-  <body class="shell-app">
+  <body class="shell-app" data-style="travor">
     <a class="sr-only" href="#content">Skip to content</a>
     <header class="app-header">
       <div class="app-header__inner">
-      <a class="logo" href="06-plan.html" aria-label="where2play.place">
+      <a class="logo" href="06-plan-skeleton.html" aria-label="where2play.place">
         <span class="mark-host mark-host--plane">
           <svg class="wing-trail" viewBox="0 0 18 10" fill="none" aria-hidden="true">
             <path d="M17 2.2c-3.2.9-6.5 2.2-10 3.6C4.2 6.8 2.2 7.6 1 8.2" />
@@ -22,7 +24,7 @@
       </a>
       <button type="button" class="menu-toggle btn btn-quiet" data-testid="nav-menu">Menu</button>
       <nav class="app-nav" aria-label="Primary">
-        <a href="06-plan.html">行程规划</a>
+        <a href="06-plan-skeleton.html">行程规划</a>
         <a href="08-saved.html" class="is-active">我的行程</a>
         <a href="07-profile.html">个人信息</a>
       </nav>
@@ -60,7 +62,7 @@
           </div>
         </a>
         <a class="trip-card" href="09-saved-detail.html">
-          <img class="trip-card__media" src="assets/play-logo.png" alt="" style="object-fit:contain;padding:1.5rem;background:linear-gradient(135deg,#7eb6ce,#3d7a96)" />
+          <img class="trip-card__media" src="assets/play-logo.png" alt="" style="object-fit:contain;padding:1.5rem" />
           <div class="trip-card__body">
             <h2>京都 3 日 · 轻松</h2>
             <p class="trip-card__meta">3 days · saved 2026-08-10</p>

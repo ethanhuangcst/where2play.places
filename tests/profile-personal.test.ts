@@ -87,4 +87,40 @@ describe("/api/profile/personal", () => {
     );
     expect(res.status).toBe(400);
   });
+
+  it("TC-M11-38-04: should_read_and_write_nationality_on_profile", async () => {
+    await registerTestUser();
+    await loginTestUser();
+    await invokeRoute(
+      putPersonal,
+      authedRequest("/api/profile/personal", {
+        method: "PUT",
+        body: {
+          name: TEST_USER.name,
+          email: TEST_USER.email,
+          defaultLocation: "Beijing",
+          nationality: "CHN",
+        },
+      }),
+    );
+    const getRes = await invokeRoute(getPersonal, authedRequest("/api/profile/personal"));
+    const got = await readJson<{ nationality: string | null }>(getRes);
+    expect(got.nationality).toBe("CHN");
+
+    const putRes = await invokeRoute(
+      putPersonal,
+      authedRequest("/api/profile/personal", {
+        method: "PUT",
+        body: {
+          name: TEST_USER.name,
+          email: TEST_USER.email,
+          defaultLocation: "New York",
+          nationality: "USA",
+        },
+      }),
+    );
+    expect(putRes.status).toBe(200);
+    const updated = await readJson<{ nationality: string | null }>(putRes);
+    expect(updated.nationality).toBe("USA");
+  });
 });

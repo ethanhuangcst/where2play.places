@@ -5,9 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>创建账号 — where2play.place</title>
     <link rel="icon" href="assets/favicon.png" type="image/png" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="assets/mockup.css" />
+    <link rel="stylesheet" href="assets/mockup-travor.css" />
   </head>
-  <body class="shell-public">
+  <body class="shell-public" data-style="travor">
     <a class="sr-only" href="#content">Skip to content</a>
 
     <div class="register-shell">
@@ -65,6 +67,25 @@
                 <div class="field field--age">
                   <label for="age">年龄</label>
                   <input id="age" name="age" type="number" inputmode="numeric" min="13" max="120" />
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="nationality">国籍（护照签发国）</label>
+                <div class="combo" data-combo data-testid="register-nationality">
+                  <input id="nationality" name="nationality" type="text" role="combobox" placeholder="请选择" autocomplete="off" />
+                  <button type="button" class="combo__toggle" aria-label="打开国籍选项" aria-expanded="false"></button>
+                  <ul class="combo__list" role="listbox" aria-label="国籍" hidden>
+                    <li role="presentation"><button type="button" role="option" data-value="CHN">中国</button></li>
+                    <li role="presentation"><button type="button" role="option" data-value="HKG">中国香港</button></li>
+                    <li role="presentation"><button type="button" role="option" data-value="TWN">中国台湾</button></li>
+                    <li role="presentation"><button type="button" role="option" data-value="USA">美国</button></li>
+                    <li role="presentation"><button type="button" role="option" data-value="JPN">日本</button></li>
+                    <li role="presentation"><button type="button" role="option" data-value="KOR">韩国</button></li>
+                    <li role="presentation"><button type="button" role="option" data-value="SGP">新加坡</button></li>
+                    <li role="presentation"><button type="button" role="option" data-value="GBR">英国</button></li>
+                    <li role="presentation"><button type="button" role="option" data-value="FRA">法国</button></li>
+                  </ul>
                 </div>
               </div>
 

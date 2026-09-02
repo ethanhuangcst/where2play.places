@@ -2116,8 +2116,30 @@ html[lang^="zh"] .app-user__tools .btn {
 }
 
 .combo__list button:hover,
-.combo__list button[aria-selected="true"] {
+.combo__list button[aria-selected="true"],
+.combo__list button[data-active="true"] {
   background: var(--cloth-a);
+}
+
+/* Register / profile nationality combobox */
+.field .combo {
+  position: relative;
+  width: 100%;
+}
+
+.field .combo input {
+  width: 100%;
+  padding-right: 2.25rem;
+}
+
+.field .combo__list {
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
+.field.is-invalid .combo input {
+  border-color: var(--alert);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--alert) 35%, transparent);
 }
 
 .combo.is-open {

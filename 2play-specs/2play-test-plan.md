@@ -143,8 +143,8 @@ MVP-1 不调 agent，但仍需真实 DB、真实 session、真实邮件路径（
 | Story | 单元 / 契约（Fast CI） | Live / E2E | 用户确认 | Story 可标 Done？ |
 | --- | --- | --- | --- | --- |
 | **34** `plan-14` | TC-M3r-34-\*（下表） | 手测一次 live 排程首块 = timeFrom ±5min | 必须 | Done |
-| **35** `plan-15` | TC-M3r-35-\*（下表） | live 抽查里斯本首末段真实交通 | 必须 | To-do |
-| **36** `plan-16` | TC-M3r-36-\*（下表） | 整批收尾 live 对照 5 症状 | 必须 | To-do |
+| **35** `plan-15` | —（**Superseded** → MVP-10） | — | — | Superseded |
+| **36** `plan-16` | TC-M3r-36-\*（下表） | 整批收尾 live 对照 5 症状 | 必须 | Done |
 
 #### TC-M3r-34（plan-14）
 
@@ -165,6 +165,52 @@ MVP-1 不调 agent，但仍需真实 DB、真实 session、真实邮件路径（
 | TC-M3r-35-03 | Unit | geocode 缓存：同 trip 内同 origin 第二次不重复调 agent（mock fetch 计数） | `tests/plan-enrich-transit.test.ts` |
 | TC-M3r-35-04 | Unit | geocode 失败：origin 段显示 i18n key「无法定位起点」，不伪造交通时长；其余站间不受影响 | `tests/plan-enrich-transit.test.ts` |
 | TC-M3r-35-05 | Unit | destination 同理：name → geocode → `to_destination` 真实时长/方式 | `tests/plan-enrich-transit.test.ts` |
+
+#### TC-M3r-36（plan-16）
+
+| ID | 类型 | 主题 | 文件 |
+| --- | --- | --- | --- |
+| TC-M3r-36-01 | Unit | `blockSchema` 保留 `from_origin`/`to_destination`/`legs_to_here`：Zod parse 后字段存在，进入 `expandArrangeDayToSlots` | `tests/expand-arrange-slots.test.ts`（扩展） |
+| TC-M3r-36-02 | Unit | enrich 失败显式 `transit_outcome: "partial"`：UI 不静默吞，标注降级原因（i18n key） | `tests/plan-enrich-transit.test.ts`（扩展） |
+| TC-M3r-36-03 | Unit | 2play 侧站间时序校验（AC5）：blocks 含 legs_to_here，gap < transit − 5min → 触发一次重试；重试仍违规则硬失败 | `tests/plan-arrange-llm.test.ts`（扩展） |
+| TC-M3r-36-04 | Unit | 2play 侧同日餐厅去重（AC6）：lunch/dinner 同名 → 触发一次重试；重试仍违规则硬失败 | `tests/plan-arrange-llm.test.ts`（扩展） |
+| TC-M3r-36-05 | Unit | `expandArrangeDayToSlots` 混合 legs：有 `legs_to_here` 用真实时长/方式；无则 `estimateTransferMin` 兜底 | `tests/expand-arrange-slots.test.ts`（扩展） |
+
+**注（2026-08-31）：** plan-15（35）**Superseded** — geocode/首末段并入 MVP-10 plan-46；TC-M3r-35-* 不再作为独立 story 门禁，等价覆盖见 TC-M10-46-04 / TC-M10-44-04。
+
+### MVP-10 — plan-46 轻骨架消费端（2026-08-31 方案确定）
+
+**真源：** `[2play-stories.md](./2play-stories.md)` #37 · `[itinerary-design.md §16–17](./itinerary-design.md)` · `[2play-design.md §4.7](./2play-design.md)` · agent `[0.refactor-plan.md](../../1.places-agent/agent-specs/0.refactor-plan.md)` 批次 11。
+
+| 门禁 | 要求 |
+| --- | --- |
+| 功能 | **37** plan-46：5 字段 + Travor UI + 悬浮助手 + 新 BFF 管线（make_itinerary → plan_next_stop/display_current_stop） |
+| 依赖 | agent Feature **44**（可 stub NDJSON 联调 UI） |
+| Live | Lisbon 4D：首 stop < 30s，总 < 90s |
+| Mock 对齐 | `ui-mockup/06-plan*.html` + Playwright 静态 file:// 或 prod 联调 |
+
+| Story | 单元 / 契约 | E2E | 用户确认 | Done？ |
+| --- | --- | --- | --- | --- |
+| **37** plan-46 | TC-M10-46-* | TC-M10-E2E-* | 必须 | ToDo |
+
+#### TC-M10-46（plan-46 BFF + UI）
+
+| ID | 类型 | 主题 | 文件（目标） |
+| --- | --- | --- | --- |
+| TC-M10-46-01 | Unit | BFF 不再调用 `streamArrangeDay` / OPENAI_CN arrange | `tests/plan-day-by-day.test.ts` 改写 |
+| TC-M10-46-02 | Unit | NDJSON 客户端：`skeleton_day` → `stop_filled` 序列 | `tests/plan-stream-client.test.ts` |
+| TC-M10-46-03 | Unit | 起点 Stay stop 映射；transit 单行双 mode 结构 | `tests/itinerary-map.test.ts` |
+| TC-M10-46-04 | Unit | origin geocode 失败 → i18n 降级，不伪造时长 | `tests/plan-enrich-transit.test.ts` 迁移 |
+| TC-M10-46-05 | Component | panel 头三按钮存在；无 bottom sticky bar | `tests/plan-page.test.tsx` |
+
+#### TC-M10-E2E（Playwright）
+
+| ID | 类型 | 主题 |
+| --- | --- | --- |
+| TC-M10-E2E-01 | E2E | 5 字段 → 助手 8 步（含默认跳过）→ 骨架预览可见 |
+| TC-M10-E2E-02 | E2E | 首屏出现 `stop-origin` + 至少一条 transit-line |
+| TC-M10-E2E-03 | E2E | 终止问答 → 确认弹窗（4 i18n key） |
+| TC-M10-E2E-04 | E2E | `prefers-reduced-motion` 无 shimmer 回归 |
 
 ### MVP-4 — Chat 双存储
 
@@ -388,6 +434,49 @@ Agent 层 live 探针细节见 places-agent 测试文档 — 此处不重复 TC 
 ## §10 失败处理
 
 修生产代码或错误测试；不得删/ skip AC 测试换绿。反模式：硬编码行程、仅用单测签 MVP-2、把每轮 chat 写入 DB、把 `make test` fixture 绿当作 live 诚实、用 mockup HTML 冒充产品 DoD。
+
+---
+
+## §10a MVP-11 — 国籍字段 + 出行建议占位（2026-09-01 规格确定）
+
+**真源：** [ADR-044](../../workspace-specs/adr/ADR-044-orizn-visa-rest-adapter.md) · `[2play-stories.md](./2play-stories.md)` Feature **38–39** · agent Feature **48** · `[2play-design.md](./2play-design.md)` §3.2/§3.4/§3.5.6。
+
+| Story | Feature | 单元 / 契约（Fast CI） | E2E | Story 可标 Done？ |
+| --- | --- | --- | --- | --- |
+| **38** profile-03 | 国籍下拉 + DB | TC-M11-38-* | TC-M11-38-E2E | ToDo |
+| **39** plan-47 | spec + mock 占位 | 文档/mock 抽检 | — | ToDo（spec only） |
+
+**MVP DoD 增量（Feature 38）：**
+
+1. 注册/资料页含国籍下拉；四 locale i18n key。
+2. Prisma `User.nationality String?` + 迁移；注册/PUT profile API 持久化。
+3. 非法 alpha-3 拒绝；空值存 `null`。
+4. **不**在本 MVP 开发 visa 查询 UI（Feature 39 仅占位）。
+
+#### TC-M11-38（profile-03 nationality）
+
+| ID | 类型 | 主题 | 文件（目标） |
+| --- | --- | --- | --- |
+| TC-M11-38-01 | Unit | `register-validation`：非法 nationality → `play.errors.nationality_invalid` | `tests/register-validation.test.ts` |
+| TC-M11-38-02 | Unit | 合法 alpha-3（`CHN`）通过客户端校验 | 同上 |
+| TC-M11-38-03 | Integration | `POST /api/auth/register` body 含 `nationality: "CHN"` → DB 持久化 | `tests/api-register.test.ts` |
+| TC-M11-38-04 | Integration | `GET/PUT /api/profile/personal` 读写 `nationality` | `tests/api-profile.test.ts` |
+| TC-M11-38-05 | Component | 注册页渲染 `data-testid="register-nationality"` select | `tests/register-page.test.tsx`（若存在）或 E2E |
+| TC-M11-38-06 | i18n | `play.register.nationality` / `play.profile.nationality` 四 locale 存在 | `tests/i18n-catalog.test.ts` |
+
+#### TC-M11-38-E2E（Playwright，MVP-11 签收）
+
+| ID | 步骤摘要 |
+| --- | --- |
+| TC-M11-38-E2E-01 | 注册选国籍 CHN → 登录 → 资料页仍为 CHN → 改 USA → 保存 → 刷新仍为 USA |
+| TC-M11-38-E2E-02 | 注册跳过国籍 → DB null → 资料页显示「请选择」 |
+
+#### TC-M11-39（plan-47 spec placeholder）
+
+| ID | 类型 | 主题 |
+| --- | --- | --- |
+| TC-M11-39-01 | 文档 | `[2play-design.md](./2play-design.md)` §3.5.6 含 BFF 契约与 i18n key 列表 |
+| TC-M11-39-02 | Mock | `ui-mockup/10-travel-advice.html` 含 `.visa-advice` 区块 |
 
 ---
 

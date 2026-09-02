@@ -1,7 +1,7 @@
 # Plan progressive NDJSON (discover → arrange)
 
-**Date:** 2026-08-21  
-**Status:** accepted — row-by-row arrange + wait motion
+**Date:** 2026-08-21 · **Updated:** 2026-08-31  
+**Status:** accepted — **as-built** Mode H row-by-row arrange + wait motion. **MVP-10 目标** 见 [`itinerary-design.md §16.2`](../itinerary-design.md)（`skeleton_*` / `stop_filled`，退役 staged sleep）。
 
 ## BFF → UI events
 
@@ -30,4 +30,4 @@ Highlights-before-first-place is BFF staging (`day_highlights` before agent stre
 
 - Arrange is LLM-bound (~45s timeout × retries). BFF falls back to batch `arrangeDay` when stream yields no blocks.
 - MCP tools remain batch JSON; progressive is HTTP-only (ADR-032 #5).
-- Mock SoT: `06-plan.html`, `06-plan-discover.html`, `06-plan-arrange-highlights.html`, `06-plan-arrange.html`, `06-plan-arrange-day2.html`. Live route: `/plan`.
+- Mock SoT（MVP-10）：`06-plan.html`, `06-plan-skeleton.html`, `06-plan-qa.html`. Legacy arrange mocks 已删除。Live route: `/plan`.

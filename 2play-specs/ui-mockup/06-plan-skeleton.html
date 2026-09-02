@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>行程规划 · 骨架填充 — where2play.place</title>
+    <link rel="icon" href="assets/favicon.png" type="image/png" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+    <link rel="stylesheet" href="assets/mockup.css" />
+    <link rel="stylesheet" href="assets/mockup-travor.css" />
+    <style>
+      .plan-mock-states a[href="06-plan-skeleton.html"] { color: var(--glaze); }
+    </style>
+  </head>
+  <body class="shell-app" data-style="travor">
+    <a class="sr-only" href="#content">Skip to content</a>
+    <header class="app-header">
+      <div class="app-header__inner">
+      <a class="logo" href="06-plan-skeleton.html" aria-label="where2play.place">
+        <span class="mark-host mark-host--plane">
+          <svg class="wing-trail" viewBox="0 0 18 10" fill="none" aria-hidden="true">
+            <path d="M17 2.2c-3.2.9-6.5 2.2-10 3.6C4.2 6.8 2.2 7.6 1 8.2" />
+          </svg>
+          <img class="mark mark--plane" src="assets/play-logo.png" alt="" width="40" height="40" />
+        </span>
+        <span class="logo-word">where2play.place</span>
+      </a>
+      <button type="button" class="menu-toggle btn btn-quiet" data-testid="nav-menu">Menu</button>
+      <nav class="app-nav" aria-label="Primary">
+        <a href="06-plan-skeleton.html" class="is-active">行程规划</a>
+        <a href="08-saved.html">我的行程</a>
+        <a href="07-profile.html">个人信息</a>
+      </nav>
+      <div class="app-user">
+        <span class="hello">你好，</span>
+        <span class="avatar" aria-hidden="true" title="Mei"><img src="assets/play-logo.png" alt="" /></span>
+        <span class="hello hello--name">Mei</span>
+        <div class="app-user__tools">
+          <div class="locale-switch" role="group" aria-label="Locale">
+            <button type="button">EN</button>
+            <button type="button" class="is-on">CN</button>
+            <button type="button">HK</button>
+            <button type="button">TW</button>
+          </div>
+          <a class="btn btn-quiet" href="01-home.html">登出</a>
+        </div>
+      </div>
+          </div>
+    </header>
+
+    <main id="content" class="app-main">
+      <h1 class="page-title">行程规划</h1>
+      <p class="plan-mock-states" role="navigation" aria-label="Mock generate states">
+        <a href="06-plan.html">起飞条</a>
+        <a href="06-plan-skeleton.html" class="is-on">骨架填充</a>
+        <a href="06-plan-qa.html">助手问答</a>
+      </p>
+
+      <div class="plan-stack">
+        <!-- 出行限制（只读） -->
+        <section class="panel planner-card plan-constraints" data-testid="plan-constraints" aria-labelledby="constraints-title">
+          <div class="panel__head">
+            <h2 id="constraints-title">出行限制</h2>
+          </div>
+          <div class="panel__body">
+            <dl class="constraint-grid">
+              <div class="constraint-item">
+                <dt>目的地</dt>
+                <dd>里斯本</dd>
+              </div>
+              <div class="constraint-item">
+                <dt>起始日期</dt>
+                <dd>2026-09-20</dd>
+              </div>
+              <div class="constraint-item">
+                <dt>天数</dt>
+                <dd>4</dd>
+              </div>
+              <div class="constraint-item">
+                <dt>人数</dt>
+                <dd>2</dd>
+              </div>
+              <div class="constraint-item">
+                <dt>预算</dt>
+                <dd>$$ 中等</dd>
+              </div>
+            </dl>
+          </div>
+        </section>
+
+        <!-- 出行小贴士 -->
+        <section class="panel plan-travel-tips" data-testid="plan-travel-tips" aria-labelledby="travel-tips-title">
+          <div class="panel__head plan-travel-tips__head">
+            <div class="plan-travel-tips__head-main">
+              <h2 id="travel-tips-title">出行小贴士</h2>
+              <span class="plan-travel-tips__meta">2026-09-20 至 09-23 · 里斯本</span>
+            </div>
+            <button type="button" class="panel-fold-btn" data-testid="plan-travel-tips-toggle" aria-expanded="true" aria-controls="travel-tips-body" aria-label="隐藏出行小贴士">
+              <svg class="panel-fold-btn__icon" viewBox="0 0 20 20" width="18" height="18" fill="none" aria-hidden="true">
+                <path d="M5 12l5-5 5 5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+          <div class="panel__body plan-travel-tips__body" id="travel-tips-body">
+            <div class="travel-tips-grid">
+              <article class="travel-tips-card">
+                <header class="travel-tips-card__head">
+                  <span class="travel-tips-card__idx" aria-hidden="true">01</span>
+                  <h3 class="travel-tips-card__title">签证与目的地</h3>
+                </header>
+                <p class="travel-tips-card__lead">
+                  <span class="travel-tips-visa-wrap">
+                    <a href="10-travel-advice.html" class="travel-tips-visa-link" data-testid="plan-visa-link">中国护照 · 葡萄牙签证要求</a>
+                    <span class="travel-tips-popover" role="tooltip">
+                      <strong>申根短期签证</strong>
+                      持中国护照以旅游为目的入境葡萄牙，通常需提前办妥申根签证；单次停留不超过 90 天。有效多国签证或居留许可者，请核对剩余停留天数与入境次数。
+                      <span class="travel-tips-popover__src">数据来源 · Orizn Visa</span>
+                    </span>
+                  </span>
+                </p>
+                <p class="travel-tips-intro">七座山丘上的大西洋港城，电车与瓷砖立面交织，贝伦到阿尔法玛都适合慢走。</p>
+                <ol class="travel-tips-must-see">
+                  <li>贝伦塔</li>
+                  <li>热罗尼莫斯修道院</li>
+                  <li>圣若热城堡</li>
+                </ol>
+              </article>
+
+              <article class="travel-tips-card">
+                <header class="travel-tips-card__head">
+                  <span class="travel-tips-card__idx" aria-hidden="true">02</span>
+                  <h3 class="travel-tips-card__title">天气与交通</h3>
+                </header>
+                <p>9 月下旬日均 22–26°C，早晚微凉；大西洋侧偶发阵雨，午后多晴朗。</p>
+                <p class="travel-tips-sub">地铁与 15/28 路电车覆盖核心景区；建议购 Viva Viagem / Zapping 卡；老城坡多，步行请预留缓冲时间。</p>
+              </article>
+
+              <article class="travel-tips-card">
+                <header class="travel-tips-card__head">
+                  <span class="travel-tips-card__idx" aria-hidden="true">03</span>
+                  <h3 class="travel-tips-card__title">衣着建议</h3>
+                </header>
+                <p>轻薄长袖 + 可脱外套；备折叠伞或轻便雨衣。海边与观景台风大，日落前加一层更稳妥。</p>
+                <p class="travel-tips-sub">石板路与电车台阶多，穿防滑、跟脚的运动鞋或休闲鞋。</p>
+              </article>
+
+              <article class="travel-tips-card">
+                <header class="travel-tips-card__head">
+                  <span class="travel-tips-card__idx" aria-hidden="true">04</span>
+                  <h3 class="travel-tips-card__title">安全提示</h3>
+                </header>
+                <p>热门景点与 28 路电车上留意扒手；背包前置、勿露贵重物。夜间阿尔法玛窄巷结伴而行。</p>
+                <p class="travel-tips-sub">紧急电话 112；中国驻葡萄牙使馆领保 +351-963-110-599（备用）。</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <p class="plan-phase is-busy" data-testid="plan-phase" role="status">
+          <span class="plan-phase__meta" data-testid="plan-updated">骨架 14:31 · 填充中</span>
+          <span class="plan-phase__msg">正在规划第 1/4 天 · 骨架已生成，逐站填充中…</span>
+        </p>
+
+        <!-- 骨架 → 逐站填充列表 -->
+        <section class="panel" aria-labelledby="itin-title">
+          <div class="panel__head panel__head--itin">
+            <h2 id="itin-title">里斯本四日游</h2>
+            <div class="panel__head-actions">
+              <button type="button" class="btn btn-danger" data-testid="replan-open">重新规划</button>
+              <button type="button" class="btn btn-quiet" data-testid="plan-save">保存行程</button>
+              <button type="button" class="btn" data-testid="plan-export">导出 PDF</button>
+            </div>
+          </div>
+          <div class="panel__body">
+            <div class="day-tabs" role="tablist" aria-label="Days">
+              <button type="button" class="day-tab is-on" data-day="1" role="tab" aria-selected="true">Day 1</button>
+              <button type="button" class="day-tab" data-day="2" role="tab" aria-selected="false">Day 2</button>
+              <button type="button" class="day-tab" data-day="3" role="tab" aria-selected="false">Day 3</button>
+              <button type="button" class="day-tab day-tab--queued" data-day="4" role="tab" aria-selected="false">Day 4 · 排队</button>
+            </div>
+
+            <div data-day-panel="1">
+              <div class="highlights">
+                <p class="highlights__label">Highlights</p>
+                <h3 class="highlights__title">贝伦塔 · 热罗尼莫斯 · 蛋挞老店</h3>
+                <p class="highlights__theme">主题：Belém 经典 · 河口地标 · 甜点</p>
+              </div>
+
+              <!-- 已填充：第一站酒店（标准 stop）+ 站间交通 + 贝伦塔 -->
+              <div class="slot is-entering" data-testid="stop-origin">
+                <div class="slot-time">09:30</div>
+                <div class="slot-body">
+                  <a class="slot-thumb-link" href="#" target="_blank" rel="noopener noreferrer"><img class="slot-thumb" src="assets/play-logo.png" alt="" /></a>
+                  <div class="slot-main">
+                    <div class="slot-copy">
+                      <span class="slot-kind">Stay</span>
+                      <h3>Hills Hotel Lisboa</h3>
+                      <p>每日起点；Marquês de Pombal 附近，电车与公交方便。</p>
+                    </div>
+                    <div class="slot-actions"><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">详情</a><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">地图</a></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="slot slot--transit is-entering">
+                <div class="slot-time">09:35</div>
+                <div class="slot-body">
+                  <p class="transit-line">
+                    <span class="transit-from">从 · <span class="transit-place">Hills Hotel</span></span>
+                    <span class="transit-to">前往 · <span class="transit-place">贝伦塔</span>：</span>
+                    <span class="transit-option transit-option--rec"><span class="transit-bracket">[</span><span class="transit-mode">15路电车 xx站-xx站</span><span class="transit-sep">|</span><span class="transit-dur">35min</span><span class="transit-sep">|</span><span class="transit-cost">$</span><span class="transit-bracket">]</span></span>
+                    <span class="transit-divider">/</span>
+                    <span class="transit-option"><span class="transit-bracket">[</span><span class="transit-mode">打车</span><span class="transit-sep">|</span><span class="transit-dur">15min</span><span class="transit-sep">|</span><span class="transit-cost">$$</span><span class="transit-bracket">]</span></span>
+                  </p>
+                </div>
+              </div>
+
+              <div class="slot is-entering" data-testid="stop-belem">
+                <div class="slot-time">10:15–12:00</div>
+                <div class="slot-body">
+                  <a class="slot-thumb-link" href="#" target="_blank" rel="noopener noreferrer"><img class="slot-thumb" src="assets/play-logo.png" alt="" /></a>
+                  <div class="slot-main">
+                    <div class="slot-copy">
+                      <span class="slot-kind">Landmark</span>
+                      <h3>贝伦塔</h3>
+                      <p>河口要塞地标；登塔看特茹河出海口。</p>
+                    </div>
+                    <div class="slot-actions"><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">详情</a><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">地图</a></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 骨架剩余（无时间）+ pending -->
+              <div class="skeleton-day">
+                <p class="skeleton-stop skeleton-stop--filled"><span class="skeleton-stop__idx">00</span><span class="skeleton-stop__name">Hills Hotel Lisboa</span><span class="skeleton-stop__slot">起点</span></p>
+                <p class="skeleton-stop skeleton-stop--filled"><span class="skeleton-stop__idx">01</span><span class="skeleton-stop__name">贝伦塔</span></p>
+                <p class="skeleton-stop is-pending" aria-live="polite"><span class="skeleton-stop__idx">02</span><span class="skeleton-stop__name">热罗尼莫斯修道院</span><span class="skeleton-stop__slot">下一站填充中…</span></p>
+                <p class="skeleton-stop skeleton-stop--meal"><span class="skeleton-stop__idx">03</span><span class="skeleton-stop__name">Pastéis de Belém</span><span class="skeleton-stop__slot">午餐</span></p>
+                <p class="skeleton-stop"><span class="skeleton-stop__idx">04</span><span class="skeleton-stop__name">发现者纪念碑</span></p>
+                <p class="skeleton-stop"><span class="skeleton-stop__idx">05</span><span class="skeleton-stop__name">贝伦文化区散步</span></p>
+                <p class="skeleton-stop skeleton-stop--meal"><span class="skeleton-stop__idx">06</span><span class="skeleton-stop__name">Time Out Market</span><span class="skeleton-stop__slot">晚餐</span></p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- 悬浮领航员收起态 -->
+    <button type="button" class="plan-nav-launch is-hidden" data-testid="plan-nav-open" aria-controls="plan-nav" aria-expanded="true">
+      <span class="mark-host plan-nav-launch__mark">
+        <img class="mark" src="assets/play-logo.png" alt="" width="28" height="28" />
+      </span>
+      <span>行程助手</span>
+    </button>
+
+    <!-- 悬浮领航员（骨架填充态，展开） -->
+    <aside class="plan-nav is-open" id="plan-nav" data-testid="plan-nav" aria-label="行程助手">
+      <div class="plan-nav__panel">
+        <div class="plan-nav__rail" aria-hidden="true"><span class="plan-nav__rail-fill"></span></div>
+        <header class="plan-nav__head">
+          <button type="button" class="plan-nav__resize" data-testid="plan-nav-resize" aria-label="拖动调整助手尺寸" title="拖动调整宽高">
+            <svg class="plan-nav__resize-icon" viewBox="0 0 20 20" width="18" height="18" fill="none" aria-hidden="true">
+              <path d="M8 4H4v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M4 4l4.5 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+              <path d="M12 16h4v-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M16 16l-4.5-4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <div class="plan-nav__head-copy">
+            <h2 class="plan-nav__title">行程助手</h2>
+            <p class="plan-nav__context">里斯本 · 4 天 · 2 人 · $$</p>
+          </div>
+          <div class="plan-nav__head-actions">
+            <button type="button" class="panel-fold-btn" data-testid="plan-nav-close" data-nav-action="collapse" aria-label="收起行程助手" title="收起">
+              <svg class="panel-fold-btn__icon" viewBox="0 0 20 20" width="18" height="18" fill="none" aria-hidden="true">
+                <path d="M5 12l5-5 5 5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+        </header>
+        <div class="plan-nav__body">
+          <div class="plan-nav__thread">
+            <div class="msg-group msg-group--agent">
+              <p class="msg-group__line">现在我了解您的要求了，让我帮您推荐适合的行程。</p>
+              <p class="msg-group__line">骨架已生成，正在逐站填充（第 3/7 站）：</p>
+            </div>
+          </div>
+          <div class="skeleton-day">
+            <p class="skeleton-day__theme">D1 · Belém 经典</p>
+            <p class="skeleton-stop skeleton-stop--filled"><span class="skeleton-stop__idx">00</span><span class="skeleton-stop__name">Hills Hotel Lisboa</span><span class="skeleton-stop__slot">起点</span></p>
+            <p class="skeleton-stop skeleton-stop--filled"><span class="skeleton-stop__idx">01</span><span class="skeleton-stop__name">贝伦塔</span></p>
+            <p class="skeleton-stop is-pending"><span class="skeleton-stop__idx">02</span><span class="skeleton-stop__name">热罗尼莫斯修道院</span></p>
+            <p class="skeleton-stop skeleton-stop--meal"><span class="skeleton-stop__idx">03</span><span class="skeleton-stop__name">Pastéis de Belém</span><span class="skeleton-stop__slot">午餐</span></p>
+            <p class="skeleton-stop"><span class="skeleton-stop__idx">04</span><span class="skeleton-stop__name">发现者纪念碑</span></p>
+            <p class="skeleton-stop"><span class="skeleton-stop__idx">05</span><span class="skeleton-stop__name">贝伦文化区散步</span></p>
+            <p class="skeleton-stop skeleton-stop--meal"><span class="skeleton-stop__idx">06</span><span class="skeleton-stop__name">Time Out Market</span><span class="skeleton-stop__slot">晚餐</span></p>
+          </div>
+          <div class="skeleton-day">
+            <p class="skeleton-day__theme">D2 · 老城 Alfama</p>
+            <p class="skeleton-stop"><span class="skeleton-stop__idx">01</span><span class="skeleton-stop__name">圣若热城堡</span></p>
+            <p class="skeleton-stop"><span class="skeleton-stop__idx">02</span><span class="skeleton-stop__name">阿尔法玛街区</span></p>
+            <p class="skeleton-stop skeleton-stop--meal"><span class="skeleton-stop__idx">03</span><span class="skeleton-stop__name">圣露西亚观景台咖啡</span><span class="skeleton-stop__slot">下午茶</span></p>
+          </div>
+        </div>
+        <form class="chat-composer" action="06-plan-skeleton.html" method="get">
+          <label class="sr-only" for="nav-input">Message</label>
+          <input id="nav-input" name="q" placeholder="填充完成后可继续调整…" data-testid="plan-nav-input" />
+          <button class="btn" type="submit" data-testid="plan-nav-send">发送</button>
+        </form>
+      </div>
+    </aside>
+
+    <!-- 重提交确认弹窗 -->
+    <div class="dialog-backdrop" data-testid="replan-dialog" aria-hidden="true" role="presentation">
+      <div class="dialog" role="alertdialog" aria-labelledby="replan-title" aria-describedby="replan-desc">
+        <h2 id="replan-title">开始新的行程规划？</h2>
+        <p id="replan-desc">这将停止当前规划并重新开始。继续吗？</p>
+        <div class="dialog__actions">
+          <button type="button" class="btn btn-quiet" data-testid="replan-cancel">继续规划</button>
+          <button type="button" class="btn" data-testid="replan-confirm">重新开始</button>
+        </div>
+      </div>
+    </div>
+
+    <footer class="family-footer family-footer--app">
+      <div class="family-footer__inner">
+        <nav class="family-footer__row" aria-label="places.family">
+          <span class="family-footer__label">places.family:</span>
+          <span class="family-footer__current"><img src="assets/play-logo.png" alt="" width="18" height="18" /><span>where2play.place</span></span>
+          <span class="family-footer__sep" aria-hidden="true">·</span>
+          <a class="family-footer__link" href="../../../2.what2eat/2eat-specs/ui-mockup/01-home.html" target="_blank" rel="noopener noreferrer"><img src="assets/food-logo.png" alt="" width="18" height="18" /><span>what2eat.food</span></a>
+          <span class="family-footer__sep" aria-hidden="true">·</span>
+          <a class="family-footer__link" href="../../../1.places-agent/agent-specs/ui-mockup/01-home.html" target="_blank" rel="noopener noreferrer"><img src="assets/agent-logo.png" alt="" width="18" height="18" /><span>places.agent-mate.ai</span></a>
+        </nav>
+        <span class="family-footer__copy">copyright © Ethan Huang</span>
+      </div>
+    </footer>
+    <script src="assets/mockup.js"></script>
+  </body>
+</html>

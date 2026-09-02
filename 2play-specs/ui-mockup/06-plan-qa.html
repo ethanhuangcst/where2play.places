@@ -3,20 +3,20 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>行程规划 · 起飞条 — where2play.place</title>
+    <title>行程规划 · 助手问答 — where2play.place</title>
     <link rel="icon" href="assets/favicon.png" type="image/png" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="assets/mockup.css" />
     <link rel="stylesheet" href="assets/mockup-travor.css" />
     <style>
-      .plan-mock-states a[href="06-plan.html"] { color: var(--glaze); }
+      .plan-mock-states a[href="06-plan-qa.html"] { color: var(--glaze); }
     </style>
   </head>
   <body class="shell-app" data-style="travor">
     <a class="sr-only" href="#content">Skip to content</a>
     <header class="app-header">
       <div class="app-header__inner">
-      <a class="logo" href="06-plan.html" aria-label="where2play.place">
+      <a class="logo" href="06-plan-qa.html" aria-label="where2play.place">
         <span class="mark-host mark-host--plane">
           <svg class="wing-trail" viewBox="0 0 18 10" fill="none" aria-hidden="true">
             <path d="M17 2.2c-3.2.9-6.5 2.2-10 3.6C4.2 6.8 2.2 7.6 1 8.2" />
@@ -27,7 +27,7 @@
       </a>
       <button type="button" class="menu-toggle btn btn-quiet" data-testid="nav-menu">Menu</button>
       <nav class="app-nav" aria-label="Primary">
-        <a href="06-plan.html" class="is-active">行程规划</a>
+        <a href="06-plan-qa.html" class="is-active">行程规划</a>
         <a href="08-saved.html">我的行程</a>
         <a href="07-profile.html">个人信息</a>
       </nav>
@@ -51,78 +51,44 @@
     <main id="content" class="app-main">
       <h1 class="page-title">行程规划</h1>
       <p class="plan-mock-states" role="navigation" aria-label="Mock generate states">
-        <a href="06-plan.html" class="is-on">起飞条</a>
+        <a href="06-plan.html">起飞条</a>
         <a href="06-plan-skeleton.html">骨架填充</a>
-        <a href="06-plan-qa.html">助手问答</a>
+        <a href="06-plan-qa.html" class="is-on">助手问答</a>
       </p>
 
       <div class="plan-stack">
-        <!-- §12 起飞条：单行五格（初始态） -->
-        <section class="panel planner-card" aria-label="Plan form">
+        <!-- 出行限制（只读，助手接管中） -->
+        <section class="panel planner-card plan-constraints" data-testid="plan-constraints" aria-labelledby="constraints-title">
+          <div class="panel__head">
+            <h2 id="constraints-title">出行限制</h2>
+          </div>
           <div class="panel__body">
-            <form class="plan-form" id="plan-form" action="06-plan-qa.html" method="get" novalidate data-testid="plan-form">
-              <div class="plan-takeoff">
-                <div class="field" data-field="dest">
-                  <div class="field-label-row">
-                    <label for="dest">目的地</label>
-                    <span class="req" aria-hidden="true">*</span>
-                  </div>
-                  <input id="dest" name="dest" value="里斯本" required data-testid="plan-dest" aria-required="true" placeholder="城市 / 区域" />
-                  <p class="field-error" hidden role="alert"></p>
-                </div>
-
-                <div class="field" data-field="start_date">
-                  <div class="field-label-row">
-                    <label for="start_date">起始日期</label>
-                    <span class="req" aria-hidden="true">*</span>
-                  </div>
-                  <input id="start_date" name="start_date" type="date" value="2026-09-20" required aria-required="true" data-testid="plan-start-date" />
-                  <p class="field-error" hidden role="alert"></p>
-                </div>
-
-                <div class="field" data-field="days">
-                  <div class="field-label-row">
-                    <label for="days">天数</label>
-                    <span class="req" aria-hidden="true">*</span>
-                  </div>
-                  <input id="days" name="days" type="number" min="1" max="14" value="4" required aria-required="true" data-testid="plan-days" />
-                  <p class="field-error" hidden role="alert"></p>
-                </div>
-
-                <div class="field" data-field="party">
-                  <div class="field-label-row">
-                    <label for="party">人数</label>
-                    <span class="req" aria-hidden="true">*</span>
-                  </div>
-                  <input id="party" name="party" type="number" min="1" max="20" value="2" required aria-required="true" data-testid="plan-party" />
-                  <p class="field-error" hidden role="alert"></p>
-                </div>
-
-                <div class="field" data-field="budget">
-                  <div class="field-label-row">
-                    <label for="budget">预算</label>
-                    <span class="req" aria-hidden="true">*</span>
-                  </div>
-                  <select id="budget" name="budget" required aria-required="true" data-testid="plan-budget">
-                    <option value="$ 经济">$ 经济</option>
-                    <option value="$$ 中等" selected>$$ 中等</option>
-                    <option value="$$$ 舒适">$$$ 舒适</option>
-                  </select>
-                  <p class="field-error" hidden role="alert"></p>
-                </div>
-
-                <div class="plan-takeoff__actions">
-                  <div class="field">
-                    <label class="sr-only" for="plan-submit-host">规划行程</label>
-                    <button class="btn" type="submit" form="plan-form" data-testid="plan-submit" id="plan-submit-host">规划行程</button>
-                  </div>
-                </div>
+            <dl class="constraint-grid">
+              <div class="constraint-item">
+                <dt>目的地</dt>
+                <dd>里斯本</dd>
               </div>
-            </form>
+              <div class="constraint-item">
+                <dt>起始日期</dt>
+                <dd>2026-09-20</dd>
+              </div>
+              <div class="constraint-item">
+                <dt>天数</dt>
+                <dd>4</dd>
+              </div>
+              <div class="constraint-item">
+                <dt>人数</dt>
+                <dd>2</dd>
+              </div>
+              <div class="constraint-item">
+                <dt>预算</dt>
+                <dd>$$ 中等</dd>
+              </div>
+            </dl>
           </div>
         </section>
 
-        <!-- 出行小贴士（目的地已填） -->
+        <!-- 出行小贴士 -->
         <section class="panel plan-travel-tips" data-testid="plan-travel-tips" aria-labelledby="travel-tips-title">
           <div class="panel__head plan-travel-tips__head">
             <div class="plan-travel-tips__head-main">
@@ -192,13 +158,78 @@
       </div>
     </main>
 
-    <!-- 悬浮领航员收起态：launch pill -->
-    <button type="button" class="plan-nav-launch" data-testid="plan-nav-open" aria-controls="plan-nav" aria-expanded="false">
+    <!-- 悬浮领航员收起态 -->
+    <button type="button" class="plan-nav-launch is-hidden" data-testid="plan-nav-open" aria-controls="plan-nav" aria-expanded="true">
       <span class="mark-host plan-nav-launch__mark">
         <img class="mark" src="assets/play-logo.png" alt="" width="28" height="28" />
       </span>
       <span>行程助手</span>
     </button>
+
+    <!-- 悬浮领航员（问答进行中） -->
+    <aside class="plan-nav is-open" id="plan-nav" data-testid="plan-nav" aria-label="行程助手">
+      <div class="plan-nav__panel">
+        <div class="plan-nav__rail" aria-hidden="true"><span class="plan-nav__rail-fill" style="height:42%"></span></div>
+        <header class="plan-nav__head">
+          <button type="button" class="plan-nav__resize" data-testid="plan-nav-resize" aria-label="拖动调整助手尺寸" title="拖动调整宽高">
+            <svg class="plan-nav__resize-icon" viewBox="0 0 20 20" width="18" height="18" fill="none" aria-hidden="true">
+              <path d="M8 4H4v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M4 4l4.5 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+              <path d="M12 16h4v-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M16 16l-4.5-4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <div class="plan-nav__head-copy">
+            <h2 class="plan-nav__title">行程助手</h2>
+            <p class="plan-nav__context">里斯本 · 4 天 · 2 人 · $$ · 问答 4/8</p>
+          </div>
+          <div class="plan-nav__head-actions">
+            <button type="button" class="panel-fold-btn" data-testid="plan-nav-close" data-nav-action="collapse" aria-label="收起行程助手" title="收起">
+              <svg class="panel-fold-btn__icon" viewBox="0 0 20 20" width="18" height="18" fill="none" aria-hidden="true">
+                <path d="M5 12l5-5 5 5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <button type="button" class="btn btn-danger" data-testid="plan-nav-terminate" data-nav-action="terminate">终止</button>
+          </div>
+        </header>
+        <div class="plan-nav__body">
+          <div class="plan-nav__thread">
+            <div class="msg-group msg-group--agent">
+              <p class="msg-group__line">收到，请告诉我更详细的要求，我来帮你规划行程。</p>
+              <p class="msg-group__line">请问您居住的酒店 / 每天行程的起点和终点决定了吗？如果没有，我暂时不安排每天出发和返回的交通。</p>
+            </div>
+            <div class="bubble bubble--user">Hills Hotel Lisboa</div>
+            <div class="bubble bubble--agent">请问您希望的每天行程开始时间？</div>
+            <div class="bubble bubble--user">9:30</div>
+            <div class="bubble bubble--agent">行程的类型？</div>
+            <div class="bubble bubble--user">C — 情侣出游</div>
+            <div class="bubble bubble--agent">你希望的节奏？</div>
+          </div>
+          <div class="plan-nav__quick" role="group" aria-label="快答">
+            <button type="button" class="chip">A · 轻松</button>
+            <button type="button" class="chip is-on">B · 适中</button>
+            <button type="button" class="chip">C · 紧凑</button>
+          </div>
+        </div>
+        <form class="chat-composer" action="06-plan-skeleton.html" method="get">
+          <label class="sr-only" for="nav-input">Message</label>
+          <input id="nav-input" name="q" placeholder="输入文字或点选上方快答…" data-testid="plan-nav-input" />
+          <button class="btn" type="submit" data-testid="plan-nav-send">发送</button>
+        </form>
+      </div>
+    </aside>
+
+    <!-- 终止确认弹窗 -->
+    <div class="dialog-backdrop" data-testid="replan-dialog" aria-hidden="true" role="presentation">
+      <div class="dialog" role="alertdialog" aria-labelledby="replan-title" aria-describedby="replan-desc">
+        <h2 id="replan-title">终止当前规划？</h2>
+        <p id="replan-desc">助手将停止收集条件，已填写的部分不会保留。</p>
+        <div class="dialog__actions">
+          <button type="button" class="btn btn-quiet" data-testid="replan-cancel">继续问答</button>
+          <button type="button" class="btn btn-danger" data-testid="replan-confirm">终止</button>
+        </div>
+      </div>
+    </div>
 
     <footer class="family-footer family-footer--app">
       <div class="family-footer__inner">

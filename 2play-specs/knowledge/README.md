@@ -11,4 +11,4 @@ Product requirements live under `2play-specs/`. Architecture decisions live unde
 | [mvp1-quality-gate.md](./mvp1-quality-gate.md) | Coverage include scope, `make quality`, with_server reuse | 2026-08-21 |
 | [where2play-mvp1-close.md](./where2play-mvp1-close.md) | MVP-1 slice close notes + DoD confirmation | 2026-08-21 |
 | [identical-multiday-itinerary.md](./identical-multiday-itinerary.md) | 旧 N× `plan_itinerary` 同日复制；现 ADR-037 = discover + BFF OPENAI_CN + `usedNames` | 2026-08-23 |
-| [plan-progressive-ndjson.md](./plan-progressive-ndjson.md) | Plan NDJSON：`slot_preview` / `slot` 四段 Progressive UX | 2026-08-22 |
+| [plan-progressive-ndjson.md](./plan-progressive-ndjson.md) | Plan NDJSON as-built + **MVP-10 事件迁移指针** | 2026-08-31 |

@@ -56,6 +56,16 @@ const blockSchema = z.object({
   alternatives: z
     .array(z.object({ name: z.string(), reason: z.string().optional() }))
     .optional(),
+  // plan-16 AC1: preserve legs_to_here from LLM output (do not strip).
+  legs_to_here: z
+    .array(
+      z.object({
+        mode: z.string().optional(),
+        duration_min: z.number().optional(),
+        recommended: z.boolean().optional(),
+      }),
+    )
+    .optional(),
 });
 
 const daySchema = z.object({
@@ -63,6 +73,14 @@ const daySchema = z.object({
   date: z.string().optional(),
   theme: z.string().min(1).optional(),
   blocks: z.array(blockSchema).min(1),
+  // plan-16 AC1: preserve from_origin/to_destination/transit_outcome from LLM output.
+  from_origin: z
+    .object({ transport: z.string().optional(), duration_min: z.number().optional() })
+    .optional(),
+  to_destination: z
+    .object({ transport: z.string().optional(), duration_min: z.number().optional() })
+    .optional(),
+  transit_outcome: z.enum(["directions", "heuristic", "partial"]).optional(),
 });
 
 /** Max slim candidates per pool in the arrange prompt (ADR-038 P0). */
@@ -310,6 +328,10 @@ export function parseArrangeDayModelText(
       date: opts.date ?? schema.data.date,
       ...(schema.data.theme ? { theme: schema.data.theme } : {}),
       blocks: schema.data.blocks,
+      // plan-16 AC1: preserve transit fields from LLM output.
+      ...(schema.data.from_origin ? { from_origin: schema.data.from_origin } : {}),
+      ...(schema.data.to_destination ? { to_destination: schema.data.to_destination } : {}),
+      ...(schema.data.transit_outcome ? { transit_outcome: schema.data.transit_outcome } : {}),
     },
   };
 }
@@ -438,6 +460,61 @@ function startTimeHardRule(timeFrom?: string): string {
   return `\nHARD RULE: the first block MUST start at ${timeFrom} exactly (up to 5 minutes earlier or later is tolerated).`;
 }
 
+/**
+ * plan-16 AC5: station timing consistency — block[i].start_time must account for
+ * previous block end + recommended leg duration (tolerance 5min).
+ */
+function stationTimingViolation(
+  blocks: Array<{
+    start_time: string;
+    duration_min: number;
+    legs_to_here?: Array<{ duration_min?: number; recommended?: boolean }>;
+  }>,
+  toleranceMin = 5,
+): string | null {
+  for (let i = 1; i < blocks.length; i++) {
+    const prev = blocks[i - 1]!;
+    const curr = blocks[i]!;
+    const prevEnd = hhmmToMinutes(prev.start_time);
+    const currStart = hhmmToMinutes(curr.start_time);
+    if (prevEnd == null || currStart == null) continue;
+    const prevEndTotal = prevEnd + prev.duration_min;
+    const legs = curr.legs_to_here ?? [];
+    const recommended = legs.find((l) => l.recommended) ?? legs[0];
+    const transitMin = recommended?.duration_min;
+    if (transitMin == null) continue;
+    const expectedStart = prevEndTotal + transitMin;
+    if (currStart < expectedStart - toleranceMin) {
+      const expH = Math.floor((expectedStart - toleranceMin) / 60) % 24;
+      const expM = (expectedStart - toleranceMin) % 60;
+      const expStr = `${String(expH).padStart(2, "0")}:${String(expM).padStart(2, "0")}`;
+      return `station_timing: block[${i}] starts ${curr.start_time} but prev ends +${transitMin}min transit = expected ≥ ${expStr} (tolerance ${toleranceMin}min)`;
+    }
+  }
+  return null;
+}
+
+/**
+ * plan-16 AC6: same-day restaurant dedup — no two meal blocks (lunch/dinner)
+ * with the same name.
+ */
+function sameDayRestaurantDedupViolation(
+  blocks: Array<{ name: string; type: string }>,
+): string | null {
+  const mealNames = new Map<string, string>();
+  for (const block of blocks) {
+    const t = (block.type ?? "").toLowerCase();
+    if (t === "lunch" || t === "dinner") {
+      const prev = mealNames.get(block.name);
+      if (prev) {
+        return `same_day_restaurant_dedup: "${block.name}" used for both ${prev} and ${block.type}`;
+      }
+      mealNames.set(block.name, block.type);
+    }
+  }
+  return null;
+}
+
 export async function* streamArrangeDay(input: {
   locale: string;
   city: string;
@@ -502,10 +579,10 @@ export async function* streamArrangeDay(input: {
       date: input.date,
     });
     if (parsed.ok) {
-      const violation = firstBlockStartViolation(
-        parsed.value.blocks,
-        input.criteria.timeFrom,
-      );
+      const violation =
+        firstBlockStartViolation(parsed.value.blocks, input.criteria.timeFrom) ??
+        stationTimingViolation(parsed.value.blocks) ??
+        sameDayRestaurantDedupViolation(parsed.value.blocks);
       if (violation) {
         lastError = violation;
         continue;

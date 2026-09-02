@@ -193,6 +193,48 @@
     grip.addEventListener("pointercancel", endDrag);
   }
 
+  /* §12 悬浮领航员：左上角拉手拖动调整宽高
+     最小宽度 = 当前默认宽度（22.5rem），最小高度 = 调整后的默认高度（45rem） */
+  var nav = document.querySelector("[data-testid='plan-nav']");
+  var navResize = document.querySelector("[data-testid='plan-nav-resize']");
+  if (nav && navResize) {
+    var MIN_W = 27 * 16;
+    var MIN_H = 45 * 16;
+    var navDrag = false;
+    var navStartX = 0;
+    var navStartY = 0;
+    var navStartW = 0;
+    var navStartH = 0;
+    function navMaxW() { return Math.min(window.innerWidth - 2 * 16, 40 * 16); }
+    function navMaxH() { return Math.min(window.innerHeight - 2 * 16, 64 * 16); }
+    function applyNavSize(w, h) {
+      var nw = Math.min(navMaxW(), Math.max(MIN_W, w));
+      var nh = Math.min(navMaxH(), Math.max(MIN_H, h));
+      nav.style.width = nw + "px";
+      nav.style.height = nh + "px";
+    }
+    var initRect = nav.getBoundingClientRect();
+    applyNavSize(initRect.width || MIN_W, initRect.height || MIN_H);
+    navResize.addEventListener("pointerdown", function (e) {
+      navDrag = true;
+      navStartX = e.clientX;
+      navStartY = e.clientY;
+      navStartW = nav.getBoundingClientRect().width;
+      navStartH = nav.getBoundingClientRect().height;
+      navResize.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    navResize.addEventListener("pointermove", function (e) {
+      if (!navDrag) return;
+      var w = navStartW + (navStartX - e.clientX);
+      var h = navStartH + (navStartY - e.clientY);
+      applyNavSize(w, h);
+    });
+    function endNavDrag() { navDrag = false; }
+    navResize.addEventListener("pointerup", endNavDrag);
+    navResize.addEventListener("pointercancel", endNavDrag);
+  }
+
   /* Replan dialog */
   var openReplan = document.querySelector("[data-testid='replan-open']");
   var backdrop = document.querySelector("[data-testid='replan-dialog']");
@@ -228,5 +270,55 @@
       setReplanOpen(false);
       closeAllCombos();
     }
+  });
+
+  /* Plan nav open / close */
+  var planNav = document.querySelector("[data-testid='plan-nav']");
+  var planNavOpenBtn = document.querySelector("[data-testid='plan-nav-open']");
+  var planNavCloseBtn = document.querySelector("[data-testid='plan-nav-close']");
+  var planNavTerminateBtn = document.querySelector("[data-testid='plan-nav-terminate']");
+
+  function setPlanNavOpen(open) {
+    if (!planNav) return;
+    planNav.classList.toggle("is-open", open);
+    if (planNavOpenBtn) {
+      planNavOpenBtn.classList.toggle("is-hidden", open);
+      planNavOpenBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+    planNav.setAttribute("aria-hidden", open ? "false" : "true");
+  }
+
+  if (planNavOpenBtn) {
+    planNavOpenBtn.addEventListener("click", function () {
+      setPlanNavOpen(true);
+    });
+  }
+
+  if (planNavCloseBtn) {
+    planNavCloseBtn.addEventListener("click", function () {
+      setPlanNavOpen(false);
+    });
+  }
+
+  if (planNavTerminateBtn) {
+    planNavTerminateBtn.addEventListener("click", function () {
+      setReplanOpen(true);
+    });
+  }
+
+  if (planNav && planNav.classList.contains("is-open") && planNavOpenBtn) {
+    planNavOpenBtn.classList.add("is-hidden");
+    planNavOpenBtn.setAttribute("aria-expanded", "true");
+  }
+
+  document.querySelectorAll("[data-testid='plan-travel-tips-toggle']").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var section = btn.closest(".plan-travel-tips");
+      if (!section) return;
+      var collapsed = section.classList.toggle("is-collapsed");
+      var expanded = !collapsed;
+      btn.setAttribute("aria-expanded", expanded ? "true" : "false");
+      btn.setAttribute("aria-label", expanded ? "隐藏出行小贴士" : "显示出行小贴士");
+    });
   });
 })();

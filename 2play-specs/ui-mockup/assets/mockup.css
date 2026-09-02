@@ -1662,6 +1662,7 @@ html[lang^="zh"] .app-user__tools .btn {
   overflow: visible;
 }
 
+/* DEPRECATED: legacy MVP-3 arrange 双行规划器（mock 已删；保留供 as-built prod 过渡） */
 .plan-board {
   display: flex;
   flex-direction: column;
@@ -2051,6 +2052,27 @@ html[lang^="zh"] .app-user__tools .btn {
 
 .combo.is-open input {
   border-color: var(--glaze);
+}
+
+/* Register / profile nationality combobox */
+.field .combo {
+  position: relative;
+  width: 100%;
+}
+
+.field .combo input {
+  width: 100%;
+  padding-right: 2.25rem;
+}
+
+.field .combo__list {
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
+.field.is-invalid .combo input {
+  border-color: var(--alert);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--alert) 35%, transparent);
 }
 
 @media (max-width: 960px) {
@@ -2723,7 +2745,8 @@ html[lang^="zh"] .app-user__tools .btn {
 
 @media (prefers-reduced-motion: reduce) {
   .slot.is-entering {
-  animation: plan-slot-in 0.45s ease-out both;
+    animation: none;
+  }
 }
 
 @keyframes plan-phase-pulse {
@@ -2795,5 +2818,636 @@ html[lang^="zh"] .app-user__tools .btn {
 
   .slot--pending {
     background-image: none;
+  }
+}
+
+/* ============================================================
+   §12 轻骨架重构 — 起飞条 / 悬浮领航员 / 骨架列表 / 跑道脊
+   （06-plan*.html 系列专用；品牌 token 沿用 :root）
+   ============================================================ */
+
+/* —— 1. 起飞条：单行五格 —— */
+.plan-takeoff {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--plan-gap);
+}
+
+.plan-takeoff .field {
+  flex: 1 1 8rem;
+  min-width: 0;
+}
+
+.plan-takeoff .field[data-field="dest"] {
+  flex: 1 1 12rem;
+}
+
+.plan-takeoff .field[data-field="start_date"] {
+  flex: 0 0 12rem;
+  max-width: 12rem;
+}
+
+.plan-takeoff .field[data-field="start_date"] input {
+  padding-right: 2.25rem;
+  font-size: 0.9rem;
+}
+
+.plan-takeoff .field[data-field="start_date"] input::-webkit-calendar-picker-indicator {
+  margin-left: 0.4rem;
+}
+
+.plan-takeoff .field[data-field="days"],
+.plan-takeoff .field[data-field="party"] {
+  flex: 0 0 3.3rem;
+  max-width: 3.3rem;
+}
+
+.plan-takeoff .field[data-field="budget"] {
+  flex: 0 0 7.5rem;
+  max-width: 7.5rem;
+}
+
+.plan-takeoff .field[data-field="budget"] select {
+  width: 100%;
+}
+
+.plan-takeoff .plan-takeoff__actions {
+  display: flex;
+  align-items: flex-end;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 640px) {
+  .plan-takeoff .field {
+    flex: 1 1 calc(50% - var(--plan-gap));
+  }
+  .plan-takeoff .field[data-field="start_date"],
+  .plan-takeoff .field[data-field="days"],
+  .plan-takeoff .field[data-field="party"],
+  .plan-takeoff .field[data-field="budget"] {
+    flex: 1 1 calc(50% - var(--plan-gap));
+    max-width: none;
+  }
+}
+
+/* §12：状态条不撑高（覆盖 .plan-phase 的 flex:1） */
+.plan-stack:has(.plan-takeoff) .plan-phase {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0.2rem 0.15rem 0;
+}
+
+/* —— 2. 骨架 stop 列表（无时间，填充前的骨架态） —— */
+.skeleton-day {
+  margin: 0 0 0.4rem;
+}
+
+.skeleton-day__theme {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  color: var(--ink-2);
+  font-size: 0.9rem;
+  margin: 0.6rem 0 0.35rem;
+}
+
+.skeleton-stop {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  padding: 0.22rem 0;
+  font-family: var(--font-ui);
+  font-size: 0.92rem;
+  color: var(--ink);
+}
+
+.skeleton-stop__idx {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--mute);
+  min-width: 1.4rem;
+  text-align: right;
+}
+
+.skeleton-stop__name {
+  flex: 1;
+  min-width: 0;
+}
+
+.skeleton-stop__slot {
+  font-size: 0.78rem;
+  color: var(--mute);
+}
+
+.skeleton-stop--meal .skeleton-stop__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.skeleton-stop--meal .skeleton-stop__name::before {
+  content: "";
+  display: inline-block;
+  width: 1.05rem;
+  height: 1.05rem;
+  flex-shrink: 0;
+  background: url("food-logo.png") center / contain no-repeat;
+}
+
+.skeleton-stop--filled {
+  opacity: 0.45;
+}
+
+.skeleton-stop.is-pending {
+  border-radius: 0.3rem;
+  background-image: linear-gradient(
+    110deg,
+    transparent 30%,
+    color-mix(in srgb, var(--glaze, #2a7a68) 8%, transparent) 45%,
+    transparent 60%
+  );
+  background-size: 200% 100%;
+  animation: plan-pending-shimmer 1.8s linear infinite;
+}
+
+/* —— 3. 悬浮领航员（复用 what2eat agent-chat 形制） —— */
+.plan-nav-launch {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1rem 0.55rem 0.65rem;
+  border: 1px solid var(--glaze-deep);
+  border-radius: var(--radius-chip);
+  background: linear-gradient(180deg, var(--glaze) 0%, var(--glaze-deep) 100%);
+  color: #fff;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(36, 56, 50, 0.22);
+}
+
+.plan-nav-launch.is-hidden {
+  display: none;
+}
+
+.plan-nav {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 45;
+  display: none;
+  width: min(27rem, calc(100vw - 2rem));
+  height: min(45rem, calc(100vh - 2rem));
+}
+
+.plan-nav.is-open {
+  display: flex;
+  flex-direction: column;
+}
+
+.plan-nav__panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 27rem;
+  max-width: min(40rem, calc(100vw - 2rem));
+  max-height: min(64rem, calc(100vh - 2rem));
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--plate);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-bowl);
+  box-shadow: 0 16px 40px rgba(36, 56, 50, 0.16);
+  animation: plan-nav-in 180ms ease-out;
+}
+
+/* 头部内拉手：拖动调整宽高 */
+.plan-nav__resize {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  margin-top: 0.05rem;
+  cursor: nwse-resize;
+  touch-action: none;
+  background: var(--plate);
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--mute);
+  transition: color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.plan-nav__resize-icon {
+  display: block;
+  pointer-events: none;
+}
+
+.plan-nav__resize:hover,
+.plan-nav__resize:focus-visible {
+  color: var(--glaze-deep);
+  border-color: color-mix(in srgb, var(--glaze) 45%, var(--line));
+  box-shadow: 0 2px 8px rgba(36, 56, 50, 0.08);
+  outline: none;
+}
+
+.plan-nav__head-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.plan-nav__head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
+@keyframes plan-nav-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.plan-nav__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.85rem 1rem 0.65rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.plan-nav__title {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  margin: 0 0 0.15rem;
+}
+
+.plan-nav__context {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  color: var(--mute);
+}
+
+.plan-nav__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.85rem 1rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.plan-nav__thread {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.msg-group {
+  max-width: 92%;
+}
+
+.msg-group--agent {
+  align-self: flex-start;
+  background: var(--plate);
+  border: 1px solid var(--line);
+  border-radius: 0.85rem 0.85rem 0.85rem 0.3rem;
+  padding: 0.65rem 0.85rem;
+}
+
+.msg-group--agent .msg-group__line {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+
+.msg-group--agent .msg-group__line + .msg-group__line {
+  margin-top: 0.55rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+}
+
+.plan-nav__thread .bubble--user {
+  align-self: flex-end;
+  max-width: 85%;
+}
+
+.plan-nav__thread .bubble--agent {
+  align-self: flex-start;
+  max-width: 92%;
+}
+
+/* —— 面板折叠按钮（出行小贴士 / 行程助手共用） —— */
+.panel-fold-btn {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  background: var(--plate);
+  color: var(--mute);
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
+}
+
+.panel-fold-btn__icon {
+  display: block;
+  transition: transform 180ms ease;
+}
+
+.panel-fold-btn:hover,
+.panel-fold-btn:focus-visible {
+  color: var(--glaze-deep);
+  border-color: color-mix(in srgb, var(--glaze) 40%, var(--line));
+  box-shadow: 0 2px 8px rgba(36, 56, 50, 0.08);
+  outline: none;
+}
+
+.is-collapsed > .panel__head .panel-fold-btn__icon,
+.plan-travel-tips.is-collapsed .panel-fold-btn__icon {
+  transform: rotate(180deg);
+}
+
+.plan-travel-tips.is-collapsed .plan-travel-tips__body {
+  display: none;
+}
+
+/* —— 出行限制（只读） —— */
+.constraint-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.75rem 1rem;
+}
+
+.constraint-item {
+  margin: 0;
+}
+
+.constraint-item dt {
+  margin: 0 0 0.2rem;
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--mute);
+  letter-spacing: 0.02em;
+}
+
+.constraint-item dd {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+@media (max-width: 720px) {
+  .constraint-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* —— 出行小贴士 —— */
+.plan-travel-tips__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.plan-travel-tips__head-main {
+  display: flex;
+  align-items: baseline;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.plan-travel-tips__meta {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--mute);
+}
+
+.travel-tips-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.travel-tips-card {
+  position: relative;
+  padding: 0.85rem 0.95rem 0.95rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-bowl);
+  background: var(--plate);
+}
+
+.travel-tips-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.75rem;
+  bottom: 0.75rem;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--glaze);
+}
+
+.travel-tips-card__head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.55rem;
+}
+
+.travel-tips-card__idx {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--mute);
+  letter-spacing: 0.04em;
+}
+
+.travel-tips-card__title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.travel-tips-card p {
+  margin: 0 0 0.45rem;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+.travel-tips-card p:last-child {
+  margin-bottom: 0;
+}
+
+.travel-tips-sub {
+  font-size: 0.82rem;
+  color: var(--mute);
+}
+
+.travel-tips-visa-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.travel-tips-visa-link {
+  font-weight: 600;
+  color: var(--glaze-deep);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--glaze) 50%, transparent);
+  text-underline-offset: 0.15em;
+}
+
+.travel-tips-visa-link:hover,
+.travel-tips-visa-link:focus-visible {
+  color: var(--glaze);
+  outline: none;
+}
+
+.travel-tips-popover {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 0.45rem);
+  width: min(17.5rem, calc(100vw - 2.5rem));
+  padding: 0.75rem 0.85rem;
+  background: var(--plate);
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+  box-shadow: 0 10px 28px rgba(36, 56, 50, 0.14);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--ink-2);
+  text-align: left;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(4px);
+  transition: opacity 140ms ease, transform 140ms ease, visibility 140ms ease;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.travel-tips-popover strong {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.82rem;
+  color: var(--ink);
+}
+
+.travel-tips-popover__src {
+  display: block;
+  margin-top: 0.45rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--mute);
+}
+
+.travel-tips-visa-wrap:hover .travel-tips-popover,
+.travel-tips-visa-wrap:focus-within .travel-tips-popover {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+}
+
+.travel-tips-intro {
+  margin-top: 0.35rem;
+}
+
+.travel-tips-must-see {
+  margin: 0.35rem 0 0;
+  padding-left: 1.15rem;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+
+.travel-tips-must-see li + li {
+  margin-top: 0.2rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel-fold-btn__icon,
+  .travel-tips-popover {
+    transition: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .travel-tips-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* —— 4. 跑道式进度脊（签名元素） —— */
+.plan-nav__rail {
+  position: absolute;
+  left: 0.55rem;
+  top: 3.4rem;
+  bottom: 4.2rem;
+  width: 2px;
+  background: color-mix(in srgb, var(--line) 70%, transparent);
+  border-radius: 1px;
+  pointer-events: none;
+}
+
+.plan-nav__rail-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 38%;
+  background: linear-gradient(180deg, var(--stub) 0%, var(--glaze) 100%);
+  border-radius: 1px;
+  transition: height 0.5s ease-out;
+}
+
+/* —— 5. 问答快答条 —— */
+.plan-nav__quick {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0.3rem 0 0.8rem;
+}
+
+.plan-nav__quick .chip {
+  font-size: 0.78rem;
+  padding: 0.18rem 0.7rem;
+}
+
+/* —— 6. reduced-motion 收尾 —— */
+@media (prefers-reduced-motion: reduce) {
+  .plan-nav__panel,
+  .skeleton-stop.is-pending {
+    animation: none;
+  }
+
+  .plan-nav__rail-fill {
+    transition: none;
   }
 }

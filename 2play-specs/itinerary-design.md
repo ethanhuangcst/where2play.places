@@ -3,7 +3,7 @@
 **Scope:** Plan 页「生成行程」的 L1 Discover → L2 Arrange 管线、BFF NDJSON 事件、Progressive UI 四段命名与动效。  
 **Related:** [`2play-design.md`](./2play-design.md) §2.4 / §3.5 · [`2play-stories.md`](./2play-stories.md) · [ADR-037](../../workspace-specs/adr/ADR-037-where2play-plan-l2-quanzil.md) · [ADR-032](../../workspace-specs/adr/ADR-032-llm-itinerary-mcp-tool-split.md) · [performance.md §3](../../1.places-agent/agent-specs/performance.md) · [ADR-038](../../workspace-specs/adr/ADR-038-discover-places-quality.md)
 
-**Status:** Accepted（§11-P0 Progressive **已实现**；Mode H + enrich **as-built**；跨产品契约见 [ADR-043](../../workspace-specs/adr/ADR-043-chatbox-mcp-and-cross-product-closure.md)）
+**Status:** Accepted（§11-P0 Progressive **已实现**；Mode H + enrich **as-built 2026-08-23**；**MVP-10 目标态** §1.3 / §16–17 **方案已确定 2026-08-31**；跨产品契约见 [ADR-043](../../workspace-specs/adr/ADR-043-chatbox-mcp-and-cross-product-closure.md)）
 
 ---
 
@@ -25,6 +25,19 @@ L3  Transit      places-agent  POST /v1/enrich_arrange_transit → legs_to_here
 ### 1.2 历史「目标态」说明
 
 原 `plan-11` / `plan-13` 目标（Mode H prompt + 真 transit）**已落地为 §1.1**。下文「目标」措辞若仍出现，以 §1.1 为准。
+
+### 1.3 目标态（MVP-10 / plan-46，方案已确定 2026-08-31）
+
+**真源：** places-agent [`performance.md §12`](../../1.places-agent/agent-specs/performance.md) · [`0.refactor-plan.md` 批次 11](../../1.places-agent/agent-specs/0.refactor-plan.md) · 本文件 §16–17 · [`2play-design.md §4`](./2play-design.md) · UI mock `ui-mockup/06-plan*.html`。
+
+```text
+L1  Discover     places-agent  POST /v1/discover_places（不变）
+L2  Skeleton     places-agent  POST /v1/make_itinerary（NDJSON：skeleton_start → skeleton_day × N → skeleton_done）
+L3  Fill         places-agent  循环 plan_next_stop + display_current_stop（串行 transit + 富信息，零 LLM）
+                 UI            起点 = 标准 Stay stop → transit 行 → 景点 stop；真逐 stop 上屏（非 staged sleep）
+```
+
+**退役：** BFF 本地 OPENAI_CN arrange（§5）、`enrich_arrange_transit` 独立调用、假 progressive（§5.4 staged sleep）。**迁移：** F42 校验 → agent Feature 44 填充层。
 
 ---
 
@@ -190,7 +203,7 @@ type SlotPreview = {
 - `.btn.is-generating` — 绿钮呼吸光
 - 不增加 indeterminate 进度条
 
-Mock SoT 同步：[`ui-mockup/06-plan-arrange.html`](./ui-mockup/06-plan-arrange.html) 等。
+Mock SoT 同步：[`ui-mockup/06-plan-skeleton.html`](./ui-mockup/06-plan-skeleton.html)（MVP-10；legacy arrange mock 已删除）。
 
 ---
 
@@ -310,3 +323,95 @@ sequenceDiagram
 - **`2play-design.md` §2.4.1 / §3.5.3：** 页面级摘要与 mock 索引；细节以 **本文件为准**。
 - **`2play-stories.md` `plan-10`：** 可验收 AC；**`2play-test-plan.md` §5.4：** 测试矩阵。
 - 冲突时：**mock 视觉** > 本文件 **交互契约** > `2play-design` 摘要。
+
+---
+
+## 16. §12 轻骨架重构迁移（MVP-10 plan-46，方案已确定 2026-08-31）
+
+**真源：** places-agent [`performance.md §12`](../../1.places-agent/agent-specs/performance.md)；where2play [`2play-design.md §4`](./2play-design.md)（页面/助手/表单/Travor UI）；UI mock `06-plan*.html` + `assets/mockup-travor.css`。
+
+### 16.1 管线替换
+
+| 现（本文件 §5 L2 管线，as-built） | 新（MVP-10 目标） |
+| --- | --- |
+| BFF 本地 `buildArrangeDayMessages` + OPENAI_CN 等满日 JSON | agent `make_itinerary` NDJSON 流式骨架 |
+| 解析后 staged `slot_preview`/`slot`（§5.4 sleep 假 progressive） | 骨架预览 → 循环 `plan_next_stop` + `display_current_stop` **真逐 stop** |
+| `enrich_arrange_transit`（BFF 调 agent） | 吸收进 `plan_next_stop`（agent 侧串行 directions） |
+| 起点藏在 `from_origin` transit 单行 | **起点 = 第一站标准 Stay stop 卡片**（§17.1） |
+
+### 16.2 BFF NDJSON 事件（目标）
+
+在 §4 四段命名不变前提下，事件载荷替换：
+
+| 事件 | 时机 | 载荷要点 |
+| --- | --- | --- |
+| `skeleton_start` | make_itinerary 开始 | `{ total_days }` |
+| `skeleton_day` | 骨架流式每完成一日 | `{ day_index, day_theme, stops: [{ name, kind, meal_slot? }] }` — **无时间** |
+| `skeleton_done` | 骨架 LLM 结束 | `{ days_count }` |
+| `stop_filled` | 每次 display_current_stop 完成 | `{ day_index, stop_index, stop, legs_to_here?, time_start?, time_end? }` |
+| `day_done` | 当日末 stop 填充完 | `{ day_index }` |
+| `itinerary_done` | 全程结束 | `{ outcome }` |
+
+**废弃（MVP-10 后）：** 整日 `slot_preview`/`slot` 批量 staged 事件；`plan-phase` 仍可保留「第 d/N 天」busy 文案，但不再绑定整日 LLM 等待。
+
+### 16.3 渐进语义变化
+
+- **保留：** 四段命名（行程日提示 / 细节提示 / 行程 / 加载中）、pending 同构 skeleton、`is-entering` 入场、reduced-motion。
+- **变化：** 粒度从「slot（整日 LLM 完成后 staged）」→ **「stop（骨架后真实逐个填充）」**；每次 `stop_filled` 对应一次真实 `plan_next_stop` 完成。
+- **骨架预览：** 助手内 day-by-day stop 名称列表（无时间）；行程主列表直接 pending + 已填充 stop，不重复长文本骨架。
+- **时间回填：** 骨架无时间；stop 上屏时由上一 stop 结束 + transit 时长推算（agent Feature 44）。
+
+### 16.4 F42 校验迁移
+
+站间时序、同日餐厅去重、day-trip 补搜、午间窗口软提示 — 从 2play `plan-arrange-llm.ts` 重试回路迁至 agent `plan_next_stop`/`display_current_stop`（Feature 44）。2play 仅透传 agent 的 `transit_outcome` 与错误码。
+
+### 16.5 测试影响
+
+- 删除/替换：`plan-arrange-llm.test.ts` 中 2play 侧时序/去重重试 → agent 侧 TC-M10-44-*。
+- 更新：`plan-day-by-day` 事件测试 → 断言 `skeleton_day` / `stop_filled` 序列。
+- E2E（TC-M10-*）：生成 → 骨架预览 → 逐 stop 上屏 → 完成态；助手 8 步含默认跳过；起点 Stay stop + transit 单行格式（§17.2）。
+
+---
+
+## 17. Stop / Transit 展示契约（MVP-10 UI，mock 定稿）
+
+**真源：** `ui-mockup/06-plan-skeleton.html` · `assets/mockup-travor.css` · [`2play-design.md §4.7`](./2play-design.md)。
+
+### 17.1 起点 stop（Stay）
+
+- 酒店/住宿作为 **第一站标准 stop 卡片**（`data-testid="stop-origin"`），与景点 stop 同构：序号、名称、kind=Stay、时段、HIGHLIGHTS。
+- **禁止** 仅把酒店塞在 transit 行的「出发 · 酒店 → …」里；transit 行只连接 **已上屏的两站**。
+
+### 17.2 Transit 行（站间）
+
+单行文案模式（i18n 模板，非硬编码）：
+
+```text
+从 · {from_name} 前往 · {to_name}：[{mode}|{duration}|{cost}] / [{mode}|{duration}|{cost}]
+```
+
+- `{from_name}` / `{to_name}` 加粗（`.transit-place`）；双 mode 用 `/` 分隔；每段为 pill（`.transit-option`：方式 | 时长 | 费用档位）。
+- 背景透明/暖色，**不用** 独立蓝色 transit 盒。
+- 无 directions 时：i18n 降级文案 + `transit_outcome: partial|heuristic`，不伪造精确分钟。
+
+### 17.3 列表顺序（单日）
+
+```text
+[Stay 起点 stop] → [transit 行] → [stop 1] → [transit] → [stop 2] → … → [pending skeleton 行…]
+```
+
+### 17.4 Panel 操作与阶段 meta
+
+- **Panel 头右侧：** 重新规划 / 保存行程 / 导出 PDF（`panel__head-actions`）；无底部 sticky 操作条。
+- **阶段 meta 左对齐：** `骨架 HH:MM · 填充中`（`plan-phase__meta`），与 day tabs 同区。
+
+### 17.5 自动化选择器（E2E / Playwright）
+
+| 区域 | 选择器 |
+| --- | --- |
+| 起点 stop | `[data-testid="stop-origin"]` |
+| 已填充 stop | `[data-testid="stop-filled"]` 或 `.slot:not(.slot--pending)` |
+| Pending | `.slot--pending` |
+| Transit 行 | `.transit-line` |
+| 助手展开 | `[data-testid="plan-nav-panel"]` |
+| 起飞 CTA | `[data-testid="plan-takeoff-submit"]` |

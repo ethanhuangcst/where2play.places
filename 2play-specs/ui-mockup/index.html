@@ -5,9 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>where2play mockup gallery</title>
     <link rel="icon" href="assets/favicon.png" type="image/png" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="assets/mockup.css" />
+    <link rel="stylesheet" href="assets/mockup-travor.css" />
   </head>
-  <body class="shell-public">
+  <body class="shell-public" data-style="travor">
     <main class="gallery-main">
       <a class="logo logo-home" href="01-home.html" aria-label="where2play.place">
         <span class="mark-host mark-host--plane">
@@ -19,23 +21,35 @@
         <span class="logo-word">where2play.place</span>
       </a>
       <h1>UI mockup gallery</h1>
-      <p class="lead" style="margin-left:0;text-align:left;max-width:none">旅行风可执行稿。确认视觉与交互后，实现须与本目录及 <code>2play-design.md</code> §1/§3 一致。</p>
+      <p class="lead" style="margin-left:0;text-align:left;max-width:none">MVP-10 Travor 可执行稿。视觉与结构以 <code>06-plan-skeleton.html</code> 及 <code>2play-design.md</code> §4.7 为准。</p>
       <ul class="gallery-list">
-        <li><a href="01-home.html">01 Home<span>公开落地 · 机翼下气流</span></a></li>
+        <li><a href="01-home.html">01 Home<span>公开落地 · Travor 暖色</span></a></li>
         <li><a href="02-register.html">02 Register<span>注册</span></a></li>
         <li><a href="03-login.html">03 Login<span>登录</span></a></li>
         <li><a href="04-reset.html">04 Reset password<span>重置密码</span></a></li>
         <li><a href="05-set-password.html">05 Set password<span>设置新密码</span></a></li>
-        <li><a href="06-plan.html">06 Plan<span>完成态 · 双行规划器（accepted）</span></a></li>
-        <li><a href="06-plan-discover.html">06b Plan · Discover<span>图1 · 搜索中 + 已找到 N 处</span></a></li>
-        <li><a href="06-plan-arrange-highlights.html">06c Plan · Arrange · Highlights<span>图3 · Highlights + pending</span></a></li>
-        <li><a href="06-plan-arrange.html">06d Plan · Arrange · slots<span>图2/4/5 · 行 by 行 + 等待动效</span></a></li>
-        <li><a href="06-plan-arrange-day2.html">06e Plan · Arrange · Day2<span>图6 · 自动切到 Day 2</span></a></li>
-        <li><a href="07-profile.html">07 Profile<span>个人信息 + 兴趣</span></a></li>
+        <li><a href="06-plan.html">06 Plan · 起飞条<span>5 必填单行 + 领航员收起 pill</span></a></li>
+        <li><a href="06-plan-skeleton.html">06 Plan · 骨架填充<span>主真源 · 骨架→逐站 · 跑道脊</span></a></li>
+        <li><a href="06-plan-qa.html">06 Plan · 助手问答<span>表单禁用 · 问答 + 快答 chips</span></a></li>
+        <li><a href="07-profile.html">07 Profile<span>个人信息</span></a></li>
         <li><a href="08-saved.html">08 Saved · 我的行程<span>已保存多卡</span></a></li>
         <li><a href="09-saved-detail.html">09 Saved detail<span>行程详情 + DB 对话</span></a></li>
+        <li><a href="10-travel-advice.html">10 Travel advice<span>出行建议 · 签证占位（MVP-11）</span></a></li>
       </ul>
     </main>
+    <footer class="family-footer">
+      <div class="family-footer__inner">
+        <nav class="family-footer__row" aria-label="places.family">
+          <span class="family-footer__label">places.family:</span>
+          <span class="family-footer__current"><img src="assets/play-logo.png" alt="" width="18" height="18" /><span>where2play.place</span></span>
+          <span class="family-footer__sep" aria-hidden="true">·</span>
+          <a class="family-footer__link" href="../../../2.what2eat/2eat-specs/ui-mockup/01-home.html" target="_blank" rel="noopener noreferrer"><img src="assets/food-logo.png" alt="" width="18" height="18" /><span>what2eat.food</span></a>
+          <span class="family-footer__sep" aria-hidden="true">·</span>
+          <a class="family-footer__link" href="../../../1.places-agent/agent-specs/ui-mockup/01-home.html" target="_blank" rel="noopener noreferrer"><img src="assets/agent-logo.png" alt="" width="18" height="18" /><span>places.agent-mate.ai</span></a>
+        </nav>
+        <span class="family-footer__copy">copyright © Ethan Huang</span>
+      </div>
+    </footer>
     <script src="assets/mockup.js"></script>
   </body>
 </html>

@@ -1,0 +1,984 @@
+/* where2play.place — §12 Travor skin（body[data-style="travor"] 作用域覆盖）
+   参考 travor.webflow.io：白/#FAF7F1 暖底 + 橙 #FF621F 主 CTA + 青 #08AC9E 辅 + 深蓝标题。
+   英文 Inter；中文沿用 2eat 獅尾腿圓（SC/TC 已在 mockup.css 注册 @font-face）。
+   06b 行程规划 + 账号/资料/我的行程等 app 页统一此皮肤。 */
+
+body[data-style="travor"] {
+  --ink: #1f3347;
+  --ink-2: #494949;
+  --mute: #7a7a8c;
+  --line: #eceaf2;
+  --plate: #ffffff;
+  --cloth-a: #faf7f1;
+  --cloth-b: #faf7f1;
+  --glaze: #ff621f;
+  --glaze-deep: #e54e0d;
+  --sky-mid: #ff621f;
+  --sky-deep: #e54e0d;
+  --teal: #08ac9e;
+  --teal-deep: #068a7f;
+  --stub: #eceaf2;
+  --zest: #ff621f;
+  --zest-deep: #e54e0d;
+  --alert: #d94f3d;
+  --danger: #d94f3d;
+  --beacon: #ff621f;
+  --navy: #1f3347;
+  --radius-bowl: 1.25rem;
+  --radius-control: 0.75rem;
+  --radius-chip: 999px;
+  --shadow-plate: 0 10px 30px rgba(31, 51, 71, 0.08);
+  --font-display: "Inter", "獅尾腿圓簡體", "獅尾腿圓繁體", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-ui: "Inter", "獅尾腿圓簡體", "獅尾腿圓繁體", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+/* 底布：平色 #faf7f1，去掉网格（公开页 + App 页） */
+body[data-style="travor"],
+body.shell-public[data-style="travor"],
+body.shell-app[data-style="travor"] {
+  background-color: var(--cloth-b);
+  background-image: none;
+}
+
+[data-style="travor"] .page-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 2rem;
+  color: var(--ink);
+}
+
+/* 顶部导航 active：橙底白字胶囊 */
+[data-style="travor"] .app-nav a {
+  border-radius: 999px;
+  padding: 0.35rem 0.95rem;
+}
+
+[data-style="travor"] .app-nav a.is-active {
+  background: #ffa26b;
+  color: #fff;
+}
+
+/* —— 通用控件 —— */
+[data-style="travor"] .panel,
+[data-style="travor"] .planner-card {
+  border: 0;
+  border-radius: var(--radius-bowl);
+  box-shadow: var(--shadow-plate);
+}
+
+[data-style="travor"] .btn {
+  background: #ffa26b;
+  border: 0;
+  border-radius: var(--radius-control);
+  color: #fff;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 0.65rem 1.5rem;
+  box-shadow: 0 8px 20px rgba(255, 162, 107, 0.32);
+}
+
+[data-style="travor"] .btn:hover {
+  background: var(--glaze);
+}
+
+[data-style="travor"] .btn.btn-quiet {
+  background: #ffa26b;
+  border: 0;
+  color: #fff;
+  box-shadow: none;
+}
+
+[data-style="travor"] .btn.btn-danger {
+  background: #ffa26b;
+  border: 0;
+  color: #fff;
+  box-shadow: none;
+}
+
+[data-style="travor"] input,
+[data-style="travor"] select {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--cloth-a);
+}
+
+[data-style="travor"] input:focus-visible,
+[data-style="travor"] select:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+
+/* ============================================================
+   起飞条：白卡 + 青标签 + 橙胶囊 CTA
+   ============================================================ */
+[data-style="travor"] .plan-takeoff {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--plan-gap);
+}
+
+[data-style="travor"] .plan-takeoff .field {
+  flex: 1 1 8rem;
+  min-width: 0;
+}
+
+[data-style="travor"] .plan-takeoff .field-label-row,
+[data-style="travor"] .plan-takeoff .field > label {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--teal-deep);
+  display: flex;
+  gap: 0.3rem;
+}
+
+[data-style="travor"] .plan-takeoff .req {
+  color: #ffa26b;
+}
+
+[data-style="travor"] .plan-takeoff .field[data-field="dest"] {
+  flex: 1 1 14rem;
+}
+
+[data-style="travor"] .plan-takeoff .field[data-field="start_date"] {
+  flex: 0 0 12rem;
+  max-width: 12rem;
+}
+
+[data-style="travor"] .plan-takeoff .field[data-field="start_date"] input {
+  padding-right: 2.25rem;
+}
+
+[data-style="travor"] .plan-takeoff .field[data-field="days"],
+[data-style="travor"] .plan-takeoff .field[data-field="party"] {
+  flex: 0 0 4.5rem;
+  max-width: 4.5rem;
+}
+
+[data-style="travor"] .plan-takeoff .field[data-field="budget"] {
+  flex: 0 0 8.5rem;
+  max-width: 8.5rem;
+}
+
+[data-style="travor"] .plan-takeoff .field[data-field="budget"] select {
+  width: 100%;
+}
+
+[data-style="travor"] .plan-takeoff__actions {
+  display: flex;
+  align-items: flex-end;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 640px) {
+  [data-style="travor"] .plan-takeoff .field {
+    flex: 1 1 calc(50% - var(--plan-gap));
+  }
+  [data-style="travor"] .plan-takeoff .field[data-field="start_date"],
+  [data-style="travor"] .plan-takeoff .field[data-field="days"],
+  [data-style="travor"] .plan-takeoff .field[data-field="party"],
+  [data-style="travor"] .plan-takeoff .field[data-field="budget"] {
+    max-width: none;
+  }
+}
+
+/* 状态条：meta 左、进度右 */
+[data-style="travor"] .plan-phase {
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  color: var(--ink-2);
+  flex: 0 0 auto;
+  padding: 0.2rem 0.15rem 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.85rem;
+}
+
+[data-style="travor"] .plan-phase__meta {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--mute);
+  order: -1;
+}
+
+[data-style="travor"] .plan-phase__msg::before {
+  content: "";
+  display: inline-block;
+  width: 0.55rem;
+  height: 0.55rem;
+  background: #ffa26b;
+  border-radius: 50%;
+  margin-right: 0.55rem;
+  vertical-align: -0.05rem;
+}
+
+[data-style="travor"] .plan-phase.is-busy .plan-phase__msg::before {
+  animation: plan-phase-pulse 1.6s ease-in-out infinite;
+}
+
+/* ============================================================
+   行程列表
+   ============================================================ */
+[data-style="travor"] .day-tabs {
+  gap: 0.45rem;
+  border-bottom: 0;
+}
+
+[data-style="travor"] .day-tab {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--ink-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--cloth-b);
+  padding: 0.4rem 1.05rem 0.4rem 1.25rem;
+}
+
+[data-style="travor"] .day-tab::before {
+  background: var(--line);
+}
+
+[data-style="travor"] .day-tab.is-on {
+  background: #ffa26b;
+  color: #fff;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+[data-style="travor"] .day-tab.is-on::before {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+[data-style="travor"] .day-tab.day-tab--queued {
+  opacity: 0.5;
+}
+
+/* Highlights：橙 eyebrow + 深蓝大题 */
+[data-style="travor"] .highlights {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  padding: 0.25rem 0 0.5rem;
+}
+
+[data-style="travor"] .highlights__label {
+  font-family: var(--font-ui);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--teal-deep);
+}
+
+[data-style="travor"] .highlights__title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.75rem;
+  color: var(--ink);
+}
+
+[data-style="travor"] .highlights__theme {
+  color: var(--mute);
+}
+
+[data-style="travor"] .highlights__tags .tag {
+  background: #f0eef8;
+  border: 0;
+  border-radius: 999px;
+  color: var(--ink-2);
+}
+
+/* strip：白卡 + 大圆角 */
+[data-style="travor"] .slot {
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--plate);
+  box-shadow: none;
+  margin-bottom: 0.55rem;
+}
+
+[data-style="travor"] .slot-time {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--teal-deep);
+  font-weight: 500;
+}
+
+[data-style="travor"] .slot-kind {
+  font-family: var(--font-ui);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.7rem;
+  color: var(--teal-deep);
+  font-weight: 700;
+}
+
+[data-style="travor"] .slot h3 {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+[data-style="travor"] .slot-thumb {
+  border-radius: 0.75rem;
+}
+
+[data-style="travor"] .map-link {
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--teal-deep);
+  border: 1px solid var(--teal);
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+}
+
+[data-style="travor"] .map-link:hover {
+  background: var(--teal);
+  color: #fff;
+}
+
+/* 交通：路线 + 双模选项 */
+[data-style="travor"] .slot--transit {
+  border: 0;
+  background: none;
+  box-shadow: none;
+  border-top: 0;
+  border-bottom: 0;
+  border-radius: 0;
+  opacity: 1;
+  padding: 0.15rem 0 0.55rem;
+}
+
+[data-style="travor"] .slot--transit .slot-body {
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  color: var(--ink-2);
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+[data-style="travor"] .slot--transit .slot-time {
+  color: var(--mute);
+  font-size: 0.78rem;
+  padding-top: 0.55rem;
+}
+
+[data-style="travor"] .transit-line {
+  display: block;
+  margin: 0;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius-control);
+  background: rgba(255, 227, 211, 0.35);
+  border: 1px solid rgba(255, 162, 107, 0.22);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+[data-style="travor"] .transit-from {
+  color: var(--mute);
+  font-weight: 500;
+}
+
+[data-style="travor"] .transit-place {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+[data-style="travor"] .transit-to {
+  color: var(--mute);
+  font-weight: 500;
+}
+
+[data-style="travor"] .transit-to .transit-place {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+[data-style="travor"] .transit-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem 0.35rem;
+  padding: 0.28rem 0.55rem;
+  margin: 0 0.1rem;
+  border-radius: var(--radius-control);
+  background: var(--plate);
+  border: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--ink-2);
+  line-height: 1.3;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+[data-style="travor"] .transit-option--rec {
+  border-color: rgba(255, 162, 107, 0.45);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 2px 8px rgba(255, 162, 107, 0.12);
+}
+
+[data-style="travor"] .transit-option--rec .transit-mode,
+[data-style="travor"] .transit-option .transit-mode {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+[data-style="travor"] .transit-sep {
+  color: #ccc8d8;
+  padding: 0 0.15rem;
+}
+
+[data-style="travor"] .transit-dur {
+  color: var(--teal-deep);
+  font-weight: 600;
+}
+
+[data-style="travor"] .transit-cost {
+  color: #ffa26b;
+  font-weight: 700;
+}
+
+[data-style="travor"] .transit-bracket {
+  color: var(--mute);
+}
+
+[data-style="travor"] .transit-divider {
+  color: var(--mute);
+  padding: 0 0.25rem;
+}
+
+[data-style="travor"] .slot--pending {
+  background-image: linear-gradient(
+    110deg,
+    transparent 30%,
+    rgba(255, 162, 107, 0.08) 45%,
+    transparent 60%
+  );
+}
+
+/* ============================================================
+   领航员：白卡 + 深蓝头 + 橙信标
+   ============================================================ */
+[data-style="travor"] .plan-nav-launch {
+  border-radius: var(--radius-control);
+  background: #ffa26b;
+  border: 0;
+  color: #fff;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  box-shadow: 0 12px 28px rgba(255, 162, 107, 0.32);
+}
+
+[data-style="travor"] .plan-nav__panel {
+  border-radius: 1.25rem;
+  border: 0;
+  box-shadow: 0 24px 60px rgba(31, 51, 71, 0.22);
+}
+
+[data-style="travor"] .plan-nav__head {
+  background: #ffe3d3;
+  color: var(--ink);
+  border-bottom: 0;
+  padding: 0.85rem 1rem 0.7rem;
+  border-radius: 1.25rem 1.25rem 0 0;
+}
+
+[data-style="travor"] .plan-nav__resize {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(255, 255, 255, 0.9);
+  color: #068a7f;
+}
+
+[data-style="travor"] .plan-nav__resize:hover,
+[data-style="travor"] .plan-nav__resize:focus-visible {
+  background: #fff;
+  color: #ff621f;
+  border-color: rgba(255, 255, 255, 1);
+  box-shadow: 0 2px 10px rgba(255, 98, 31, 0.12);
+}
+
+[data-style="travor"] .plan-nav__title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--ink);
+  margin: 0 0 0.15rem;
+}
+
+[data-style="travor"] .plan-nav__context {
+  color: var(--mute);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+[data-style="travor"] .plan-nav__head .btn {
+  font-size: 0.85rem;
+  padding: 0.4rem 1rem;
+  box-shadow: none;
+}
+
+[data-style="travor"] .plan-nav__head .btn-quiet {
+  border-color: transparent;
+  color: #fff;
+  background: #ffa26b;
+}
+
+[data-style="travor"] .plan-nav__head .btn-danger {
+  border-color: transparent;
+  color: #fff;
+  background: #ffa26b;
+}
+
+/* 跑道脊保留：浅紫灰 → 橙 */
+[data-style="travor"] .plan-nav__rail {
+  background: var(--stub);
+}
+
+[data-style="travor"] .plan-nav__rail-fill {
+  background: #ffa26b;
+}
+
+/* 助手消息：暖白底 + 左侧信标，连续段落合并为一块 */
+[data-style="travor"] .plan-nav__body {
+  background: #faf7f1;
+}
+
+[data-style="travor"] .msg-group--agent {
+  background: #fff;
+  border-color: #e8e2da;
+  border-left: 3px solid #068a7f;
+  box-shadow: 0 1px 0 rgba(31, 51, 71, 0.04);
+}
+
+[data-style="travor"] .msg-group--agent .msg-group__line {
+  color: var(--ink-2);
+}
+
+[data-style="travor"] .bubble {
+  border-radius: 1rem;
+  font-size: 0.88rem;
+  padding: 0.6rem 0.85rem;
+  line-height: 1.45;
+}
+
+[data-style="travor"] .bubble--agent {
+  background: #fff;
+  border: 1px solid #e8e2da;
+  border-left: 3px solid #068a7f;
+  color: var(--ink-2);
+  box-shadow: 0 1px 0 rgba(31, 51, 71, 0.04);
+}
+
+[data-style="travor"] .bubble--user {
+  background: #ffe3d3;
+  border: 0;
+  color: var(--ink);
+}
+
+/* 骨架预览 */
+[data-style="travor"] .skeleton-day__theme {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--teal-deep);
+}
+
+[data-style="travor"] .skeleton-stop__idx {
+  color: #ffa26b;
+}
+
+[data-style="travor"] .skeleton-stop--meal .skeleton-stop__name::before {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+/* 快答 chips：暖底 inactive，浅橙 active */
+[data-style="travor"] .plan-nav__quick .chip {
+  border-radius: var(--radius-control);
+  border: 1px solid var(--line);
+  background: var(--cloth-b);
+  color: var(--ink-2);
+  font-weight: 700;
+}
+
+[data-style="travor"] .plan-nav__quick .chip.is-on {
+  background: #ffa26b;
+  color: #fff;
+  border-color: transparent;
+}
+
+/* 弹窗 */
+[data-style="travor"] .dialog {
+  border-radius: 1.25rem;
+  border: 0;
+}
+
+[data-style="travor"] .dialog h2 {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+/* 出行小贴士 */
+[data-style="travor"] .plan-travel-tips {
+  border: 0;
+  box-shadow: 0 8px 24px rgba(31, 51, 71, 0.06);
+}
+
+[data-style="travor"] .plan-travel-tips .panel__head h2 {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+}
+
+[data-style="travor"] .travel-tips-card {
+  background: #fff;
+  border-color: #e8e2da;
+}
+
+[data-style="travor"] .travel-tips-card::before {
+  background: #ffa26b;
+}
+
+[data-style="travor"] .travel-tips-card__title {
+  color: #068a7f;
+}
+
+[data-style="travor"] .travel-tips-visa-link {
+  color: #068a7f;
+}
+
+[data-style="travor"] .travel-tips-visa-link:hover,
+[data-style="travor"] .travel-tips-visa-link:focus-visible {
+  color: #ff621f;
+}
+
+[data-style="travor"] .travel-tips-popover {
+  border-color: #e8e2da;
+  border-radius: 0.65rem;
+  box-shadow: 0 12px 32px rgba(31, 51, 71, 0.14);
+}
+
+[data-style="travor"] .panel-fold-btn {
+  background: #fff;
+  border-color: #e8e2da;
+  color: #068a7f;
+}
+
+[data-style="travor"] .panel-fold-btn:hover,
+[data-style="travor"] .panel-fold-btn:focus-visible {
+  color: #ff621f;
+  border-color: color-mix(in srgb, #ffa26b 45%, #e8e2da);
+}
+
+[data-style="travor"] .plan-nav__head .panel-fold-btn {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(255, 255, 255, 0.95);
+}
+
+[data-style="travor"] .plan-constraints .panel__head h2 {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+}
+
+[data-style="travor"] .constraint-item dt {
+  color: var(--mute);
+}
+
+[data-style="travor"] .constraint-item dd {
+  color: var(--ink);
+}
+
+/* 页签导航状态条 */
+[data-style="travor"] .plan-mock-states a.is-on {
+  color: #ffa26b;
+}
+
+/* 行程 panel 头：标题左、操作右（避开助手遮挡） */
+[data-style="travor"] .panel__head--itin {
+  align-items: center;
+  padding-right: 1.25rem;
+}
+
+[data-style="travor"] .panel__head--itin h2 {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+[data-style="travor"] .panel__head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+[data-style="travor"] .panel__head-actions .btn {
+  font-size: 0.85rem;
+  padding: 0.4rem 1rem;
+  box-shadow: none;
+}
+
+/* 底部仅保留导出，去掉 sticky 蓝底条 */
+[data-style="travor"] .plan-actions--export-only {
+  justify-content: flex-start;
+  position: static;
+  background: transparent;
+  padding-top: 0.25rem;
+}
+
+/* ============================================================
+   账号 / 资料 / 我的行程（与 §12 同款 Travor 语言）
+   ============================================================ */
+
+[data-style="travor"].shell-public .register-topbar .logo-word {
+  color: var(--ink);
+}
+
+[data-style="travor"] .register-card,
+[data-style="travor"] .auth-card {
+  border: 0;
+  border-radius: var(--radius-bowl);
+  box-shadow: var(--shadow-plate);
+  background: var(--plate);
+}
+
+[data-style="travor"] .register-card__head {
+  background: var(--plate);
+  border-bottom: 0;
+  padding-bottom: 0.5rem;
+}
+
+[data-style="travor"] .register-card__head h1,
+[data-style="travor"] .register-card__head h2,
+[data-style="travor"] .auth-card h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+[data-style="travor"] .register-card__head .meta,
+[data-style="travor"] .auth-card .meta {
+  color: var(--mute);
+}
+
+[data-style="travor"] .register-card__actions {
+  border-top-color: var(--line);
+}
+
+[data-style="travor"] .register-card__fields label,
+[data-style="travor"] .auth-card label,
+[data-style="travor"] .field-label-row label {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--teal-deep);
+}
+
+[data-style="travor"] .field label.is-required::after {
+  color: #ffa26b;
+}
+
+[data-style="travor"] .register-required-note,
+[data-style="travor"] .field-label-note {
+  color: var(--mute);
+}
+
+[data-style="travor"] .auth-links a {
+  color: var(--teal-deep);
+  font-weight: 600;
+}
+
+[data-style="travor"] .auth-links a:hover {
+  color: var(--teal);
+}
+
+[data-style="travor"] .register-card__fields .chip-row .chip {
+  border-radius: var(--radius-control);
+  border: 1px solid var(--line);
+  background: var(--cloth-b);
+  color: var(--ink-2);
+  font-weight: 700;
+}
+
+[data-style="travor"] .register-card__fields .chip-row .chip.is-on {
+  background: #ffa26b;
+  color: #fff;
+  border-color: transparent;
+}
+
+[data-style="travor"] .location-detect {
+  color: var(--teal-deep);
+}
+
+[data-style="travor"] .location-detect:hover {
+  color: var(--teal);
+  background: rgba(8, 172, 158, 0.08);
+}
+
+[data-style="travor"] .field .combo input {
+  width: 100%;
+  padding-right: 2.25rem;
+}
+
+[data-style="travor"] .field .combo__list {
+  max-height: 16rem;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-plate);
+}
+
+[data-style="travor"] .combo__toggle::before {
+  border-top-color: var(--teal-deep);
+}
+
+[data-style="travor"] .combo__list button:hover,
+[data-style="travor"] .combo__list button[aria-selected="true"] {
+  background: #ffe3d3;
+  color: var(--ink);
+}
+
+[data-style="travor"] .app-header {
+  border-bottom-color: var(--line);
+  background: color-mix(in srgb, var(--cloth-b) 92%, white);
+}
+
+[data-style="travor"] .locale-switch button.is-on {
+  background: #ffa26b;
+  color: #fff;
+}
+
+[data-style="travor"] .trip-card {
+  border: 0;
+  border-radius: var(--radius-bowl);
+  box-shadow: var(--shadow-plate);
+}
+
+[data-style="travor"] .trip-card:hover {
+  box-shadow: 0 16px 40px rgba(31, 51, 71, 0.12);
+}
+
+[data-style="travor"] .trip-card__media {
+  background: #ffe3d3;
+}
+
+[data-style="travor"] .trip-card__body h2 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+[data-style="travor"] .trip-card__meta {
+  color: var(--teal-deep);
+}
+
+[data-style="travor"] .page-meta {
+  color: var(--mute);
+}
+
+[data-style="travor"] .page-meta a {
+  color: var(--teal-deep);
+  font-weight: 600;
+}
+
+[data-style="travor"] .empty-state {
+  border-color: var(--line);
+  background: var(--plate);
+}
+
+[data-style="travor"] .chat-panel .bubble--agent {
+  background: #f4f3fa;
+  border: 0;
+  color: var(--ink-2);
+}
+
+[data-style="travor"] .chat-panel .bubble--user {
+  background: #ffe3d3;
+  color: var(--ink);
+}
+
+[data-style="travor"] .hour-time {
+  font-family: var(--font-mono);
+  color: var(--teal-deep);
+  font-weight: 500;
+}
+
+/* —— Home / Gallery / Travel advice —— */
+[data-style="travor"] .home-main h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+[data-style="travor"] .home-main .lead {
+  color: var(--ink-2);
+}
+
+[data-style="travor"] .logo-home .logo-word {
+  color: var(--ink);
+}
+
+[data-style="travor"] .gallery-main h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+[data-style="travor"] .gallery-list a {
+  color: var(--ink);
+  border-color: var(--line);
+  background: var(--plate);
+  box-shadow: var(--shadow-plate);
+}
+
+[data-style="travor"] .gallery-list a:hover {
+  border-color: rgba(255, 162, 107, 0.45);
+}
+
+[data-style="travor"] .gallery-list a span {
+  color: var(--mute);
+}
+
+[data-style="travor"] .visa-advice .callout.is-ok {
+  background: rgba(8, 172, 158, 0.08);
+  border: 1px solid rgba(8, 172, 158, 0.25);
+  color: var(--ink-2);
+}
+
+[data-style="travor"] .visa-advice h3 {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  color: var(--teal-deep);
+  font-size: 0.9rem;
+}
+
+/* —— Footer（公开页与 App 页统一暖底） —— */
+[data-style="travor"] .family-footer,
+[data-style="travor"] .family-footer--app {
+  background: var(--cloth-b);
+  border-top: 1px solid var(--line);
+  backdrop-filter: none;
+}
+
+[data-style="travor"] .family-footer__inner {
+  font-family: var(--font-ui);
+}
+
+[data-style="travor"] .family-footer__label {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--teal-deep);
+}
+
+[data-style="travor"] .family-footer__link:focus-visible {
+  outline-color: var(--teal);
+}

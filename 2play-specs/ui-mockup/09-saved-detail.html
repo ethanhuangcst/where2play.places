@@ -5,128 +5,298 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>行程详情 — where2play.place</title>
     <link rel="icon" href="assets/favicon.png" type="image/png" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="assets/mockup.css" />
+    <link rel="stylesheet" href="assets/mockup-travor.css" />
   </head>
-  <body class="shell-app">
+  <body class="shell-app" data-style="travor">
     <a class="sr-only" href="#content">Skip to content</a>
     <header class="app-header">
       <div class="app-header__inner">
-      <a class="logo" href="06-plan.html" aria-label="where2play.place">
-        <span class="mark-host mark-host--plane">
-          <svg class="wing-trail" viewBox="0 0 18 10" fill="none" aria-hidden="true">
-            <path d="M17 2.2c-3.2.9-6.5 2.2-10 3.6C4.2 6.8 2.2 7.6 1 8.2" />
-          </svg>
-          <img class="mark mark--plane" src="assets/play-logo.png" alt="" width="40" height="40" />
-        </span>
-        <span class="logo-word">where2play.place</span>
-      </a>
-      <button type="button" class="menu-toggle btn btn-quiet" data-testid="nav-menu">Menu</button>
-      <nav class="app-nav" aria-label="Primary">
-        <a href="06-plan.html">行程规划</a>
-        <a href="08-saved.html" class="is-active">我的行程</a>
-        <a href="07-profile.html">个人信息</a>
-      </nav>
-      <div class="app-user">
-        <span class="hello">你好，</span>
-        <span class="avatar" aria-hidden="true" title="Mei"><img src="assets/play-logo.png" alt="" /></span>
-        <span class="hello hello--name">Mei</span>
-        <div class="app-user__tools">
-          <div class="locale-switch" role="group" aria-label="Locale">
-            <button type="button">EN</button>
-            <button type="button" class="is-on">CN</button>
-            <button type="button">HK</button>
-            <button type="button">TW</button>
+        <a class="logo" href="06-plan-skeleton.html" aria-label="where2play.place">
+          <span class="mark-host mark-host--plane">
+            <svg class="wing-trail" viewBox="0 0 18 10" fill="none" aria-hidden="true">
+              <path d="M17 2.2c-3.2.9-6.5 2.2-10 3.6C4.2 6.8 2.2 7.6 1 8.2" />
+            </svg>
+            <img class="mark mark--plane" src="assets/play-logo.png" alt="" width="40" height="40" />
+          </span>
+          <span class="logo-word">where2play.place</span>
+        </a>
+        <button type="button" class="menu-toggle btn btn-quiet" data-testid="nav-menu">Menu</button>
+        <nav class="app-nav" aria-label="Primary">
+          <a href="06-plan-skeleton.html">行程规划</a>
+          <a href="08-saved.html" class="is-active">我的行程</a>
+          <a href="07-profile.html">个人信息</a>
+        </nav>
+        <div class="app-user">
+          <span class="hello">你好，</span>
+          <span class="avatar" aria-hidden="true" title="Mei"><img src="assets/play-logo.png" alt="" /></span>
+          <span class="hello hello--name">Mei</span>
+          <div class="app-user__tools">
+            <div class="locale-switch" role="group" aria-label="Locale">
+              <button type="button">EN</button>
+              <button type="button" class="is-on">CN</button>
+              <button type="button">HK</button>
+              <button type="button">TW</button>
+            </div>
+            <a class="btn btn-quiet" href="01-home.html">登出</a>
           </div>
-          <a class="btn btn-quiet" href="01-home.html">登出</a>
         </div>
       </div>
-          </div>
     </header>
 
     <main id="content" class="app-main">
       <p class="page-meta"><a href="08-saved.html">← 我的行程</a></p>
       <h1 class="page-title">台北 2 日 · 情侣节奏</h1>
-      <p class="page-meta">已保存 · 对话来自数据库快照</p>
+      <p class="page-meta">已保存 · 2026-08-18</p>
 
       <div class="plan-stack">
-        <section class="panel">
+        <!-- 出行限制（只读） -->
+        <section class="panel planner-card plan-constraints" data-testid="plan-constraints" aria-labelledby="constraints-title">
           <div class="panel__head">
-            <h2>行程详情</h2>
-            <span class="page-meta" style="margin:0">saved 2026-08-18</span>
+            <h2 id="constraints-title">出行限制</h2>
           </div>
           <div class="panel__body">
-            <p class="itinerary-summary">西门町起步，城市漫步与夜市；次日北投集中活动。</p>
-            <div class="day-tabs">
-              <button type="button" class="day-tab is-on" data-day="1">Day 1</button>
-              <button type="button" class="day-tab" data-day="2">Day 2</button>
+            <dl class="constraint-grid">
+              <div class="constraint-item">
+                <dt>目的地</dt>
+                <dd>台北</dd>
+              </div>
+              <div class="constraint-item">
+                <dt>起始日期</dt>
+                <dd>2026-11-08</dd>
+              </div>
+              <div class="constraint-item">
+                <dt>天数</dt>
+                <dd>2</dd>
+              </div>
+              <div class="constraint-item">
+                <dt>人数</dt>
+                <dd>2</dd>
+              </div>
+              <div class="constraint-item">
+                <dt>预算</dt>
+                <dd>$$ 中等</dd>
+              </div>
+            </dl>
+          </div>
+        </section>
+
+        <!-- 出行小贴士 -->
+        <section class="panel plan-travel-tips" data-testid="plan-travel-tips" aria-labelledby="travel-tips-title">
+          <div class="panel__head plan-travel-tips__head">
+            <div class="plan-travel-tips__head-main">
+              <h2 id="travel-tips-title">出行小贴士</h2>
+              <span class="plan-travel-tips__meta">2026-11-08 至 11-09 · 台北</span>
             </div>
+            <button type="button" class="panel-fold-btn" data-testid="plan-travel-tips-toggle" aria-expanded="true" aria-controls="travel-tips-body" aria-label="隐藏出行小贴士">
+              <svg class="panel-fold-btn__icon" viewBox="0 0 20 20" width="18" height="18" fill="none" aria-hidden="true">
+                <path d="M5 12l5-5 5 5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+          <div class="panel__body plan-travel-tips__body" id="travel-tips-body">
+            <div class="travel-tips-grid">
+              <article class="travel-tips-card">
+                <header class="travel-tips-card__head">
+                  <span class="travel-tips-card__idx" aria-hidden="true">01</span>
+                  <h3 class="travel-tips-card__title">签证与目的地</h3>
+                </header>
+                <p class="travel-tips-card__lead">
+                  <span class="travel-tips-visa-wrap">
+                    <a href="10-travel-advice.html" class="travel-tips-visa-link" data-testid="plan-visa-link">中国护照 · 台湾地区入境要求</a>
+                    <span class="travel-tips-popover" role="tooltip">
+                      <strong>入台证</strong>
+                      持中国护照以观光等事由前往台湾地区，须提前办妥有效入台证及相关签注；证件与停留期限以签发机关为准，出行前请核对有效期。
+                      <span class="travel-tips-popover__src">数据来源 · Orizn Visa</span>
+                    </span>
+                  </span>
+                </p>
+                <p class="travel-tips-intro">盆地都市与象山夜景交织，捷运串联西门町到北投，适合情侣慢节奏漫步。</p>
+                <ol class="travel-tips-must-see">
+                  <li>龙山寺</li>
+                  <li>台北 101 观景台</li>
+                  <li>北投温泉博物馆</li>
+                </ol>
+              </article>
+
+              <article class="travel-tips-card">
+                <header class="travel-tips-card__head">
+                  <span class="travel-tips-card__idx" aria-hidden="true">02</span>
+                  <h3 class="travel-tips-card__title">天气与交通</h3>
+                </header>
+                <p>11 月上旬日均 20–24°C，湿度偏高；午后偶阵雨，傍晚转凉。</p>
+                <p class="travel-tips-sub">捷运 + 公车覆盖主要景点；悠游卡可跨捷运/公车；西门町至宁夏夜市步行可达。</p>
+              </article>
+
+              <article class="travel-tips-card">
+                <header class="travel-tips-card__head">
+                  <span class="travel-tips-card__idx" aria-hidden="true">03</span>
+                  <h3 class="travel-tips-card__title">衣着建议</h3>
+                </header>
+                <p>轻薄长袖 + 薄外套；备折叠伞。北投温泉区室内外温差大，备一双好脱的鞋。</p>
+                <p class="travel-tips-sub">夜市与捷运站步行多，穿透气防滑的休闲鞋。</p>
+              </article>
+
+              <article class="travel-tips-card">
+                <header class="travel-tips-card__head">
+                  <span class="travel-tips-card__idx" aria-hidden="true">04</span>
+                  <h3 class="travel-tips-card__title">安全提示</h3>
+                </header>
+                <p>捷运与夜市拥挤处留意随身物品；雨天石板路湿滑，放慢脚步。</p>
+                <p class="travel-tips-sub">紧急电话 119 / 110；中国驻台北办事处领保 +886-2-2723-6170（备用）。</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <!-- 行程详情 -->
+        <section class="panel" aria-labelledby="itin-title">
+          <div class="panel__head panel__head--itin">
+            <h2 id="itin-title">台北二日游</h2>
+            <div class="panel__head-actions">
+              <a class="btn btn-quiet" href="08-saved.html">返回列表</a>
+              <button type="button" class="btn" data-testid="plan-export">导出 PDF</button>
+              <button type="button" class="btn btn-danger">取消收藏</button>
+            </div>
+          </div>
+          <div class="panel__body">
+            <div class="day-tabs" role="tablist" aria-label="Days">
+              <button type="button" class="day-tab is-on" data-day="1" role="tab" aria-selected="true">Day 1</button>
+              <button type="button" class="day-tab" data-day="2" role="tab" aria-selected="false">Day 2</button>
+            </div>
+
             <div data-day-panel="1">
-              <ul class="hour-list">
-                <li class="hour-row">
-                  <span class="hour-time">09:30</span>
-                  <div class="hour-place">
-                    <img class="hour-thumb" src="assets/play-logo.png" alt="" />
-                    <div>
+              <div class="highlights">
+                <p class="highlights__label">Highlights</p>
+                <h3 class="highlights__title">龙山寺 · 西门町 · 宁夏夜市</h3>
+                <p class="highlights__theme">主题：老城参拜 · 步行商圈 · 夜市小吃</p>
+              </div>
+
+              <div class="slot" data-testid="stop-origin">
+                <div class="slot-time">09:00</div>
+                <div class="slot-body">
+                  <a class="slot-thumb-link" href="#" target="_blank" rel="noopener noreferrer"><img class="slot-thumb" src="assets/play-logo.png" alt="" /></a>
+                  <div class="slot-main">
+                    <div class="slot-copy">
+                      <span class="slot-kind">Stay</span>
+                      <h3>台北车站附近酒店</h3>
+                      <p>每日起点；捷运与台铁枢纽。</p>
+                    </div>
+                    <div class="slot-actions"><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">详情</a><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">地图</a></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="slot slot--transit">
+                <div class="slot-time">09:15</div>
+                <div class="slot-body">
+                  <p class="transit-line">
+                    <span class="transit-from">从 · <span class="transit-place">台北车站附近酒店</span></span>
+                    <span class="transit-to">前往 · <span class="transit-place">龙山寺</span>：</span>
+                    <span class="transit-option transit-option--rec"><span class="transit-bracket">[</span><span class="transit-mode">捷运</span><span class="transit-sep">|</span><span class="transit-dur">15min</span><span class="transit-sep">|</span><span class="transit-cost">$</span><span class="transit-bracket">]</span></span>
+                    <span class="transit-divider">/</span>
+                    <span class="transit-option"><span class="transit-bracket">[</span><span class="transit-mode">打车</span><span class="transit-sep">|</span><span class="transit-dur">8min</span><span class="transit-sep">|</span><span class="transit-cost">$$</span><span class="transit-bracket">]</span></span>
+                  </p>
+                </div>
+              </div>
+
+              <div class="slot" data-testid="stop-filled">
+                <div class="slot-time">09:30–11:00</div>
+                <div class="slot-body">
+                  <a class="slot-thumb-link" href="#" target="_blank" rel="noopener noreferrer"><img class="slot-thumb" src="assets/play-logo.png" alt="" /></a>
+                  <div class="slot-main">
+                    <div class="slot-copy">
+                      <span class="slot-kind">Temple</span>
                       <h3>龙山寺</h3>
                       <p>开场参拜，避开正午。</p>
-                      <a class="map-link" href="#" target="_blank" rel="noopener noreferrer">详情</a><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">地图</a>
                     </div>
+                    <div class="slot-actions"><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">详情</a><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">地图</a></div>
                   </div>
-                </li>
-                <li class="hour-row">
-                  <span class="hour-time">18:30</span>
-                  <div class="hour-place">
-                    <img class="hour-thumb" src="assets/play-logo.png" alt="" />
-                    <div>
+                </div>
+              </div>
+
+              <div class="slot slot--transit">
+                <div class="slot-time">18:00</div>
+                <div class="slot-body">
+                  <p class="transit-line">
+                    <span class="transit-from">从 · <span class="transit-place">西门町</span></span>
+                    <span class="transit-to">前往 · <span class="transit-place">宁夏夜市</span>：</span>
+                    <span class="transit-option transit-option--rec"><span class="transit-bracket">[</span><span class="transit-mode">步行</span><span class="transit-sep">|</span><span class="transit-dur">12min</span><span class="transit-sep">|</span><span class="transit-cost">$</span><span class="transit-bracket">]</span></span>
+                  </p>
+                </div>
+              </div>
+
+              <div class="slot" data-testid="stop-filled">
+                <div class="slot-time">18:30–20:30</div>
+                <div class="slot-body">
+                  <a class="slot-thumb-link" href="#" target="_blank" rel="noopener noreferrer"><img class="slot-thumb" src="assets/play-logo.png" alt="" /></a>
+                  <div class="slot-main">
+                    <div class="slot-copy">
+                      <span class="slot-kind">Night market</span>
                       <h3>宁夏夜市</h3>
                       <p>晚餐小吃。</p>
-                      <a class="map-link" href="#" target="_blank" rel="noopener noreferrer">详情</a><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">地图</a>
                     </div>
+                    <div class="slot-actions"><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">详情</a><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">地图</a></div>
                   </div>
-                </li>
-              </ul>
+                </div>
+              </div>
             </div>
+
             <div data-day-panel="2" hidden>
-              <ul class="hour-list">
-                <li class="hour-row">
-                  <span class="hour-time">14:30</span>
-                  <div class="hour-place">
-                    <img class="hour-thumb" src="assets/play-logo.png" alt="" />
-                    <div>
+              <div class="highlights">
+                <p class="highlights__label">Highlights</p>
+                <h3 class="highlights__title">北投温泉 · 轻松收尾</h3>
+                <p class="highlights__theme">主题：少走路 · 温泉半日</p>
+              </div>
+
+              <div class="slot" data-testid="stop-origin">
+                <div class="slot-time">13:00</div>
+                <div class="slot-body">
+                  <a class="slot-thumb-link" href="#" target="_blank" rel="noopener noreferrer"><img class="slot-thumb" src="assets/play-logo.png" alt="" /></a>
+                  <div class="slot-main">
+                    <div class="slot-copy">
+                      <span class="slot-kind">Stay</span>
+                      <h3>台北车站附近酒店</h3>
+                      <p>Day 2 起点。</p>
+                    </div>
+                    <div class="slot-actions"><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">详情</a><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">地图</a></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="slot slot--transit">
+                <div class="slot-time">13:30</div>
+                <div class="slot-body">
+                  <p class="transit-line">
+                    <span class="transit-from">从 · <span class="transit-place">台北车站附近酒店</span></span>
+                    <span class="transit-to">前往 · <span class="transit-place">北投温泉博物馆</span>：</span>
+                    <span class="transit-option transit-option--rec"><span class="transit-bracket">[</span><span class="transit-mode">捷运</span><span class="transit-sep">|</span><span class="transit-dur">25min</span><span class="transit-sep">|</span><span class="transit-cost">$</span><span class="transit-bracket">]</span></span>
+                  </p>
+                </div>
+              </div>
+
+              <div class="slot" data-testid="stop-filled">
+                <div class="slot-time">14:30–17:00</div>
+                <div class="slot-body">
+                  <a class="slot-thumb-link" href="#" target="_blank" rel="noopener noreferrer"><img class="slot-thumb" src="assets/play-logo.png" alt="" /></a>
+                  <div class="slot-main">
+                    <div class="slot-copy">
+                      <span class="slot-kind">Museum</span>
                       <h3>北投温泉博物馆</h3>
                       <p>轻松收尾。</p>
-                      <a class="map-link" href="#" target="_blank" rel="noopener noreferrer">详情</a><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">地图</a>
                     </div>
+                    <div class="slot-actions"><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">详情</a><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">地图</a></div>
                   </div>
-                </li>
-              </ul>
+                </div>
+              </div>
             </div>
           </div>
         </section>
-
-        <section class="panel">
-          <div class="panel__head">
-            <h2>保存时的对话</h2>
-            <span class="page-meta" style="margin:0">只读自 DB · 续聊请回到规划并再次保存</span>
-          </div>
-          <div class="chat-panel">
-            <div class="chat-transcript" data-testid="chat-transcript">
-              <div class="bubble bubble--agent">已排好台北 2 日。</div>
-              <div class="bubble bubble--user">第二天少走路。</div>
-              <div class="bubble bubble--agent">Day 2 已改为北投集中。</div>
-            </div>
-          </div>
-        </section>
-
-        <div class="plan-actions">
-          <a class="btn btn-quiet" href="08-saved.html">返回列表</a>
-          <button type="button" class="btn" data-testid="plan-export">导出 PDF</button>
-          <button type="button" class="btn btn-danger">取消收藏</button>
-        </div>
       </div>
     </main>
 
-        <footer class="family-footer family-footer--app">
+    <footer class="family-footer family-footer--app">
       <div class="family-footer__inner">
         <nav class="family-footer__row" aria-label="places.family">
           <span class="family-footer__label">places.family:</span>

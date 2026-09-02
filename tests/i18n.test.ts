@@ -12,7 +12,20 @@ const REGISTER_FIELD_KEYS = [
   "play.errors.age_required",
   "play.errors.age_out_of_range",
   "play.errors.photo_too_large",
+  "play.errors.nationality_invalid",
   "play.errors.network",
+] as const;
+
+const NATIONALITY_COUNTRY_KEYS = [
+  "play.nationality.country.CHN",
+  "play.nationality.country.HKG",
+  "play.nationality.country.TWN",
+] as const;
+
+const NATIONALITY_KEYS = [
+  "play.register.nationality",
+  "play.register.nationality_placeholder",
+  "play.profile.nationality",
 ] as const;
 
 describe("i18n catalogs", () => {
@@ -27,6 +40,17 @@ describe("i18n catalogs", () => {
   it("should_define_register_field_errors_in_all_locales", () => {
     for (const locale of ["EN", "CN", "HK", "TW"] as const) {
       for (const key of REGISTER_FIELD_KEYS) {
+        expect(catalogs[locale][key], `${locale} missing ${key}`).toBeTruthy();
+      }
+    }
+  });
+
+  it("TC-M11-38-06: should_define_nationality_keys_in_all_locales", () => {
+    for (const locale of ["EN", "CN", "HK", "TW"] as const) {
+      for (const key of NATIONALITY_KEYS) {
+        expect(catalogs[locale][key], `${locale} missing ${key}`).toBeTruthy();
+      }
+      for (const key of NATIONALITY_COUNTRY_KEYS) {
         expect(catalogs[locale][key], `${locale} missing ${key}`).toBeTruthy();
       }
     }

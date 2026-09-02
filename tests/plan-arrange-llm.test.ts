@@ -309,4 +309,174 @@ describe("plan-arrange-llm", () => {
     expect(calls).toBe(1);
     expect(result.blocks[0]?.start_time).toBe("10:00");
   });
+
+  // ==========================================================================
+  // plan-16: Keep LLM transit fields + 2play-side timing/dedup validations
+  // ==========================================================================
+
+  it("should_preserve_legs_to_here_on_parse_TC_M3r_36_01", () => {
+    const raw = JSON.stringify({
+      day_index: 1,
+      blocks: [
+        {
+          name: "Place A",
+          type: "attraction",
+          start_time: "10:00",
+          duration_min: 90,
+          reason: "ok",
+          legs_to_here: [{ mode: "metro", duration_min: 25, recommended: true }],
+        },
+        {
+          name: "Place B",
+          type: "attraction",
+          start_time: "11:55",
+          duration_min: 60,
+          reason: "ok",
+          legs_to_here: [{ mode: "walk", duration_min: 5, recommended: true }],
+        },
+      ],
+    });
+    const result = parseArrangeDayModelText(raw, {
+      dayIndex: 1,
+      candidateNames: new Set(["Place A", "Place B"]),
+      date: "2026-08-22",
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.blocks[0]?.legs_to_here).toEqual([
+      { mode: "metro", duration_min: 25, recommended: true },
+    ]);
+    expect(result.value.blocks[1]?.legs_to_here).toEqual([
+      { mode: "walk", duration_min: 5, recommended: true },
+    ]);
+  });
+
+  it("should_retry_when_station_timing_violation_TC_M3r_36_03", async () => {
+    let calls = 0;
+    setArrangeLlmCompleteForTests(async () => {
+      calls += 1;
+      // First attempt: block 1 ends 12:00, transit 30min, but block 2 starts 12:10 (gap too short).
+      // Retry: block 2 starts 12:35 (accounts for transit).
+      const block2Start = calls === 1 ? "12:10" : "12:35";
+      return JSON.stringify({
+        day_index: 1,
+        blocks: [
+          { name: "Place A", type: "attraction", start_time: "10:00", duration_min: 120, reason: "ok" },
+          {
+            name: "Place B",
+            type: "attraction",
+            start_time: block2Start,
+            duration_min: 60,
+            reason: "ok",
+            legs_to_here: [{ mode: "metro", duration_min: 30, recommended: true }],
+          },
+        ],
+      });
+    });
+    const result = await completeArrangeDay({
+      locale: "EN",
+      city: "Taipei",
+      dayIndex: 1,
+      date: "2026-08-22",
+      criteria: { destination: "Taipei", days: 1, startDate: "2026-08-22" },
+      providers: ["GOOGLE_MAPS"],
+      candidates: { places: [{ name: "Place A" }, { name: "Place B" }], restaurants: [] },
+    });
+    expect(calls).toBe(2);
+    expect(result.blocks[1]?.start_time).toBe("12:35");
+  });
+
+  it("should_pass_station_timing_when_gap_accounts_for_transit_TC_M3r_36_03", async () => {
+    let calls = 0;
+    setArrangeLlmCompleteForTests(async () => {
+      calls += 1;
+      return JSON.stringify({
+        day_index: 1,
+        blocks: [
+          { name: "Place A", type: "attraction", start_time: "10:00", duration_min: 120, reason: "ok" },
+          {
+            name: "Place B",
+            type: "attraction",
+            start_time: "12:30",
+            duration_min: 60,
+            reason: "ok",
+            legs_to_here: [{ mode: "metro", duration_min: 30, recommended: true }],
+          },
+        ],
+      });
+    });
+    const result = await completeArrangeDay({
+      locale: "EN",
+      city: "Taipei",
+      dayIndex: 1,
+      date: "2026-08-22",
+      criteria: { destination: "Taipei", days: 1, startDate: "2026-08-22" },
+      providers: ["GOOGLE_MAPS"],
+      candidates: { places: [{ name: "Place A" }, { name: "Place B" }], restaurants: [] },
+    });
+    expect(calls).toBe(1);
+    expect(result.blocks[1]?.start_time).toBe("12:30");
+  });
+
+  it("should_retry_when_same_day_restaurant_dedup_violation_TC_M3r_36_04", async () => {
+    let calls = 0;
+    setArrangeLlmCompleteForTests(async () => {
+      calls += 1;
+      // First attempt: same restaurant for lunch and dinner.
+      // Retry: different restaurant for dinner.
+      const dinnerName = calls === 1 ? "Same Restaurant" : "Different Restaurant";
+      return JSON.stringify({
+        day_index: 1,
+        blocks: [
+          { name: "Place A", type: "attraction", start_time: "10:00", duration_min: 120, reason: "ok" },
+          { name: "Same Restaurant", type: "lunch", start_time: "12:30", duration_min: 60, reason: "ok" },
+          { name: "Place B", type: "attraction", start_time: "14:00", duration_min: 60, reason: "ok" },
+          { name: dinnerName, type: "dinner", start_time: "18:00", duration_min: 90, reason: "ok" },
+        ],
+      });
+    });
+    const result = await completeArrangeDay({
+      locale: "EN",
+      city: "Taipei",
+      dayIndex: 1,
+      date: "2026-08-22",
+      criteria: { destination: "Taipei", days: 1, startDate: "2026-08-22" },
+      providers: ["GOOGLE_MAPS"],
+      candidates: {
+        places: [{ name: "Place A" }, { name: "Place B" }],
+        restaurants: [{ name: "Same Restaurant" }, { name: "Different Restaurant" }],
+      },
+    });
+    expect(calls).toBe(2);
+    expect(result.blocks[3]?.name).toBe("Different Restaurant");
+  });
+
+  it("should_pass_dedup_when_lunch_dinner_different_names_TC_M3r_36_04", async () => {
+    let calls = 0;
+    setArrangeLlmCompleteForTests(async () => {
+      calls += 1;
+      return JSON.stringify({
+        day_index: 1,
+        blocks: [
+          { name: "Place A", type: "attraction", start_time: "10:00", duration_min: 120, reason: "ok" },
+          { name: "Lunch Place", type: "lunch", start_time: "12:30", duration_min: 60, reason: "ok" },
+          { name: "Place B", type: "attraction", start_time: "14:00", duration_min: 60, reason: "ok" },
+          { name: "Dinner Place", type: "dinner", start_time: "18:00", duration_min: 90, reason: "ok" },
+        ],
+      });
+    });
+    const result = await completeArrangeDay({
+      locale: "EN",
+      city: "Taipei",
+      dayIndex: 1,
+      date: "2026-08-22",
+      criteria: { destination: "Taipei", days: 1, startDate: "2026-08-22" },
+      providers: ["GOOGLE_MAPS"],
+      candidates: {
+        places: [{ name: "Place A" }, { name: "Place B" }],
+        restaurants: [{ name: "Lunch Place" }, { name: "Dinner Place" }],
+      },
+    });
+    expect(calls).toBe(1);
+  });
 });

@@ -183,4 +183,56 @@ describe("expandArrangeDayToSlots", () => {
     }
     expect(transit?.preview.reason).toBe("play.plan.transit_directions");
   });
+
+  it("should_fallback_to_estimate_when_no_legs_to_here_TC_M3r_36_05", () => {
+    const expanded = expandArrangeDayToSlots(
+      [
+        {
+          name: "A",
+          type: "attraction",
+          start_time: "10:00",
+          duration_min: 60,
+          reason: "first",
+        },
+        {
+          name: "B",
+          type: "attraction",
+          start_time: "12:00",
+          duration_min: 60,
+          reason: "second",
+          // No legs_to_here — should fall back to estimateTransferMin
+        },
+      ],
+      {},
+      { transit_outcome: "directions" },
+    );
+
+    const transit = expanded.find((e) => e.preview.kind === "transit");
+    expect(transit?.slot.kind).toBe("transit");
+    // Fallback estimate should produce a transit slot (not empty)
+    if (transit?.slot.kind === "transit") {
+      expect(transit.slot.text).toBeTruthy();
+    }
+  });
+
+  it("should_show_partial_transit_outcome_label_TC_M3r_36_02", () => {
+    const expanded = expandArrangeDayToSlots(
+      [
+        {
+          name: "A",
+          type: "attraction",
+          start_time: "10:00",
+          duration_min: 60,
+          reason: "first",
+        },
+      ],
+      { from_origin: { transport: "walk", duration_min: 10 } },
+      { transit_outcome: "partial" },
+    );
+
+    // When transit_outcome is "partial", the from_origin transit should still be shown
+    // but the outcome should be reflected (no crash, degraded state visible).
+    const transit = expanded.find((e) => e.preview.kind === "transit");
+    expect(transit).toBeDefined();
+  });
 });

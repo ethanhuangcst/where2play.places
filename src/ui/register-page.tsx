@@ -18,6 +18,7 @@ import { LocaleSwitch } from "@/src/ui/locale-switch";
 import { PasswordField } from "@/src/ui/password-field";
 import { LocationField } from "@/src/ui/location-field";
 import { RegisterPhotoBowl } from "@/src/ui/register-photo-bowl";
+import { NationalitySelect } from "@/src/ui/nationality-select";
 import { usePageTitle } from "@/src/ui/use-page-title";
 import { FieldWrap, fieldDescribedBy } from "@/src/ui/field-wrap";
 import { notifySessionChanged } from "@/src/ui/session-events";
@@ -47,6 +48,7 @@ export default function RegisterPageClient() {
   const [locationLng, setLocationLng] = useState<number | null>(null);
   const [interests, setInterests] = useState<InterestId[]>([]);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [nationality, setNationality] = useState("");
 
   function toggleInterest(id: InterestId) {
     setInterests((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -98,6 +100,7 @@ export default function RegisterPageClient() {
       age: String(fd.get("age") ?? ""),
       password: String(fd.get("password") ?? ""),
       confirmPassword: String(fd.get("password_confirm") ?? ""),
+      nationality: nationality || undefined,
     };
     const clientErrors = validateRegisterClient(input);
     if (Object.keys(clientErrors).length > 0) {
@@ -109,6 +112,7 @@ export default function RegisterPageClient() {
       name: input.name,
       email: input.email,
       gender: fd.get("gender") || undefined,
+      nationality: nationality || undefined,
       age: input.age || undefined,
       defaultLocation: loc || undefined,
       defaultLat: locationLat ?? undefined,
@@ -222,6 +226,21 @@ export default function RegisterPageClient() {
                       />
                     </FieldWrap>
                   </div>
+                  <NationalitySelect
+                    id="nationality"
+                    testId="register-nationality"
+                    value={nationality}
+                    onChange={(v) => {
+                      setNationality(v);
+                      clearField("nationality");
+                    }}
+                    labelKey="play.register.nationality"
+                  />
+                  {fieldErrors.nationality ? (
+                    <p className="error" role="alert" data-testid="field-nationality-error">
+                      {t(fieldErrors.nationality)}
+                    </p>
+                  ) : null}
                   <div className="field">
                     <label htmlFor="location">{t("play.register.location")}</label>
                     <LocationField

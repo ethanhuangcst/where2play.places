@@ -125,4 +125,38 @@ describe("POST /api/auth/register", () => {
     const res = await registerRoute(bffRequest("/api/auth/register", { method: "POST", body }));
     expect(res.status).toBe(409);
   });
+
+  it("TC-M11-38-03: should_persist_nationality_on_register", async () => {
+    const res = await registerRoute(
+      bffRequest("/api/auth/register", {
+        method: "POST",
+        body: {
+          name: "Nationality User",
+          email: "nationality@where2play.place",
+          password: "testpass123",
+          confirmPassword: "testpass123",
+          nationality: "CHN",
+        },
+      }),
+    );
+    expect(res.status).toBe(200);
+    const user = await prisma.user.findUnique({ where: { email: "nationality@where2play.place" } });
+    expect(user?.nationality).toBe("CHN");
+  });
+
+  it("should_reject_invalid_nationality_on_register", async () => {
+    const res = await registerRoute(
+      bffRequest("/api/auth/register", {
+        method: "POST",
+        body: {
+          name: "Bad Nat",
+          email: "bad.nat@where2play.place",
+          password: "testpass123",
+          confirmPassword: "testpass123",
+          nationality: "INVALID",
+        },
+      }),
+    );
+    expect(res.status).toBe(400);
+  });
 });

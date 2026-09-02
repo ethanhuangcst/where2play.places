@@ -52,6 +52,15 @@ describe("validateRegisterClient", () => {
     );
   });
 
+  it("TC-M11-38-01: should_flag_invalid_nationality", () => {
+    const errors = validateRegisterClient({ ...valid, nationality: "BAD" });
+    expect(errors.nationality).toBe("play.errors.nationality_invalid");
+  });
+
+  it("TC-M11-38-02: should_pass_valid_nationality_chn", () => {
+    expect(validateRegisterClient({ ...valid, nationality: "CHN" })).toEqual({});
+  });
+
   it("should_map_api_errors_to_fields", () => {
     expect(mapApiErrorToField("errors.name_required").field).toBe("name");
     expect(mapApiErrorToField("errors.email_required").field).toBe("email");

@@ -3,37 +3,60 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Reset password — where2play.place</title>
+    <title>重置密码 — where2play.place</title>
     <link rel="icon" href="assets/favicon.png" type="image/png" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="assets/mockup.css" />
+    <link rel="stylesheet" href="assets/mockup-travor.css" />
   </head>
-  <body class="shell-public">
+  <body class="shell-public" data-style="travor">
     <a class="sr-only" href="#content">Skip to content</a>
-    <main id="content" class="auth-main">
-      <div class="auth-card">
+
+    <div class="register-shell">
+      <header class="register-topbar">
         <a class="logo" href="01-home.html" aria-label="where2play.place">
           <span class="mark-host mark-host--plane">
             <svg class="wing-trail" viewBox="0 0 18 10" fill="none" aria-hidden="true">
-            <path d="M17 2.2c-3.2.9-6.5 2.2-10 3.6C4.2 6.8 2.2 7.6 1 8.2" />
-          </svg>
+              <path d="M17 2.2c-3.2.9-6.5 2.2-10 3.6C4.2 6.8 2.2 7.6 1 8.2" />
+            </svg>
             <img class="mark mark--plane" src="assets/play-logo.png" alt="" width="40" height="40" />
           </span>
           <span class="logo-word">where2play.place</span>
         </a>
-        <h1>Reset password</h1>
-        <p class="meta">We will email a link to set a new password.</p>
-        <div class="callout is-info" hidden data-testid="reset-sent">Check your email for the reset link.</div>
-        <form class="auth-form" action="04-reset.html" method="get">
-          <div class="field">
-            <label for="email">Email</label>
-            <input id="email" name="email" type="email" autocomplete="email" />
-          </div>
-          <button class="btn" type="submit">Send reset link</button>
-        </form>
-        <p class="auth-links"><a href="03-login.html">Back to sign in</a></p>
-      </div>
-    </main>
-        <footer class="family-footer">
+        <div class="locale-switch" role="group" aria-label="Locale">
+          <button type="button">EN</button>
+          <button type="button" class="is-on">CN</button>
+          <button type="button">HK</button>
+          <button type="button">TW</button>
+        </div>
+      </header>
+
+      <main id="content" class="auth-main auth-main--register">
+        <div class="register-card">
+          <header class="register-card__head">
+            <h1>重置密码</h1>
+            <p class="meta">我们会向你的邮箱发送设置新密码的链接。</p>
+          </header>
+
+          <form class="register-card__form auth-form" action="04-reset.html" method="get">
+            <div class="register-card__fields">
+              <div class="callout is-info" hidden data-testid="reset-sent">请查收邮件中的重置链接。</div>
+              <div class="field">
+                <label for="email">Email</label>
+                <input id="email" name="email" type="email" autocomplete="email" />
+              </div>
+            </div>
+
+            <div class="register-card__actions">
+              <button class="btn register-card__submit" type="submit">发送重置链接</button>
+              <p class="auth-links"><a href="03-login.html">返回登录</a></p>
+            </div>
+          </form>
+        </div>
+      </main>
+    </div>
+
+    <footer class="family-footer">
       <div class="family-footer__inner">
         <nav class="family-footer__row" aria-label="places.family">
           <span class="family-footer__label">places.family:</span>

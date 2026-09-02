@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/src/db/client";
 import { authError, requireUser, normalizeEmail } from "@/src/auth/user";
 import { PHOTO_MAX_BYTES } from "@/src/auth/register-validation";
+import { isValidNationality } from "@/src/core/country-codes";
 import { normalizeInterests } from "@/src/core/interests";
 
 function photoUrlTooLarge(url: string | undefined): boolean {
@@ -15,6 +16,16 @@ const personalSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
   gender: z.string().optional(),
+  nationality: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((v) => {
+      if (v == null) return null;
+      const trimmed = v.trim().toUpperCase();
+      return trimmed ? trimmed : null;
+    })
+    .refine((v) => isValidNationality(v ?? ""), { message: "invalid nationality" }),
   age: z.coerce.number().int().min(1).max(120).optional(),
   defaultLocation: z.string().min(1),
   defaultLat: z.number().min(-90).max(90).optional().nullable(),
@@ -39,6 +50,7 @@ export async function GET(request: NextRequest) {
     name: u.name,
     email: u.email,
     gender: u.gender,
+    nationality: u.nationality,
     age: u.age,
     defaultLocation: u.defaultLocation,
     defaultLat: u.defaultLat,
@@ -74,6 +86,7 @@ export async function PUT(request: NextRequest) {
       name: parsed.data.name.trim(),
       email,
       gender: parsed.data.gender || null,
+      nationality: parsed.data.nationality ?? null,
       age: parsed.data.age,
       defaultLocation: parsed.data.defaultLocation.trim(),
       defaultLat: latProvided ? parsed.data.defaultLat : null,
@@ -92,6 +105,7 @@ export async function PUT(request: NextRequest) {
     name: updated.name,
     email: updated.email,
     gender: updated.gender,
+    nationality: updated.nationality,
     age: updated.age,
     defaultLocation: updated.defaultLocation,
     defaultLat: updated.defaultLat,

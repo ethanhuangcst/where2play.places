@@ -8,11 +8,20 @@ import { authError, normalizeEmail } from "@/src/auth/user";
 import { normalizeLocale } from "@/src/core/locales";
 import { normalizeInterests } from "@/src/core/interests";
 import { PHOTO_MAX_BYTES, registerSchemaFailure } from "@/src/auth/register-validation";
+import { isValidNationality } from "@/src/core/country-codes";
 
 const registerSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
   gender: z.string().optional(),
+  nationality: z
+    .string()
+    .optional()
+    .transform((v) => {
+      const trimmed = v?.trim().toUpperCase();
+      return trimmed ? trimmed : undefined;
+    })
+    .refine((v) => isValidNationality(v), { message: "invalid nationality" }),
   age: z.preprocess(
     (v) => {
       if (v === undefined || v === null || v === "") return undefined;
@@ -73,6 +82,7 @@ export async function POST(request: NextRequest) {
       email,
       name: data.name.trim(),
       gender: data.gender || null,
+      nationality: data.nationality ?? null,
       age: data.age,
       defaultLocation: data.defaultLocation?.trim() ?? null,
       photoUrl: data.photoUrl || null,

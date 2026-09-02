@@ -5,13 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>个人信息 — where2play.place</title>
     <link rel="icon" href="assets/favicon.png" type="image/png" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="assets/mockup.css" />
+    <link rel="stylesheet" href="assets/mockup-travor.css" />
   </head>
-  <body class="shell-app">
+  <body class="shell-app" data-style="travor">
     <a class="sr-only" href="#content">Skip to content</a>
     <header class="app-header">
       <div class="app-header__inner">
-        <a class="logo" href="06-plan.html" aria-label="where2play.place">
+        <a class="logo" href="06-plan-skeleton.html" aria-label="where2play.place">
           <span class="mark-host mark-host--plane">
             <svg class="wing-trail" viewBox="0 0 18 10" fill="none" aria-hidden="true">
               <path d="M17 2.2c-3.2.9-6.5 2.2-10 3.6C4.2 6.8 2.2 7.6 1 8.2" />
@@ -22,7 +24,7 @@
         </a>
         <button type="button" class="menu-toggle btn btn-quiet" data-testid="nav-menu">Menu</button>
         <nav class="app-nav" aria-label="Primary">
-          <a href="06-plan.html">行程规划</a>
+          <a href="06-plan-skeleton.html">行程规划</a>
           <a href="08-saved.html">我的行程</a>
           <a href="07-profile.html" class="is-active">个人信息</a>
         </nav>
@@ -83,6 +85,25 @@
                 <div class="field field--age">
                   <label for="age">年龄</label>
                   <input id="age" name="age" type="number" inputmode="numeric" min="13" max="120" value="28" />
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="nationality">国籍（护照签发国）</label>
+                <div class="combo" data-combo data-testid="profile-nationality" data-value="CHN">
+                  <input id="nationality" name="nationality" type="text" role="combobox" value="中国" autocomplete="off" />
+                  <button type="button" class="combo__toggle" aria-label="打开国籍选项" aria-expanded="false"></button>
+                  <ul class="combo__list" role="listbox" aria-label="国籍" hidden>
+                    <li role="presentation"><button type="button" role="option" data-value="CHN" aria-selected="true">中国</button></li>
+                    <li role="presentation"><button type="button" role="option" data-value="HKG">中国香港</button></li>
+                    <li role="presentation"><button type="button" role="option" data-value="TWN">中国台湾</button></li>
+                    <li role="presentation"><button type="button" role="option" data-value="USA">美国</button></li>
+                    <li role="presentation"><button type="button" role="option" data-value="JPN">日本</button></li>
+                    <li role="presentation"><button type="button" role="option" data-value="KOR">韩国</button></li>
+                    <li role="presentation"><button type="button" role="option" data-value="SGP">新加坡</button></li>
+                    <li role="presentation"><button type="button" role="option" data-value="GBR">英国</button></li>
+                    <li role="presentation"><button type="button" role="option" data-value="FRA">法国</button></li>
+                  </ul>
                 </div>
               </div>
 

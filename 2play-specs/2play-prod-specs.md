@@ -6,7 +6,9 @@
 
 帮助「不知道去哪玩」的用户：在 **个人信息（Profile）** 保存轻量出行兴趣偏好；在 **行程规划（Plan）** 填写边界后，经 BFF **一次推荐一条行程**（discover→OPENAI_CN arrange），同页展示 **Day-by-Day / Hour-by-hour**；页内 **单一 Chat** 随动修改当前行程；支持 **重新规划**、**保存** 到 **我的行程（Saved）**、以及 **PDF 导出**。
 
-**性能取舍：** 不一次生成多条行程、Plan 主路径不展示多卡短名单；L2 走产品 OPENAI_CN（Mode H 拉 agent prompt）+ `enrich_arrange_transit`，避免堵在 agent `execution=agent`。契约真源：[ADR-043](../../workspace-specs/adr/ADR-043-chatbox-mcp-and-cross-product-closure.md)、[`itinerary-design.md`](./itinerary-design.md)。
+**MVP-10 目标态（方案已确定 2026-08-31，待实现）：** Plan 简化为 5 必填 + 悬浮助手问答；BFF 改调 agent `make_itinerary` → 循环 `plan_next_stop`/`display_current_stop`（详见 [`itinerary-design.md §1.3`](./itinerary-design.md)）；退役 BFF 本地 OPENAI_CN arrange 与假 progressive。当前 as-built 仍为 Mode H（下文职责划分）。
+
+**性能取舍（as-built）：** 不一次生成多条行程；L2 走产品 OPENAI_CN（Mode H 拉 agent prompt）+ `enrich_arrange_transit`。
 
 场所与地图经 BFF 以 **HTTP + caller API key** 调用 places-agent（**discover** / search / geocode / navigate）。**初排 L2 与行程助手**由 where2play BFF 调用本应用 OPENAI_CN。浏览器不持有 map vendor 密钥、caller key 或 LLM 密钥。
 

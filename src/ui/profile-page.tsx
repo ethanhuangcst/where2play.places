@@ -12,6 +12,7 @@ import { usePageTitle } from "@/src/ui/use-page-title";
 import { authJson } from "@/src/ui/auth-api";
 import { notifySessionChanged } from "@/src/ui/session-events";
 import { FieldWrap } from "@/src/ui/field-wrap";
+import { NationalitySelect } from "@/src/ui/nationality-select";
 
 export default function ProfilePageClient() {
   const t = useT();
@@ -27,6 +28,7 @@ export default function ProfilePageClient() {
     name: "",
     email: "",
     gender: "",
+    nationality: "",
     age: "",
     defaultLocation: "",
     defaultLat: null as number | null,
@@ -47,6 +49,7 @@ export default function ProfilePageClient() {
       name: string;
       email: string;
       gender?: string | null;
+      nationality?: string | null;
       age?: number | null;
       defaultLocation?: string | null;
       defaultLat?: number | null;
@@ -60,6 +63,7 @@ export default function ProfilePageClient() {
           name: p.name ?? "",
           email: p.email ?? "",
           gender: p.gender ?? "",
+          nationality: p.nationality ?? "",
           age: p.age != null ? String(p.age) : "",
           defaultLocation: p.defaultLocation ?? "",
           defaultLat: p.defaultLat ?? null,
@@ -87,6 +91,7 @@ export default function ProfilePageClient() {
           name: personal.name,
           email: personal.email,
           gender: personal.gender || undefined,
+          nationality: personal.nationality || null,
           age: personal.age ? Number(personal.age) : undefined,
           defaultLocation: personal.defaultLocation,
           defaultLat: personal.defaultLat,
@@ -178,6 +183,13 @@ export default function ProfilePageClient() {
                     />
                   </div>
                 </div>
+                <NationalitySelect
+                  id="profile-nationality"
+                  testId="profile-nationality"
+                  value={personal.nationality}
+                  onChange={(v) => setPersonal({ ...personal, nationality: v })}
+                  labelKey="play.profile.nationality"
+                />
                 <div className="field">
                   <label htmlFor="location" className="is-required">
                     {t("play.register.location")}

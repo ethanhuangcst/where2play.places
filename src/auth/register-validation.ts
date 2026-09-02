@@ -1,3 +1,5 @@
+import { isValidNationality } from "@/src/core/country-codes";
+
 export const PHOTO_MAX_BYTES = 2 * 1024 * 1024;
 
 export type RegisterField =
@@ -6,7 +8,8 @@ export type RegisterField =
   | "age"
   | "password"
   | "password_confirm"
-  | "photo";
+  | "photo"
+  | "nationality";
 
 export type RegisterClientInput = {
   name: string;
@@ -14,6 +17,7 @@ export type RegisterClientInput = {
   age: string;
   password: string;
   confirmPassword: string;
+  nationality?: string;
 };
 
 const FIELD_ORDER: RegisterField[] = [
@@ -22,6 +26,7 @@ const FIELD_ORDER: RegisterField[] = [
   "age",
   "password",
   "password_confirm",
+  "nationality",
   "photo",
 ];
 
@@ -47,6 +52,10 @@ export function validateRegisterClient(input: RegisterClientInput): Partial<Reco
   if (!confirm) errors.password_confirm = "play.errors.password_required";
   else if (confirm.length < 8) errors.password_confirm = "play.errors.password_too_short";
   else if (password !== confirm) errors.password_confirm = "play.errors.password_mismatch";
+  const nationality = input.nationality?.trim().toUpperCase() ?? "";
+  if (nationality && !isValidNationality(nationality)) {
+    errors.nationality = "play.errors.nationality_invalid";
+  }
 
   return errors;
 }
@@ -75,6 +84,7 @@ export function registerSchemaFailure(error: {
     return { key: "errors.password_too_short", field: "password_confirm" };
   }
   if (path === "age") return { key: "errors.age_out_of_range", field: "age" };
+  if (path === "nationality") return { key: "errors.nationality_invalid", field: "nationality" };
   if (path === "photoUrl") return { key: "errors.photo_too_large", field: "photo" };
   return { key: "errors.validation" };
 }
@@ -94,6 +104,7 @@ export function mapApiErrorToField(
     "age",
     "password",
     "password_confirm",
+    "nationality",
     "photo",
   ]);
   if (apiField && registerFields.has(apiField as RegisterField)) {
@@ -125,6 +136,8 @@ export function mapApiErrorToField(
       return { field: "age", errorKey: "play.errors.age_out_of_range", formLevel: false };
     case "errors.photo_too_large":
       return { field: "photo", errorKey: "play.errors.photo_too_large", formLevel: false };
+    case "errors.nationality_invalid":
+      return { field: "nationality", errorKey: "play.errors.nationality_invalid", formLevel: false };
     case "errors.csrf":
       return { errorKey: "play.errors.csrf", formLevel: true };
     case "errors.session_expired":
