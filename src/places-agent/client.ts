@@ -129,6 +129,20 @@ export async function geocode(input: {
   };
 }
 
+export async function searchPlaces(input: {
+  query: string;
+  address?: string;
+  locale: string;
+  providers?: string[];
+}): Promise<AgentEnvelope<Array<{ name: string; location?: { lat?: number; lng?: number } }>>> {
+  return postV1("search_places", {
+    query: input.query,
+    address: input.address,
+    locale: input.locale,
+    providers: input.providers,
+  });
+}
+
 export function defaultProviders(): string[] {
   try {
     const raw = process.env.W2P_DEFAULT_PROVIDERS ?? '["GOOGLE_MAPS"]';
@@ -190,6 +204,8 @@ function arrangeTimeoutMs(): number {
 export type DiscoverPlacesData = {
   candidates?: { places?: unknown[]; restaurants?: unknown[] };
   weather?: unknown;
+  trip_id?: string;
+  revision?: number;
 };
 
 export type ArrangeDayData = Record<string, unknown>;
@@ -206,7 +222,7 @@ export async function discoverPlaces(
   );
 }
 
-/** ADR-032: arrange a single day from candidates (~10–45s). */
+/** @deprecated Mode H — use planNextStop + makeItinerary skeleton pipeline instead. */
 export async function arrangeDay(
   body: Record<string, unknown>,
 ): Promise<AgentEnvelope<ArrangeDayData>> {
@@ -215,7 +231,7 @@ export async function arrangeDay(
 
 export type EnrichArrangeTransitData = Record<string, unknown>;
 
-/** Feature 37 — attach real/heuristic transit legs to arranged day blocks. */
+/** @deprecated Mode H — use planNextStop skeleton fill instead. */
 export async function enrichArrangeTransit(
   body: Record<string, unknown>,
 ): Promise<AgentEnvelope<EnrichArrangeTransitData>> {
@@ -225,6 +241,75 @@ export async function enrichArrangeTransit(
     injectedFetch ?? fetch,
     arrangeTimeoutMs(),
   );
+}
+
+const DEFAULT_MAKE_ITINERARY_TIMEOUT_MS = 170_000;
+
+function makeItineraryTimeoutMs(): number {
+  const raw = Number(process.env.PLACES_AGENT_MAKE_ITINERARY_TIMEOUT_MS ?? DEFAULT_MAKE_ITINERARY_TIMEOUT_MS);
+  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_MAKE_ITINERARY_TIMEOUT_MS;
+}
+
+export type MakeItineraryData = {
+  skeleton?: { days?: unknown[] };
+  trip_id?: string;
+  revision?: number;
+  candidates_slim?: { places?: unknown[]; restaurants?: unknown[] };
+};
+
+export async function makeItinerary(
+  body: Record<string, unknown>,
+): Promise<AgentEnvelope<MakeItineraryData>> {
+  return postV1<MakeItineraryData>(
+    "make_itinerary",
+    body,
+    injectedFetch ?? fetch,
+    makeItineraryTimeoutMs(),
+  );
+}
+
+export type PlanNextStopData = Record<string, unknown>;
+
+export async function planNextStop(
+  body: Record<string, unknown>,
+): Promise<AgentEnvelope<PlanNextStopData>> {
+  return postV1<PlanNextStopData>("plan_next_stop", body, injectedFetch ?? fetch, planTimeoutMs());
+}
+
+export type FetchTripDetailsData = Record<string, unknown>;
+
+export async function patchTrip(
+  body: Record<string, unknown>,
+): Promise<AgentEnvelope<{ trip_id?: string; revision?: number }>> {
+  return postV1("patch_trip", body, injectedFetch ?? fetch, planTimeoutMs());
+}
+
+export async function fetchTripDetails(
+  body: Record<string, unknown>,
+): Promise<AgentEnvelope<FetchTripDetailsData>> {
+  return postV1<FetchTripDetailsData>("fetch_trip_details", body, injectedFetch ?? fetch, planTimeoutMs());
+}
+
+export type PlaceDetailsData = Record<string, unknown>;
+
+export async function getPlaceDetails(
+  body: Record<string, unknown>,
+): Promise<AgentEnvelope<PlaceDetailsData>> {
+  return postV1<PlaceDetailsData>("get_place_details", body, injectedFetch ?? fetch, timeoutMs());
+}
+
+export type TravelTipsData = Record<string, unknown>;
+
+export async function travelTips(
+  body: Record<string, unknown>,
+): Promise<AgentEnvelope<TravelTipsData>> {
+  return postV1<TravelTipsData>("travel_tips", body, injectedFetch ?? fetch, planTimeoutMs());
+}
+
+export async function visaRequirement(
+  body: Record<string, unknown>,
+): Promise<AgentEnvelope<Record<string, unknown>>> {
+  return postV1("visa_requirement", body, injectedFetch ?? fetch, timeoutMs());
 }
 
 export type AgentNdjsonEvent = Record<string, unknown> & { type: string };

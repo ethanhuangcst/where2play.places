@@ -1,3 +1,4 @@
+import { coerceAgentTime } from "./coerce-agent-time";
 import type { PlanBoundaries } from "./itinerary-types";
 
 function pad(n: number): string {
@@ -21,21 +22,26 @@ export function ymdPlusDays(startYmd: string, daysOffset: number): string {
   return localDatePlus(daysOffset, parseLocalYmd(startYmd));
 }
 
-function mapPace(pace?: string): "tight" | "medium" | "relaxed" | undefined {
+export function mapPace(pace?: string): "tight" | "medium" | "relaxed" | undefined {
   if (!pace) return undefined;
   const p = pace.toLowerCase();
   if (/紧凑|tight|packed/.test(p)) return "tight";
   if (/轻松|relaxed|easy|leisure/.test(p)) return "relaxed";
-  if (/适中|medium|moderate/.test(p)) return "medium";
+  if (/适中|medium|moderate|mid|balanced/.test(p)) return "medium";
   return undefined;
 }
 
-function mapSpend(budget?: string): "budget" | "premium" | undefined {
+export function mapSpend(budget?: string): "budget" | "premium" | undefined {
   if (!budget) return undefined;
   const b = budget.toLowerCase();
-  if (/经济|budget|cheap/.test(b)) return "budget";
-  if (/舒适|premium|luxury|高/.test(b)) return "premium";
+  if (b === "economy" || /经济|budget|cheap|economy/.test(b)) return "budget";
+  if (b === "comfort" || /舒适|premium|luxury|高|comfort/.test(b)) return "premium";
   return undefined;
+}
+
+/** Normalize times to HH:MM (F77). */
+export function normalizeAgentTime(raw: string): string {
+  return coerceAgentTime(raw, "09:00");
 }
 
 function transitPreferred(transport?: string): boolean | undefined {
@@ -47,7 +53,7 @@ function transitPreferred(transport?: string): boolean | undefined {
 
 function boundsFromCriteria(criteria: PlanBoundaries): { start: string; end: string } {
   const start = criteria.startDate;
-  const end = ymdPlusDays(start, Math.max(1, criteria.days));
+  const end = ymdPlusDays(start, Math.max(0, criteria.days - 1));
   return { start, end };
 }
 
@@ -56,6 +62,19 @@ function boundsFromCriteria(criteria: PlanBoundaries): { start: string; end: str
  * string. Agent reads preferences.natural_language into the arrange prompt;
  * preferences.interests is an accepted-but-unused field there, so we never send it.
  */
+/** Omit revision when absent or invalid — Zod rejects `null`. */
+export function tripLedgerFields(
+  tripId?: string,
+  revision?: number,
+): Record<string, string | number> {
+  if (!tripId) return {};
+  const fields: Record<string, string | number> = { trip_id: tripId };
+  if (typeof revision === "number" && Number.isInteger(revision) && revision > 0) {
+    fields.revision = revision;
+  }
+  return fields;
+}
+
 export function buildNaturalLanguage(criteria: PlanBoundaries): string | undefined {
   const parts = [
     criteria.tripType,
@@ -123,6 +142,50 @@ export function buildDiscoverPlacesBody(
     locale: opts.locale,
     providers: opts.providers,
     numDays: Math.max(1, criteria.days),
+    ...(criteria.mustInclude?.length ? { must_include: criteria.mustInclude } : {}),
+  };
+}
+
+/** Intake-resolved origin, or name-only. Never geocode hotel without city. */
+export function originFromPlanCriteria(
+  criteria: PlanBoundaries,
+): { name: string; lat?: number; lng?: number } | undefined {
+  const name = criteria.dailyStart?.trim();
+  if (!name) return undefined;
+  if (typeof criteria.originLat === "number" && typeof criteria.originLng === "number") {
+    return { name, lat: criteria.originLat, lng: criteria.originLng };
+  }
+  return { name };
+}
+
+export function buildMakeItineraryBody(
+  criteria: PlanBoundaries,
+  opts: {
+    locale: string;
+    providers: string[];
+    candidates: { places: unknown[]; restaurants: unknown[] };
+    origin?: { name: string; lat?: number; lng?: number };
+    tripId?: string;
+    revision?: number;
+  },
+): Record<string, unknown> {
+  const origin =
+    opts.origin ?? originFromPlanCriteria(criteria) ?? { name: criteria.destination };
+  const pace = mapPace(criteria.pace);
+  const budget = mapSpend(criteria.budget);
+
+  return {
+    city: criteria.destination.trim(),
+    numDays: Math.max(1, criteria.days),
+    candidates: opts.candidates,
+    locale: opts.locale,
+    providers: opts.providers,
+    origin,
+    ...(pace ? { pace } : {}),
+    ...(budget ? { budget } : {}),
+    ...(criteria.mustInclude?.length ? { must_include: criteria.mustInclude } : {}),
+    natural_language: buildNaturalLanguage(criteria),
+    ...tripLedgerFields(opts.tripId, opts.revision),
   };
 }
 
@@ -148,8 +211,8 @@ export function buildArrangeDayBody(
   const budget = mapSpend(criteria.budget);
 
   const preferences: Record<string, unknown> = {};
-  if (criteria.timeFrom) preferences.time_from = criteria.timeFrom;
-  if (criteria.timeTo) preferences.time_to = criteria.timeTo;
+  if (criteria.timeFrom) preferences.time_from = normalizeAgentTime(criteria.timeFrom);
+  if (criteria.timeTo) preferences.time_to = normalizeAgentTime(criteria.timeTo);
   const transit = transitPreferred(criteria.transport);
   if (transit != null) preferences.transit_preferred = transit;
   const naturalLanguage = buildNaturalLanguage(criteria);

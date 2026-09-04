@@ -7,9 +7,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const t = useT();
 
   useEffect(() => {
-    document.body.className = "";
+    document.body.className = "shell-app";
+    document.body.dataset.style = "travor";
     return () => {
       document.body.className = "";
+      delete document.body.dataset.style;
     };
   }, []);
 

@@ -25,6 +25,15 @@ type Props = {
   showPending?: boolean;
   /** Header shows generating instead of Updated. */
   generating?: boolean;
+  /** Skeleton stop names for unfilled stops on active day. */
+  skeletonStops?: { name: string; filled?: boolean; pending?: boolean; mealSlot?: string }[];
+  /** Current slot detail hint (itinerary-design §3). */
+  slotPreviewText?: string | null;
+  saving?: boolean;
+  onReplan?: () => void;
+  onSave?: () => void;
+  /** Open in-page place sheet (plan-46). Map stays external. */
+  onOpenPlaceSheet?: (slot: Extract<ItinerarySlot, { kind: "place" }>, dayIndex: number) => void;
 };
 
 function formatUpdated(iso: string, locale: string): string {
@@ -50,6 +59,12 @@ export function PlanItineraryView({
   liveHighlights = null,
   showPending = false,
   generating = false,
+  skeletonStops = [],
+  slotPreviewText = null,
+  saving = false,
+  onReplan,
+  onSave,
+  onOpenPlaceSheet,
 }: Props) {
   const t = useT();
   const locale = useLocale();
@@ -68,6 +83,8 @@ export function PlanItineraryView({
 
   const activeFromItinerary = itinerary.days.find((d) => d.dayIndex === day);
   const onArrangeDay = generating && day === (focusDayIndex ?? day);
+  const showProgressiveOutline =
+    day === (focusDayIndex ?? day) && (generating || skeletonStops.length > 0);
   const showingLive = onArrangeDay && (liveSlots.length > 0 || Boolean(liveHighlights) || showPending);
   const slots: ItinerarySlot[] = onArrangeDay && liveSlots.length > 0
     ? liveSlots
@@ -81,13 +98,29 @@ export function PlanItineraryView({
 
   return (
     <section className="panel" aria-labelledby="itin-title" data-testid="plan-itinerary">
-      <div className="panel__head">
+      <div className="panel__head panel__head--itin">
         <h2 id="itin-title">{itinerary.title}</h2>
-        <span className="page-meta" style={{ margin: 0 }} data-testid="plan-updated">
-          {generating
-            ? t("play.plan.generating")
-            : t("play.plan.updated", { time: formatUpdated(itinerary.updatedAt, locale) })}
-        </span>
+        <div className="panel__head-actions">
+          {onReplan ? (
+            <button type="button" className="btn btn-danger" data-testid="replan-open" onClick={onReplan}>
+              {t("play.plan.replan")}
+            </button>
+          ) : null}
+          {onSave ? (
+            <button
+              type="button"
+              className="btn btn-quiet"
+              data-testid="plan-save"
+              disabled={saving || generating}
+              onClick={onSave}
+            >
+              {saving ? t("play.plan.saving") : t("play.plan.save")}
+            </button>
+          ) : null}
+          <button type="button" className="btn" data-testid="plan-export" disabled title={t("play.plan.export_pdf_soon")}>
+            {t("play.plan.export_pdf")}
+          </button>
+        </div>
       </div>
       <div className="panel__body">
         <div className="day-tabs" role="tablist" aria-label={t("play.plan.days_tabs")}>
@@ -154,23 +187,30 @@ export function PlanItineraryView({
             </p>
           ) : null}
 
+          {slotPreviewText && showProgressiveOutline ? (
+            <p className="plan-slot-preview" data-testid="plan-slot-preview" role="status">
+              {slotPreviewText}
+            </p>
+          ) : null}
+
           {slots.map((slot, idx) => {
             if (slot.kind === "transit") {
               return (
                 <div
                   key={`t-${idx}`}
-                  className={`slot slot--transit${onArrangeDay && liveSlots.length > 0 ? " is-entering" : ""}`}
+                  className={`transit-line slot slot--transit${onArrangeDay && liveSlots.length > 0 ? " is-entering" : ""}`}
                   data-testid="plan-transit-slot"
                 >
-                  <div className="slot-time">{slot.start}</div>
                   <div className="slot-body">{slot.text}</div>
                 </div>
               );
             }
+            const isOrigin = slot.placeKind === "stay";
             return (
               <div
                 key={`p-${idx}`}
-                className={`slot${onArrangeDay && liveSlots.length > 0 ? " is-entering" : ""}`}
+                className={`slot${isOrigin ? " stop-origin" : ""}${onArrangeDay && liveSlots.length > 0 ? " is-entering" : ""}`}
+                data-testid={isOrigin ? "stop-origin" : "stop-filled"}
               >
                 <div className="slot-time">
                   {slot.start}–{slot.end}
@@ -196,7 +236,16 @@ export function PlanItineraryView({
                       {slot.summary ? <p>{slot.summary}</p> : null}
                     </div>
                     <div className="slot-actions">
-                      {slot.detailsUrl ? (
+                      {onOpenPlaceSheet ? (
+                        <button
+                          type="button"
+                          className="map-link stop-detail-open"
+                          data-testid="stop-detail-open"
+                          onClick={() => onOpenPlaceSheet(slot, day)}
+                        >
+                          {t("play.plan.slot_details")}
+                        </button>
+                      ) : slot.detailsUrl ? (
                         <a
                           className="map-link"
                           href={slot.detailsUrl}
@@ -208,10 +257,11 @@ export function PlanItineraryView({
                       ) : null}
                       {slot.mapUrl ? (
                         <a
-                          className="map-link"
+                          className="map-link stop-map-open"
                           href={slot.mapUrl}
                           target="_blank"
                           rel="noopener noreferrer"
+                          data-testid="stop-map-open"
                         >
                           {t("play.plan.slot_map")}
                         </a>
@@ -239,6 +289,31 @@ export function PlanItineraryView({
                 </div>
               </div>
             </div>
+          ) : null}
+
+          {skeletonStops.length > 0 && showProgressiveOutline ? (
+            <div className="skeleton-day" data-testid="plan-skeleton-day">
+              {skeletonStops.map((stop, idx) => (
+                <p
+                  key={`sk-${idx}`}
+                  data-testid="plan-skeleton-stop"
+                  className={`skeleton-stop${stop.filled ? " skeleton-stop--filled" : ""}${stop.pending ? " is-pending" : ""}${stop.mealSlot ? " skeleton-stop--meal" : ""}`}
+                >
+                  <span className="skeleton-stop__idx">{String(idx).padStart(2, "0")}</span>
+                  <span className="skeleton-stop__name">{stop.name}</span>
+                  {stop.mealSlot ? <span className="skeleton-stop__slot">{stop.mealSlot}</span> : null}
+                  {stop.pending ? (
+                    <span className="skeleton-stop__slot">{t("play.plan.stop_filling")}</span>
+                  ) : null}
+                </p>
+              ))}
+            </div>
+          ) : null}
+
+          {!generating && !onArrangeDay ? (
+            <p className="page-meta" data-testid="plan-updated">
+              {t("play.plan.updated", { time: formatUpdated(itinerary.updatedAt, locale) })}
+            </p>
           ) : null}
         </div>
       </div>

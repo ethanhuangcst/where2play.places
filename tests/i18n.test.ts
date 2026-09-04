@@ -14,6 +14,7 @@ const REGISTER_FIELD_KEYS = [
   "play.errors.photo_too_large",
   "play.errors.nationality_invalid",
   "play.errors.network",
+  "play.errors.invalid_input",
 ] as const;
 
 const NATIONALITY_COUNTRY_KEYS = [

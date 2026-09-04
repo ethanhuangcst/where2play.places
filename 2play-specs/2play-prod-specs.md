@@ -1,16 +1,16 @@
 # where2play — 产品规格
 
-**where2play**（`where2play.place`）产品需求。地图工具、vendor 密钥、**L1 候选发现**在 **places-agent**；**L2 按天排程与行程助手**在 where2play BFF 本应用 OPENAI_CN（[ADR-036](../../workspace-specs/adr/ADR-036-where2play-assistant-quanzil.md)、[ADR-037](../../workspace-specs/adr/ADR-037-where2play-plan-l2-quanzil.md)）。家族架构见 [`workspace-specs/2.architecture.md`](../../workspace-specs/2.architecture.md)；agent 能力见 [`1.places-agent/agent-specs/`](../../1.places-agent/agent-specs/)；地图/引擎边界见 [ADR-008](../../workspace-specs/adr/ADR-008-itinerary-ownership.md)。设计规格见 [`2play-design.md`](./2play-design.md)。用户故事与 AC 见 [`2play-stories.md`](./2play-stories.md)。测试与质量门见 [`2play-test-plan.md`](./2play-test-plan.md)。持久化见 [ADR-033](../../workspace-specs/adr/ADR-033-where2play-postgres-prisma.md)。
+**where2play**（`where2play.place`）产品需求。地图工具、vendor 密钥、**L1 候选发现**在 **places-agent**；**L2 按天排程与行程助手**在 where2play BFF 本应用 **Qwen**（[ADR-047](../../workspace-specs/adr/ADR-047-qwen-primary-llm.md)；历史 ADR-036/037）。家族架构见 [`workspace-specs/2.architecture.md`](../../workspace-specs/2.architecture.md)；agent 能力见 [`1.places-agent/agent-specs/`](../../1.places-agent/agent-specs/)；地图/引擎边界见 [ADR-008](../../workspace-specs/adr/ADR-008-itinerary-ownership.md)。设计规格见 [`2play-design.md`](./2play-design.md)。用户故事与 AC 见 [`2play-stories.md`](./2play-stories.md)。测试与质量门见 [`2play-test-plan.md`](./2play-test-plan.md)。持久化见 [ADR-033](../../workspace-specs/adr/ADR-033-where2play-postgres-prisma.md)。
 
 ## 产品定义
 
-帮助「不知道去哪玩」的用户：在 **个人信息（Profile）** 保存轻量出行兴趣偏好；在 **行程规划（Plan）** 填写边界后，经 BFF **一次推荐一条行程**（discover→OPENAI_CN arrange），同页展示 **Day-by-Day / Hour-by-hour**；页内 **单一 Chat** 随动修改当前行程；支持 **重新规划**、**保存** 到 **我的行程（Saved）**、以及 **PDF 导出**。
+帮助「不知道去哪玩」的用户：在 **个人信息（Profile）** 保存轻量出行兴趣偏好；在 **行程规划（Plan）** 填写边界后，经 BFF **一次推荐一条行程**（discover→Qwen / agent `make_itinerary`），同页展示 **Day-by-Day / Hour-by-hour**；页内 **单一 Chat** 随动修改当前行程；支持 **重新规划**、**保存** 到 **我的行程（Saved）**、以及 **PDF 导出**。
 
-**MVP-10 目标态（方案已确定 2026-08-31，待实现）：** Plan 简化为 5 必填 + 悬浮助手问答；BFF 改调 agent `make_itinerary` → 循环 `plan_next_stop`/`display_current_stop`（详见 [`itinerary-design.md §1.3`](./itinerary-design.md)）；退役 BFF 本地 OPENAI_CN arrange 与假 progressive。当前 as-built 仍为 Mode H（下文职责划分）。
+**MVP-10 / MVP-18 目标态：** Plan 简化为 5 必填 + 悬浮助手问答；BFF 调 agent `make_itinerary` → 循环 `plan_next_stop`；**每步写后 `fetch_trip_details`** 驱动 UI。退役 `display_current_stop`、BFF 本地 arrange 与假 progressive。**行程相关展示不以 LLM 散文或写工具 HTTP 为真源**（ADR-046 D6）。当前 as-built 仍可能混用旧路径（下文职责划分）。
 
-**性能取舍（as-built）：** 不一次生成多条行程；L2 走产品 OPENAI_CN（Mode H 拉 agent prompt）+ `enrich_arrange_transit`。
+**性能取舍（as-built）：** 不一次生成多条行程；产品 LLM = **Qwen**；骨架经 agent `make_itinerary`。
 
-场所与地图经 BFF 以 **HTTP + caller API key** 调用 places-agent（**discover** / search / geocode / navigate）。**初排 L2 与行程助手**由 where2play BFF 调用本应用 OPENAI_CN。浏览器不持有 map vendor 密钥、caller key 或 LLM 密钥。
+场所与地图经 BFF 以 **HTTP + caller API key** 调用 places-agent（**discover** / search / geocode / navigate）。**初排 L2 与行程助手**由 where2play BFF 调用本应用 **Qwen**。浏览器不持有 map vendor 密钥、caller key 或 LLM 密钥。
 
 **不做：** 下单与支付、票务/酒店实时库存权威、与 what2eat 的 SSO、双 Chat / FAB 全局 Chat、一次多行程推荐、MVP 未保存规划 History 列表、多人实时协作、离线地图包、places-agent 管理 UI、餐厅决策（归 what2eat）。
 

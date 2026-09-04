@@ -2,6 +2,7 @@ import type { ItineraryDto } from "./itinerary-types";
 import type { ChatMessage } from "./chat-truncate";
 import type { ItineraryPatch } from "./itinerary-patch";
 import { openaiApiBaseUrl } from "./openai-config";
+import { chatLlmConfigured, resolveChatLlmConfig } from "./llm-chat-config";
 
 export type AssistantParseResult = {
   reply: string;
@@ -113,8 +114,7 @@ export function setChatLlmCompleteForTests(fn: ChatLlmComplete | null): void {
 }
 
 export function openaiConfigured(): boolean {
-  const key = process.env.OPENAI_API_KEY?.trim();
-  return Boolean(key && key !== "fixture");
+  return chatLlmConfigured();
 }
 
 export async function completeAssistantChat(args: {
@@ -124,15 +124,16 @@ export async function completeAssistantChat(args: {
 }): Promise<string> {
   if (chatLlmOverride) return chatLlmOverride(args);
 
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
-  if (!apiKey || apiKey === "fixture") {
+  const cfg = resolveChatLlmConfig();
+  if (!cfg) {
     throw Object.assign(new Error("openai_not_configured"), {
       outcomeKey: "errors.openai_not_configured",
     });
   }
 
-  const base = openaiApiBaseUrl();
-  const model = process.env.OPENAI_CHAT_MODEL ?? "gpt-5.4";
+  const apiKey = cfg.apiKey;
+  const base = cfg.baseURL || openaiApiBaseUrl();
+  const model = cfg.model;
 
   const res = await fetch(`${base}/chat/completions`, {
     method: "POST",
@@ -213,15 +214,16 @@ export async function streamAssistantChat(args: {
     return full;
   }
 
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
-  if (!apiKey || apiKey === "fixture") {
+  const cfg = resolveChatLlmConfig();
+  if (!cfg) {
     throw Object.assign(new Error("openai_not_configured"), {
       outcomeKey: "errors.openai_not_configured",
     });
   }
 
-  const base = openaiApiBaseUrl();
-  const model = process.env.OPENAI_CHAT_MODEL ?? "gpt-5.4";
+  const apiKey = cfg.apiKey;
+  const base = cfg.baseURL || openaiApiBaseUrl();
+  const model = cfg.model;
 
   const res = await fetch(`${base}/chat/completions`, {
     method: "POST",

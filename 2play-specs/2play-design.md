@@ -2,6 +2,8 @@
 
 **where2play**（`where2play.place`）视觉、技术架构与页面契约。产品边界见 [`2play-prod-specs.md`](./2play-prod-specs.md)；用户故事与 AC 见 [`2play-stories.md`](./2play-stories.md)；测试与质量门见 [`2play-test-plan.md`](./2play-test-plan.md)；部署见 [`6.deployment-plan.md`](./6.deployment-plan.md)。家族架构见 [`../../workspace-specs/2.architecture.md`](../../workspace-specs/2.architecture.md)；行程引擎 [ADR-008](../../workspace-specs/adr/ADR-008-itinerary-ownership.md)。格式与深度对齐 what2eat [`2eat-design.md`](../../2.what2eat/2eat-specs/2eat-design.md)。
 
+**主 LLM（ADR-047）：** BFF 本应用 chat / 历史 L2 arrange 走 **Qwen**（`QWEN_*`，默认 `qwen-plus`）。`make_itinerary` 走 places-agent（agent 同样优先 Qwen）。`QWEN_API_KEY` 为空时回退 `OPENAI_*`。历史文档中的 OPENAI_CN 指旧主网关。
+
 **技术栈：** 与 what2eat 同族 thin client。实现目录 `3.where2play/`。本地 **PORT=3030**；生产 `where2play.place`（宿主机 `3005→3000`）。
 
 **冲突优先级：** 与 [`ui-mockup/`](./ui-mockup/) + [`assets/mockup.css`](./ui-mockup/assets/mockup.css) 冲突时，**以 mock 为准**。实现真实页面须与本文件 §1 / §3 及对应 HTML **视觉与结构 100% 一致**（文案走 i18n key，源语言参考 mock 中文/英文）。
@@ -227,7 +229,8 @@ App DB ← User, InterestProfile, SavedItinerary + ItineraryChatMessage (commit 
 | `/api/auth/reset-password` | POST | 发重置邮件 |
 | `/api/auth/set-password` | POST | 凭 token 设新密码 |
 | `/api/profile/personal` | GET/PUT | 个人信息 + **出行兴趣** + **nationality?**（单卡一次保存） |
-| `/api/plan` | POST | 边界 → agent **discover** + **BFF OPENAI_CN arrange×N**（NDJSON，见 §2.4.1 / ADR-037）；JSON 兼容返回最终 `ItineraryDto` |
+| `/api/plan` | POST | 问答完成后：复用 `trip_id` 的池 → `make_itinerary` → `travel_tips` → `plan_next_stop` 循环 + fetch（§4.10 / NDJSON） |
+| `/api/plan/discover` | POST | 点「规划行程」即 `discover_places` 写池，fetch `candidates` 返回 `trip_id` + grounded 芯片名 |
 | `/api/plan/current` | GET | 读取未过期 PlanSessionCache（刷新恢复中部行程 + 表单 criteria） |
 | `/api/plan/replan` | POST | 新一条（同 §2.4.1 编排）；body 含截断 chat 上下文；**不**清 local transcript |
 | `/api/chat` | POST | 行程助手：BFF → **本应用 OPENAI_CN 流式**；可选 agent `search_*`；返回 assistant + `itineraryPatch`/`itinerary`（[ADR-036](../../workspace-specs/adr/ADR-036-where2play-assistant-quanzil.md)） |
@@ -237,7 +240,7 @@ App DB ← User, InterestProfile, SavedItinerary + ItineraryChatMessage (commit 
 | `/api/itineraries/[id]` | GET | 详情 + DB chat（只读） |
 | `/api/itineraries/[id]/export` | GET | PDF（`application/pdf`） |
 | `/api/geocode/reverse` | POST | 反向 geocode（出发地） |
-| `/api/travel-advice/visa` | GET | **（MVP-11 后续）** 读 session nationality + query destination → agent `/v1/visa_requirement` |
+| `/api/travel-advice/visa` | GET | **（MVP-11 后续）** 读 session nationality + destination → agent `visa_requirement` **写** Trip；UI 再 `fetch_trip_details` `artifacts` |
 
 **横切：** Mutating 路由 = session cookie + CSRF（对齐 what2eat）。Caller key **仅**服务端 env。未认证访问 App `/api/plan|saved|…` → `401`。
 
@@ -247,7 +250,7 @@ App DB ← User, InterestProfile, SavedItinerary + ItineraryChatMessage (commit 
 
 **Progressive UX 与四段 UI（行程日提示 / 行程细节提示 / 行程 / 加载中提示）专项设计：** [`itinerary-design.md`](./itinerary-design.md)。
 
-对齐 [ADR-032](../../workspace-specs/adr/ADR-032-llm-itinerary-mcp-tool-split.md)：**先发现、再按天安排**。where2play 负责 progressive UX 与 **L2 OPENAI_CN**；places-agent 提供 **L1** `discover_places`（HTTP 可 NDJSON）。**主路径不再**调用 agent `arrange_day` / 整单 `plan_itinerary`（[ADR-037](../../workspace-specs/adr/ADR-037-where2play-plan-l2-quanzil.md)）。
+对齐 [ADR-032](../../workspace-specs/adr/ADR-032-llm-itinerary-mcp-tool-split.md)：**先发现、再安排**。where2play **现行 Plan 主路径**见 **§4.10**（discover ∥ intake → make → tips → fill+fetch），不再以本小节历史 `arrange_day` 为真源。
 
 ```text
 1. requireUser + CSRF
@@ -342,6 +345,7 @@ App DB ← User, InterestProfile, SavedItinerary + ItineraryChatMessage (commit 
 | `dailyStart` / `dailyEnd` | string | 否 |
 | `timeFrom` / `timeTo` | `HH:MM` | 否；成对则 to > from |
 | `interests` | string[]（§3.8 枚举或自定义） | 否 |
+| `mustInclude` | string[] | 否（MVP-10 助手步 g；透传 agent，ADR-042） |
 | `constraints` | string ≤500 | 否 |
 | `locale` | `EN`\|`CN`\|`HK`\|`TW` | 是（或从 session） |
 
@@ -506,10 +510,10 @@ type ChatMessage = {
 | `/login` | `03-login.html` | email/password | `login-submit` | account-02 |
 | `/reset-password` | `04-reset.html` | 发信 / sent | `reset-sent` | account-03 |
 | `/set-password` | `05-set-password.html` | 新密码 | — | account-04 |
-| `/plan` | `06-plan.html`；`06-plan-skeleton.html`；`06-plan-qa.html` | 起飞条 5 字段、骨架填充、助手问答（Travor §4.7） | `plan-form`, `plan-dest`, `plan-start-date`, `plan-days`, `plan-party`, `plan-budget`, `plan-submit`, `plan-nav`, `plan-nav-resize`, `plan-nav-input`, `plan-nav-send`, `plan-nav-close`, `replan-dialog`, … | plan-46 |
-| `/profile` | `07-profile.html` | 单列用户资料（含兴趣） | `profile-save` | profile-01 |
+| `/plan` | `06-plan.html`；`06-plan-skeleton.html`；`06-plan-qa.html` | 起飞条 5 字段、骨架填充、助手问答、place sheet（Travor §4.7–§4.8） | `plan-form`, `plan-dest`, `plan-start-date`, `plan-days`, `plan-party`, `plan-budget`, `plan-submit`, `plan-constraints`, `plan-travel-tips`, `plan-nav`, `stop-detail-open`, `stop-map-open`, `place-sheet`, `place-sheet-map`, `replan-dialog`, … | plan-46 |
+| `/profile` | `07-profile.html` | 单列用户资料（含兴趣） | `profile-save`, `profile-nationality` | profile-01, profile-03 |
 | `/saved` | `08-saved.html` | 行程卡网格 | `trip-card`（实现时加） | saved-01 |
-| `/saved/[id]` | `09-saved-detail.html` | Day/Hour + DB 对话只读 | `chat-transcript`, `plan-export` | saved-02 |
+| `/saved/[id]` | `09-saved-detail.html` | constraints + tips + Day/Hour（同 Plan 完成态）+ place sheet | `stop-detail-open`, `place-sheet`, `plan-export` | saved-02, plan-46 |
 | — | `index.html` | 画廊 | — | — |
 
 ---
@@ -523,18 +527,20 @@ type ChatMessage = {
 | Headline | 源 EN：`Where should we play?`（i18n） |
 | Lead | 源 EN：`Life is short, and the world is wide.`；CN：`世界这么大，我想去看看 …`（HK/TW 同句繁体） |
 | CTA | Primary `Start exploring` → `/register`；Quiet `Sign in` → `/login` |
+| 次要链 | `Create account` / 注册链 → `/register`（`auth-links`，与实现一致） |
 | Footer | 公开 `family-footer`（§1.5） |
 
 ---
 
 ### 3.2 Register — `02-register.html`
 
-**单列** `.register-shell` → `.register-card`（宽 `--max-register-card`）。**无**右侧头像栏（与 2eat 双列不同）。
+**双列** `.register-shell` → `.register-card`（宽 `--max-register-card`）。`.register-card__grid`：左 `.register-card__fields`、右 `.register-card__photo`（头像可选，同 2eat 家族 bowl 交互）。
 
 顶栏：logo → home；locale EN/CN/HK/TW。
 
 | 字段 | 标签（CN） | 必填 | 控件 |
 | --- | --- | --- | --- |
+| photo | 头像（可选） | 否 | `.register-photo` bowl；`data-testid="field-photo"` |
 | name | 姓名 | **是** `is-required` | text |
 | email | Email + note「用于登录账号」 | **是** | email |
 | gender | 性别 | 否 | select：不愿透露（默认）/ 女 / 男 / 其他 |
@@ -587,11 +593,12 @@ type ChatMessage = {
 
 ### 3.4 Profile — `07-profile.html`
 
-**单列** `.app-main--profile` → `.profile-stack` → **一张** `.register-card`「用户资料」。  
+**双列** `.app-main--profile` → `.profile-stack` → **一张** `.register-card`「用户资料」。`.register-card__grid`：左字段、右 `.register-card__photo`（头像可选，同注册页 bowl；`data-testid="field-photo"`）。  
 **无**独立「出行兴趣」第二卡（已合并）。**无**页顶长说明文案。
 
 | 字段 | 标签（CN） | 必填（实现） | 控件 |
 | --- | --- | --- | --- |
+| photo | 头像（可选） | 否 | `.register-photo` bowl；已上传时 `.has-photo` 预览 |
 | name | 姓名 | **是**（标 `*` + note） | text |
 | email | Email +「用于登录账号」 | **是** | email |
 | gender | 性别 | 否 | select |
@@ -733,7 +740,7 @@ Mock SoT（**已删除，历史参考**）：`06-plan-discover.html`（图1）�
 | `User.nationality` | ISO alpha-3 护照国（Feature **38**；空则提示补全资料） |
 | 当前 Plan 边界 / 用户选择 | 目的地 alpha-3（由目的地名 geocode 或映射表解析） |
 
-**BFF（规划）：** `GET /api/travel-advice/visa?destination=JPN` — 服务端读 session `User.nationality` → `POST places-agent /v1/visa_requirement`。
+**BFF（规划）：** `GET /api/travel-advice/visa?destination=JPN` — 服务端读 session `User.nationality` → `POST places-agent /v1/visa_requirement` **写入账本**（需 `trip_id`）→ UI **`fetch_trip_details` `artifacts.visa`**。不得把 visa HTTP JSON 直接绑到 `.visa-advice`。
 
 **UI 区块 `.visa-advice`（mock 占位）：**
 
@@ -765,10 +772,13 @@ Mock SoT（**已删除，历史参考**）：`06-plan-discover.html`（图1）�
 
 ### 3.7 Saved detail — `09-saved-detail.html`
 
-- 返回「← 我的行程」；标题 = 卡标题；meta「已保存 · 对话来自数据库快照」
-- 行程详情：Day tabs + hour rows（可与 Plan slot 视觉同族）
-- 「保存时的对话」：只读 transcript；注记「只读自 DB · 续聊请回到规划并再次保存」
-- 底栏：返回列表 · 导出 PDF · 取消收藏（danger）
+- 返回「← 我的行程」；页面标题 = 卡标题；meta「已保存 · {date}」
+- **与 Plan 完成态同构的 `plan-stack`：**
+  - `plan-constraints` 只读出行限制
+  - `plan-travel-tips` 四卡小贴士（可折叠）
+  - 行程 panel：`panel__head--itin` 右侧 **返回列表 / 导出 PDF / 取消收藏**
+  - Day tabs + highlights + stay origin + transit + filled slots + **详情｜地图**（同 §4.8）
+- **MVP-4 `saved-04` 追加块（mock 可省略）：** 行程下方只读 DB 对话（`chat-transcript`）+ 注记「只读自 DB · 续聊请回到规划并再次保存」
 
 ---
 
@@ -790,18 +800,22 @@ Profile / Register 标签固定为 **出行兴趣（多选）**。Plan 块标题
 
 ---
 
-### 3.9 实现核对清单（100% 对齐 mock）
+### 3.9 实现核对清单（100% 对齐 mock · MVP-10 Travor）
 
-- [ ] Token 与 `mockup.css` `:root` 一致（含 `--cloth-b`、`--plan-col`、`--max-register-card`）
-- [ ] Primary = glaze；非 mustard 主按钮
-- [ ] Logo = `wing-trail` path + −11deg 动画族；无旧 trail
-- [ ] Header：行程规划 / 我的行程 / 个人信息；中文 weight 400
-- [ ] Footer：三列栅格 + 12px 拉丁；当前产品非链
-- [ ] Register / Profile：单列卡；兴趣合并；标签「出行兴趣（多选）」；无禁用长说明
-- [ ] Plan：双行栅格（目的地/起始日期列 + `.plan-when` 行 + prefs）；无分区大标题；combo 全量选项；slot 时间列 = `--plan-col`；Discover/Arrange 同态 progressive
-- [ ] Chat 内嵌非 FAB；resize 仅高
-- [ ] Replan 确认 + 分隔泡；保存提交行程+对话；Saved 多卡；详情只读 DB 对话
-- [ ] 四 locale catalogs；reduced-motion 关闭飞行动画
+- [ ] Token 与 `mockup-travor.css` + `mockup.css` 结构类一致（`--bg-warm`、`--accent-cta`、`--label-teal`、`--plan-col`）
+- [ ] `body[data-style="travor"]` 于 App + Auth 页
+- [ ] Home：`auth-links` 注册链（§3.1）
+- [ ] Register / Profile：`.register-card__grid` + 头像 bowl（§3.2/§3.4）
+- [ ] Plan 起飞条：`plan-takeoff` 单行 5 必填 + 「规划行程」仅调起助手（**无** legacy 双行 `plan-board`）
+- [ ] `plan-constraints`（12 项，§4.2.1）+ `plan-travel-tips`（四卡 + visa popover + fold；目的地+日期+天数齐即展示）
+- [ ] 骨架填充：`stop-origin`、transit 单行、pending skeleton、`panel__head-actions`
+- [ ] Stop 行：`stop-detail-open` → place sheet；`stop-map-open` 外链地图
+- [ ] Place sheet：facts + 本行程安排 + 如何到达 + `place-sheet-map`
+- [ ] 悬浮领航员：`plan-nav` resize / 收起 / 8 步问答（`06-plan-qa.html`）
+- [ ] Saved 详情与 Plan 完成态 slot 同构
+- [ ] Register / Profile：国籍字段（Feature 38 spec）
+- [ ] 四 locale catalogs；`prefers-reduced-motion` 关 shimmer
+- [ ] Replan 确认 dialog（4 i18n key）
 
 ---
 
@@ -830,7 +844,7 @@ Profile / Register 标签固定为 **出行兴趣（多选）**。Plan 块标题
 
 **移除字段（改由助手问答获取）：** 类型、节奏、交通偏好、每日起点/终点、开始/结束时间、偏好 chips、其他限制。
 
-**按钮：** 「生成行程」→「**规划行程**」（`plan-submit`）。点击后调起行程助手 Agent 接管，不直接生成。
+**按钮：** 「生成行程」→「**规划行程**」（`plan-submit`）。点击后：（1）调起行程助手；（2）**立即**开始 `discover_places`（与问答并行，见 §4.10）。不在此时调用 `make_itinerary`。
 
 ### 4.2 行程助手 — 右下角悬浮框
 
@@ -846,11 +860,39 @@ Profile / Register 标签固定为 **出行兴趣（多选）**。Plan 块标题
 | d | 行程的类型？（A 个人放松 B 家庭度假 C 情侣出游 D 景点打卡 E 美食之旅，其他请说明） | 景点打卡 |
 | e | 你希望的节奏？（A 轻松 B 适中 C 紧凑，其他请说明） | 适中 |
 | f | 交通偏好？（A 公共交通优先 B 步行优先 C 打车优先，其他请说明） | 公共交通+步行 |
-| g | 有没有特别想去的地点？ | 默认列出必去点 |
+| g | 有没有特别想去的地点？ | 芯片 = fetch `candidates` 上 **`must_see`（热门，可 8 处）**；**等** discover+fetch 完成。用户手填 3 处写入 `mustInclude`，**不**把芯片改成只剩 3 处、也**不**回写抹掉池上 `must_see` |
 | h | 还有别的要求吗？例如有老人、有婴儿、有轮椅，请说明 | 无 |
-| i | 现在我了解您的要求了，让我帮您推荐适合的行程 | — |
+| i | 现在我了解您的要求了，让我帮您推荐适合的行程 | 本步触发 `make_itinerary`（非再问一题） |
+| j | 大致行程已经安排完毕，现在开始逐天逐行程安排细节 | fetch 骨架进对话之后 |
+| k | `[目的地][天数][人数][类型]行程已规划完毕，告诉我你的想法，我可以再做调整` | fill `done` 之后 |
 
 **跳过交互：** 每步支持快捷「使用默认」或直接回车采用默认值；用户也可文字输入自定义。
+
+#### 4.2.1 `plan-constraints` 只读字段（助手接管后展示）
+
+**真源：** `ui-mockup/06-plan-qa.html` / `06-plan-skeleton.html` / `09-saved-detail.html` 内 `data-testid="plan-constraints"`。
+
+助手点击「规划行程」后主区隐藏起飞条，改为只读 **出行限制** panel。字段分两组：**起飞条 5 必填**（§4.1）+ **助手 8 步 b–h 收集项**（映射 `PlanBoundaries`，见 §2.5 MVP-10 扩展）。
+
+| 分组 | 助手步 | 面板标签（i18n key 示例） | `PlanBoundaries` 字段 | 默认值 / 空态 |
+| --- | --- | --- | --- | --- |
+| 起飞 | — | `play.plan.destination` 等 | `destination`, `startDate`, `days`, `partySize`, `budget` | 表单当前值 |
+| 助手 | b | `play.plan.constraint_hotel` | `dailyStart`（酒店/起点）；可选 `dailyEnd` | 无 → 显示 i18n「无（不安排每日交通）」 |
+| 助手 | c | `play.plan.constraint_day_start` | `timeFrom` | `09:00` |
+| 助手 | d | `play.plan.constraint_trip_type` | `tripType` | 景点打卡 |
+| 助手 | e | `play.plan.constraint_pace` | `pace` | 适中 |
+| 助手 | f | `play.plan.constraint_transport` | `transport` | 公共交通+步行 |
+| 助手 | g | `play.plan.constraint_must_see` | `mustInclude[]` | **用户指定**（手填或从芯片多选）。与芯片热门名单分列：约束条展示用户名单；芯片仍是 `must_see` |
+| 助手 | h | `play.plan.constraint_other` | `constraints` | 无 → i18n「无」 |
+
+**展示规则：**
+
+- **Feature 41 Story 1（CTA 刚接管、尚无任何助手答案）：** 起飞 5 项显示用户值；助手 7 项全部 `pending`，值为 `play.plan.constraint_pending`（`—`）。**禁止**用默认值灰字填满未答项；**禁止**把 discover / `must_see` 名单写入必去格。
+- 助手问答进行中（Story 2+）：已答项显示用户值；未答项仍为 `constraint_pending`。默认值只出现在助手问句 hint（`assistant_defaults_hint`），不预填约束条。
+- 问答完成并开始规划后：全部项只读；改约束须重新规划（§4.3）。
+- 必去点 `mustInclude` 仅在用户答完 g 后透传 `make_itinerary`（非 UI encyclopedia，ADR-042）。芯片真源见 §4.12 Story 3，**不是** CTA 当秒搜点，也不是 intake 期 `travel_tips`。
+
+**交叉引用：** 8 步问题文案与默认值 — [`performance.md §12.11`](../../1.places-agent/agent-specs/performance.md)；i18n 问句 — §4.6 `play.plan.assistant_q_*`。
 
 ### 4.3 助手接管与终止
 
@@ -868,14 +910,14 @@ Profile / Register 标签固定为 **出行兴趣（多选）**。Plan 块标题
 
 ### 4.4 渐进行程展示 — 骨架 + 逐 stop
 
-**管线（BFF）：**
+**管线（BFF）：** 见 §4.10。摘要：
 
 ```text
-助手问答完成 → discover_places → make_itinerary（流式骨架）
-  → 助手对话框内展示骨架预览（简单文字列表，day-by-day stop-by-stop，只显示 stop 名称，无时间）
-  → display_current_stop(起点) → 行程列表开始
-  → 循环: plan_next_stop → display_current_stop → 行程列表 +1 stop
-  → 一天结束 → 下一天
+点「规划行程」→ 隐藏起飞栏 → 助手问答（b 起）；约束条未答 = —
+  →（Story 3）步骤 g：才 POST /api/plan/discover → fetch candidates 出芯片
+  → 问答结束 → 助手 i → make → fetch skeleton → 助手 j
+  → 循环 plan_next_stop + fetch → 助手 k
+  → travel_tips（骨架后）→ fetch artifacts → 贴士四卡
 ```
 
 **行程列表（保留 §3.5.2 slot 结构）：**
@@ -887,13 +929,13 @@ Profile / Register 标签固定为 **出行兴趣（多选）**。Plan 块标题
 
 ### 4.5 BFF 编排变更
 
-| 现状（§2.4） | 新（MVP-10） |
+| 现状（§2.4 历史 arrange） | 新（MVP-10 + §4.10） |
 | --- | --- |
-| `plan-day-by-day.ts` 逐日 arrange（本地 OPENAI_CN `plan-arrange-llm.ts`）+ `enrich_arrange_transit` | 改调 agent `make_itinerary`（NDJSON 流式骨架）+ 循环 `plan_next_stop` + `display_current_stop` |
-| 本地 `buildArrangeDayMessages` prompt | 删除（agent 侧拼 prompt） |
-| 助手经 `/v1/chat` 或 BFF OPENAI_CN | BFF OPENAI_CN 流式（ADR-036 保留），问答完成后编排上述管线 |
+| `plan-day-by-day.ts` 逐日 arrange | CTA **只**开助手；**步骤 g** 才 `discover_places`；intake 结束后 `make_itinerary` + `plan_next_stop` + `fetch_trip_details` |
+| 本地 `buildArrangeDayMessages` | 删除（agent 侧） |
+| 助手经 BFF OPENAI_CN 规划 | BFF 无规划 LLM；intake 为本地表单默认/跳过；规划只调 agent |
 
-**工具迁移：** `arrangeDay`/`enrichArrangeTransit` client fn 删除；新增 `makeItinerary`/`planNextStop`/`displayCurrentStop`。
+**工具迁移：** 删 `arrangeDay`/`enrichArrangeTransit`；增 `makeItinerary`/`planNextStop`/`fetchTripDetails`；place sheet 按需 `getPlaceDetails`。
 
 ### 4.6 i18n 键（新增）
 
@@ -903,6 +945,7 @@ Profile / Register 标签固定为 **出行兴趣（多选）**。Plan 块标题
 | `play.plan.confirm_replan_title/body/confirm/cancel` | 重提交弹窗（§4.3） |
 | `play.plan.assistant_greeting` | 问 a |
 | `play.plan.assistant_q_hotel` … `assistant_q_other` | 问 b–h |
+| `play.plan.constraint_hotel` … `play.plan.constraint_other` | constraints 面板标签（§4.2.1） |
 | `play.plan.assistant_use_default` | 「使用默认」快捷 |
 | `play.plan.assistant_defaults_hint` | 默认值提示（如「默认：适中」） |
 | `play.plan.skeleton_preview_title` | 骨架预览标题 |
@@ -911,6 +954,15 @@ Profile / Register 标签固定为 **出行兴趣（多选）**。Plan 块标题
 | `play.plan.nav_collapse` | 「收起」 |
 | `play.plan.nav_terminate` | 「终止」 |
 | `play.plan.quick_use_default` | 快答 chips「使用默认」 |
+| `play.plan.assistant_know_enough` | 步 i：现在我了解您的要求了… |
+| `play.plan.assistant_skeleton_ready` | 步 j：大致行程已经安排完毕… |
+| `play.plan.assistant_plan_complete` | 步 k：`{destination}{days}{party}{tripType}行程已规划完毕…` |
+| `play.plan.assistant_discovering` | 搜点中（**仅 Story 3 步骤 g**，禁止 CTA 当秒） |
+| `play.plan.constraint_pending` | 约束条未答占位（源英 `—`） |
+| `play.plan.assistant_making` | 正在排大致行程（等 make） |
+| `play.plan.assistant_filling_stop` | 正在安排第 {name} 站（含交通） |
+| `play.plan.phase_making` | 主区 `plan-phase`：正在生成骨架 |
+| `play.plan.phase_make_timeout` | make 失败且 fetch 无骨架 |
 
 ### 4.7 UI 视觉（Frontend Design 确认稿，2026-08-31 — Travor 皮肤定稿）
 
@@ -932,7 +984,7 @@ Profile / Register 标签固定为 **出行兴趣（多选）**。Plan 块标题
 
 **按钮：** 全部实心 CTA 统一 `--accent-cta` / hover；**不用** 绿渐变 launch pill（旧 §1 `--glaze` 绿仅作历史 mock 参考）。
 
-**起飞条（`plan-takeoff`）：** 单行 5 格——目的地（拉长）/ 起始日期（`12rem`，日历）/ 天数（`3.3rem`）/ 人数（`3.3rem`）/ 预算（`<select>`：`$ 经济` / `$$ 中等` / `$$$ 舒适`），右端「规划行程」。移动端折两列。**点击只调起领航员**，不直接生成。
+**起飞条（`plan-takeoff`）：** 单行 5 格——目的地（拉长）/ 起始日期（`12rem`，日历）/ 天数（`3.3rem`）/ 人数（`3.3rem`）/ 预算（`<select>`：`$ 经济` / `$$ 中等` / `$$$ 舒适`），右端「规划行程」。移动端折两列。**点击调起领航员并启动 discover**（§4.10），不在此时 `make_itinerary`。
 
 **悬浮领航员（`plan-nav`）：** 右下角参考 what2eat。
 
@@ -953,9 +1005,184 @@ Profile / Register 标签固定为 **出行兴趣（多选）**。Plan 块标题
 
 **阶段 meta（`plan-phase__meta`）：** 左对齐 `骨架 HH:MM · 填充中`。
 
+**出行限制（`plan-constraints`）：** 助手接管后主区只读展示（§4.2.1）；`constraint-grid` = 起飞 5 项 + 助手 b–h 共 7 项；无编辑（改约束须重新规划）。
+
+**出行小贴士（`plan-travel-tips`）：** 四卡 grid；visa 链 + hover popover；`plan-travel-tips-toggle` 折叠。数据来自 **`fetch_trip_details` `artifacts`**（写路径：`travel_tips` / `visa_requirement` 各至多一次）。`iconic_places` 与助手步骤 g 芯片同一有序数组。完整面板仅 `planning`/`done` 展示；intake 可写 tips 后 fetch iconic。禁止用 `inferred_must_see` merge。禁止用 tips/visa HTTP 体或 OPENAI_CN 散文填卡。MVP-11 前 visa 可静态占位。
+
+**Stop 行（`.slot`）：** 见 §4.8；`.slot-actions` 仅非 transit；缩略图 `slot-thumb-link` 可链地图或打开 sheet（实现二选一，mock 默认 thumb 链 `#`）。
+
 **重提交/终止弹窗：** 沿用 `.dialog`；文案 §4.3 i18n（4 key）。
 
 **a11y：** 拉手 `aria-label`；领航员 `aria-label`；表单禁用 `aria-disabled`；reduced-motion 关 shimmer。
+
+### 4.8 场所详情浮层 — place sheet（2026-09-02 定稿）
+
+**真源：** `06-plan-skeleton.html` / `09-saved-detail.html` 内 `[data-testid="place-sheet"]`；样式 `mockup-travor.css` `.dialog--place` 段。
+
+**触发：** 非 transit stop 行点击 **详情**（`data-testid="stop-detail-open"`）→ 页内 modal；**地图**（`stop-map-open`）仍直接 vendor 外链新标签。
+
+**结构：**
+
+```text
+.dialog-backdrop[data-testid=place-sheet]
+  └ .dialog.dialog--place[role=dialog]
+      ├ .place-dialog__bar（标题 + 关闭 place-sheet-close）
+      ├ .place-panel--facts（图 + 名 + 评分/kind/source + 地址/电话/开放/价格）
+      ├ .place-panel--itin（本行程安排：Day · 时段 + slot 摘要）
+      ├ .place-panel--nav（如何到达：复用 legs_to_here 推荐/备选，与 .transit-line 一致）
+      └ .dialog__actions（在地图中打开 place-sheet-map + 关闭）
+```
+
+**数据：**
+
+| 区块 | 来源 |
+| --- | --- |
+| 事实字段 | BFF → agent `get_place_details`（place_id / name+latlng）；或 trip filled 已带富信息则优先 |
+| 行程上下文 | 当前 `ItinerarySlot`（dayIndex、start/end、summary） |
+| 如何到达 | 同 stop 前一条 `.slot--transit` / `legs_to_here` |
+| 地图 URL | vendor deep link（Google/AMAP 等）；无 key query |
+
+**i18n 键（新增，四 locale）：**
+
+| Key | 用途 |
+| --- | --- |
+| `play.plan.place_sheet_title` | Dialog 标题 |
+| `play.plan.place_sheet_close` | 关闭 |
+| `play.plan.place_sheet_open_map` | 在地图中打开 |
+| `play.plan.place_sheet_section_facts` | 场所信息 |
+| `play.plan.place_sheet_section_itin` | 本行程安排 |
+| `play.plan.place_sheet_section_nav` | 如何到达 |
+| `play.plan.place_sheet_loading` / `place_sheet_error` | 异步 enrich |
+| `play.plan.slot_details` / `play.plan.slot_map` | 列表行按钮（已有则复用） |
+
+**禁止：** transit 行放详情按钮；place sheet 内编造地址/评分；静默失败。
+
+---
+
+## 4.9 MVP-18：写库后 fetch（与 agent §22 / §23 对齐）
+
+**原则：** places-agent 写入 Trip；**2play 所有行程相关 UI** 只读 `fetch_trip_details`。写工具与 NDJSON 不是散文源。
+
+| UI | 写完成 | fetch |
+| --- | --- | --- |
+| 步骤 g 芯片 | `discover_places` 热度 `must_see`（**不**被用户 3 处覆盖） | `candidates` |
+| 用户必去 | intake → `mustInclude` → make 写 `constraints.must_include` | `constraints` |
+| 贴士 01 必去地 / intro / 交通 / 衣着 / 安全 / 天气 | **`make_itinerary` 之后** `travel_tips` → `artifacts.tips` | `artifacts` |
+| 贴士签证卡 | `visa_requirement` → `artifacts.visa` | `artifacts` |
+| 骨架预览 | `make_itinerary` | `skeleton` |
+| 行程卡 | `plan_next_stop` | `filled` + `cursor` |
+| 约束条 | intake；首次写 constraints 后可对齐账本 | `constraints` 或本地镜像直至首次写 |
+
+**起飞默认（F71）：** `budget` 初始与 replan 为 `mid`；展示用 `budgetOptionLabel`。
+
+**时刻（F77）：** 与 agent §22.2 同一套解析；BFF 发出前已是 `HH:MM`。
+
+**骨架预览（F72）：** 输入为 fetch 的 `skeleton.days[]`；折叠与酒店同名的每日 stay；`highlights.title` 用 `day_theme` 一次。
+
+---
+
+## 4.10 生成一条行程的调用全流程（2026-09-03 修订）
+
+与 agent [`agent-design.md` §23 / §24](../../1.places-agent/agent-specs/agent-design.md) 同一契约。浏览器 **不**直连 agent。
+
+```mermaid
+flowchart TD
+  A[起飞栏 5 项] --> B[规划行程]
+  B --> C[打开助手 b；约束条未答为 pending]
+  B --> D[静默 POST /api/plan/discover]
+  C --> H[b-f 不问搜点]
+  D --> E[类目池 + 热度 must_see]
+  H --> I[步骤 g 等池]
+  E --> I
+  I --> I2[芯片热门 must_see 小于等于 5]
+  I2 --> J[用户可另指定 mustInclude]
+  J --> K[步骤 h]
+  K --> L[助手 i：了解要求了 F41 S2 停]
+  L --> M[POST /api/plan NDJSON]
+  M --> N[geocode 酒店]
+  N --> O[fetch candidates 复用池]
+  O --> P[make_itinerary 池+must_include]
+  P -->|非200| P1[fetch skeleton 再决定]
+  P -->|200| Q[fetch skeleton]
+  P1 --> Q
+  Q --> R[助手列出每日站名]
+  R --> S[助手 j：开始逐站细节]
+  Q --> T[travel_tips + fetch artifacts]
+  T --> U[主区贴士四卡]
+  S --> V[plan_next_stop]
+  V --> W[fetch filled 升 revision]
+  W --> X[助手一行含 transit]
+  W --> Y[主区 slot + plan-phase]
+  Y --> Z{还有站?}
+  Z -->|是| V
+  Z -->|否| AA[助手 k：行程已规划完毕]
+```
+
+**数据流（谁存、谁读）**
+
+| 步骤 | Agent 写 | 2play 存 | UI 读 |
+| --- | --- | --- | --- |
+| discover | `candidates.must_see`、评分 | 浏览器 `tripId`；**不**把整池放前端 | 芯片 ← BFF 已 fetch 的名字 |
+| intake | 无 | `intakeAnswers`；`mustInclude` ≠ 覆盖 must_see | 约束条 |
+| make | `skeleton`、`constraints.must_include` | NDJSON 进度 | 助手骨架文案 ← **fetch skeleton** |
+| tips | `artifacts.tips` | — | 四卡 ← fetch artifacts |
+| 每站 | `filled`（覆盖一站） | 内存 `itinerary.slots` 累加 | 主区 slot；助手一行 |
+| 完成 | — | `PlanSessionCache` **含 trip_id** | 刷新可再 fetch |
+
+**同流通知：** 没有 agent 推送。页面「知道」下一步，只因为 BFF 在**同一条** NDJSON 里：写成功 → fetch → 事件。make 502 必须先 fetch 再放弃。
+
+**禁止：** HTTP `findIconicPlaces`；`patch_skeleton`；空池 make；tips 当芯片；用户 3 处回写抹 8 处 `must_see`；用 `fetch(filled)` 当全天真相。
+
+---
+
+## 4.11 过程提示（主区 + 助手）— 沿用现有视觉，不新做绿渐变
+
+现网 **没有**整页绿渐变进度条。真源仍是 Travor：暖底、浅橙 CTA、teal 标签（§4.7）。用户可见「现在在做什么」分三层，全部 i18n。
+
+| 层 | DOM | 何时 | 文案角色 |
+| --- | --- | --- | --- |
+| 主区阶段条 | `.plan-phase.is-busy`（已有） | discovering / making / filling | meta：`骨架 HH:MM · 填充中`；msg：搜点 / 生成骨架 / 第 d/N 天 |
+| 细节预告 | `.plan-slot-preview`（§3.5.3） | 每站 fill 前 | `preview_place` / `preview_transit` / `preview_meal` |
+| 加载行 | `.slot--pending` / `.skeleton-stop.is-pending` | 下一站未 fill | 同构骨架，非虚线框 |
+| 助手对话 | `plan-nav__thread` 系统行 | 每阶段切换 | i / making / 骨架列表 / j / 每站+transit / k |
+| 跑道脊 | `.plan-nav__rail-fill` | intake+规划 | 进度比例，**不是**绿渐变 pill |
+
+**助手 thread 最低可见句（key 见 §4.6）：**
+
+1. 开场 a（**CTA 当秒无** `assistant_discovering`）  
+2. b–h 问句；g 才搜点，未就绪只加载  
+3. `assistant_know_enough` + `assistant_making`  
+4. fetch 骨架后：按日短列表（站名，来自 fetch）  
+5. `assistant_skeleton_ready`  
+6. 每站：站名 + 推荐 transit 一句（来自该次 fill 后的展示映射；主区仍 fetch）  
+7. `assistant_plan_complete`
+
+**主区在骨架已 fetch、fill 未完时：** Day tabs + 已 fill 的 slot **以及** 未 fill 的 `skeletonStops`（不得只渲染酒店 stay）。这是「每天只有酒店」的 UI 闸。
+
+**动效：** 沿用 slot 入场、phase/pending shimmer；`prefers-reduced-motion` 关闭。不引入紫渐变 / 黑底 acid / 旧 glaze 绿 launch。
+
+---
+
+## 4.12 Plan 页重建（Feature 41）
+
+现网 `plan-page` 在 CTA 并行 discover、约束条可写入热门必去，且 fill 常只出酒店。**从 Feature 41 起按故事拆页重建**，一次一条。皮肤仍是 Travor（§4.7），不新开色板。
+
+| Story | 用户可见 | 禁止 |
+| --- | --- | --- |
+| **1** | CTA → `plan-nav` 问候+问 b；隐藏起飞栏；7 项 pending | 可见搜点文案；make；必去格写 POI |
+| **2** | 静默 Trip+discover（池内热度打标 ≤5）∥ b–h；g 等池后再问；完成后 know_enough | 可见 discovering；为打标再搜热点 |
+| **4（本切片）** | make + fetch 骨架；thread 进度（0.1s）+ 标题 + 骨架卡 | fill / `plan_next_stop`；stay-only 当成功；写信封当骨架 |
+| **5** | 步骤 b 目的地内 `search_places`；未命中重输/忽略 | 无城市酒店 geocode；AMAP 澳门点当「找不到」 |
+
+**Story 5 顺序：** 非空 b → BFF `search_places(query, address=目的地)` → 80km 内命中则 PATCH + session origin；未命中 422 + 重输/忽略。空 b 不搜。`plan-skeleton-only` / `plan-skeleton-fill` **不得**再对酒店名无城市 geocode。供应商失败只传 name。agent 硬闸见 ADR-048 / F83。
+
+**Story 1 组件（沿用，不新皮肤）：** `PlanTakeoffForm`、`PlanAssistantNav`、`PlanConstraintsPanel`。约束 `dd` 未答用 `play.plan.constraint_pending`；必去格 `data-testid="constraint-must-see"`。
+
+**Story 1 与旧 AC：** 废止可见的 CTA discover 文案。`buildConstraintItems` 未答 g **不得**用 `suggestedMustSee` 填格子。
+
+**Story 2 顺序：** CTA 同时打开助手与静默 JSON discover；步骤 g `POST /api/plan/candidates` → agent `fetch_trip_details`（不复用 CTA 信封）。
+
+**Story 4 顺序：** intake+discover 完成后 `POST /api/plan` 带 `mode: "skeleton"`（make-only）。BFF：`make_itinerary` → `fetch_trip_details` `fields: ["skeleton"]` → NDJSON `phase: skeleton` / `skeleton_done`（载荷来自 fetch 切片）。UI：know_enough + planning 文案 + `plan-make-elapsed`；成功后 headline 再 `plan-thread-skeleton`。**不**调用 fill。`prefers-reduced-motion` 仍适用。
 
 ---
 
@@ -967,7 +1194,7 @@ Profile / Register 标签固定为 **出行兴趣（多选）**。Plan 块标题
 | [`2play-stories.md`](./2play-stories.md) | AC / backlog |
 | [`2play-test-plan.md`](./2play-test-plan.md) | 质量门与用例 |
 | [`2play-deployment-plan.md`](./2play-deployment-plan.md) | 部署（[`6.deployment-plan.md`](./6.deployment-plan.md) 同义入口） |
-| [`../../1.places-agent/agent-specs/`](../../1.places-agent/agent-specs/) | Agent HTTP / `plan_itinerary` |
+| [`../../1.places-agent/agent-specs/agent-design.md`](../../1.places-agent/agent-specs/agent-design.md) §23 | 宿主调用契约（含 2play 例子） |
 | [`../../workspace-specs/6.deployment-plan.md`](../../workspace-specs/6.deployment-plan.md) §0 | 端口注册 |
 | [ADR-033](../../workspace-specs/adr/ADR-033-where2play-postgres-prisma.md) | where2play PostgreSQL |
 | [`../../2.what2eat/2eat-specs/2eat-design.md`](../../2.what2eat/2eat-specs/2eat-design.md) | 姊妹薄客户端参考 |

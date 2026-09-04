@@ -321,4 +321,32 @@
       btn.setAttribute("aria-label", expanded ? "隐藏出行小贴士" : "显示出行小贴士");
     });
   });
+
+  /* Place detail sheet (plan-46) */
+  var placeSheet = document.querySelector("[data-testid='place-sheet']");
+  function setPlaceSheetOpen(open) {
+    if (!placeSheet) return;
+    placeSheet.classList.toggle("is-open", open);
+    placeSheet.setAttribute("aria-hidden", open ? "false" : "true");
+    if (open) {
+      var closeBtn = placeSheet.querySelector("[data-testid='place-sheet-close']");
+      if (closeBtn) closeBtn.focus();
+    }
+  }
+  document.querySelectorAll("[data-open-place-sheet]").forEach(function (btn) {
+    btn.addEventListener("click", function (e) {
+      e.preventDefault();
+      setPlaceSheetOpen(true);
+    });
+  });
+  if (placeSheet) {
+    placeSheet.querySelectorAll("[data-close-place-sheet]").forEach(function (el) {
+      el.addEventListener("click", function () {
+        setPlaceSheetOpen(false);
+      });
+    });
+    placeSheet.addEventListener("click", function (e) {
+      if (e.target === placeSheet) setPlaceSheetOpen(false);
+    });
+  }
 })();

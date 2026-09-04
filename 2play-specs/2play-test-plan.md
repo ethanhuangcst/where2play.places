@@ -178,39 +178,61 @@ MVP-1 不调 agent，但仍需真实 DB、真实 session、真实邮件路径（
 
 **注（2026-08-31）：** plan-15（35）**Superseded** — geocode/首末段并入 MVP-10 plan-46；TC-M3r-35-* 不再作为独立 story 门禁，等价覆盖见 TC-M10-46-04 / TC-M10-44-04。
 
-### MVP-10 — plan-46 轻骨架消费端（2026-08-31 方案确定）
+### MVP-10 — plan-46 轻骨架消费端（2026-09-02 mock/spec 锁定；UI 重做）
 
-**真源：** `[2play-stories.md](./2play-stories.md)` #37 · `[itinerary-design.md §16–17](./itinerary-design.md)` · `[2play-design.md §4.7](./2play-design.md)` · agent `[0.refactor-plan.md](../../1.places-agent/agent-specs/0.refactor-plan.md)` 批次 11。
+**真源：** `[2play-stories.md](./2play-stories.md)` #37 · `[itinerary-design.md §16–17](./itinerary-design.md)` · `[2play-design.md §3.9 / §4.2.1 / §4.7](./2play-design.md)` · mock [`ui-mockup/`](./ui-mockup/) · agent `[0.refactor-plan.md](../../1.places-agent/agent-specs/0.refactor-plan.md)` 批次 11/16。
 
 | 门禁 | 要求 |
 | --- | --- |
-| 功能 | **37** plan-46：5 字段 + Travor UI + 悬浮助手 + 新 BFF 管线（make_itinerary → plan_next_stop/display_current_stop） |
-| 依赖 | agent Feature **44**（可 stub NDJSON 联调 UI） |
+| 功能 | **37** plan-46：mock **100%** 结构对齐 + 5 字段 + `plan-nav` intake + constraints/travel-tips + 新 BFF（`make_itinerary` → `plan_next_stop` + `fetch_trip_details`）+ place sheet |
+| 依赖 | agent F44 + F63/64 + **F65 Done**（无 `display_current_stop`） |
+| Mock 门 | 实现页 DOM/testid 与 `06-plan.html` / `06-plan-qa.html` / `06-plan-skeleton.html` / `09-saved-detail.html` 一致；**不得**仅用 CSS 壳冒充 |
 | Live | Lisbon 4D：首 stop < 30s，总 < 90s |
-| Mock 对齐 | `ui-mockup/06-plan*.html` + Playwright 静态 file:// 或 prod 联调 |
+| Agent parity | 30 城（§5.5） |
+| 用户 | 明确 usable 确认（DoD） |
+
+**分阶段测试签收（对齐 stories W2.5a–f）：**
+
+| 子阶段 | 必绿测试 |
+| --- | --- |
+| W2.5b BFF | TC-M10-46-01/02/03 + `plan-skeleton-fill` |
+| W2.5c Shell | TC-M10-46-12 + 视觉 spot-check `01–05`/`07–08` |
+| W2.5d Plan UI | TC-M10-46-05/08/09/10/11 + TC-M10-E2E-01–04 |
+| W2.5e Saved | TC-M10-46-06/07 + TC-M10-E2E-05 + saved detail 同构 |
+| W2.5f 签收 | `make test-e2e-mvp10-live` + parity stub + 用户确认 |
 
 | Story | 单元 / 契约 | E2E | 用户确认 | Done？ |
 | --- | --- | --- | --- | --- |
-| **37** plan-46 | TC-M10-46-* | TC-M10-E2E-* | 必须 | ToDo |
+| **37** plan-46 | TC-M10-46-* | TC-M10-E2E-* | 必须 | **ToDo** |
 
 #### TC-M10-46（plan-46 BFF + UI）
 
 | ID | 类型 | 主题 | 文件（目标） |
 | --- | --- | --- | --- |
-| TC-M10-46-01 | Unit | BFF 不再调用 `streamArrangeDay` / OPENAI_CN arrange | `tests/plan-day-by-day.test.ts` 改写 |
-| TC-M10-46-02 | Unit | NDJSON 客户端：`skeleton_day` → `stop_filled` 序列 | `tests/plan-stream-client.test.ts` |
-| TC-M10-46-03 | Unit | 起点 Stay stop 映射；transit 单行双 mode 结构 | `tests/itinerary-map.test.ts` |
-| TC-M10-46-04 | Unit | origin geocode 失败 → i18n 降级，不伪造时长 | `tests/plan-enrich-transit.test.ts` 迁移 |
-| TC-M10-46-05 | Component | panel 头三按钮存在；无 bottom sticky bar | `tests/plan-page.test.tsx` |
+| TC-M10-46-01 | Unit | BFF 默认路径不调 `streamArrangeDay` / OPENAI_CN arrange | `tests/plan-skeleton-fill.test.ts` |
+| TC-M10-46-02 | Unit | NDJSON：`skeleton_day` → `stop_filled` 序列 | `tests/plan-stream-client.test.ts` |
+| TC-M10-46-03 | Unit | 起点 Stay stop；transit 单行双 mode | `tests/itinerary-skeleton-map.test.ts` |
+| TC-M10-46-04 | Unit | origin geocode 失败 → i18n 降级 | `tests/plan-skeleton-fill.test.ts` |
+| TC-M10-46-05 | Component | `plan-takeoff` 5 格；无 `plan-board` 双行；CTA 仅开助手 | `tests/plan-page.test.tsx` |
+| TC-M10-46-06 | Component | place sheet：facts/itiner/nav；Escape 关闭 | `tests/place-sheet.test.tsx` |
+| TC-M10-46-07 | Unit | place sheet enrich / 失败 i18n | `tests/place-sheet-data.test.ts` |
+| TC-M10-46-08 | Unit | intake 8 步：默认跳过、`PlanBoundaries` 映射（§4.2.1） | `tests/plan-intake.test.ts` |
+| TC-M10-46-09 | Component | `plan-constraints` 12 项；问答中 `—` | `tests/plan-constraints.test.tsx` |
+| TC-M10-46-10 | Component | `plan-travel-tips` 四卡 + fold + visa popover | `tests/plan-travel-tips.test.tsx` |
+| TC-M10-46-11 | Component | panel 头三按钮；`plan-phase`；无 bottom sticky | `tests/plan-page.test.tsx` |
+| TC-M10-46-12 | Component | Public/App `data-style="travor"`；register/profile photo grid | `tests/travor-shell.test.tsx` |
 
 #### TC-M10-E2E（Playwright）
 
 | ID | 类型 | 主题 |
 | --- | --- | --- |
-| TC-M10-E2E-01 | E2E | 5 字段 → 助手 8 步（含默认跳过）→ 骨架预览可见 |
-| TC-M10-E2E-02 | E2E | 首屏出现 `stop-origin` + 至少一条 transit-line |
+| TC-M10-E2E-01 | E2E | 5 字段 → `plan-nav` 8 步（含默认跳过）→ 骨架预览可见 |
+| TC-M10-E2E-02 | E2E | 首屏 `stop-origin` + 至少一条 `.transit-line` |
 | TC-M10-E2E-03 | E2E | 终止问答 → 确认弹窗（4 i18n key） |
-| TC-M10-E2E-04 | E2E | `prefers-reduced-motion` 无 shimmer 回归 |
+| TC-M10-E2E-04 | E2E | `prefers-reduced-motion` 无 shimmer |
+| TC-M10-E2E-05 | E2E | `stop-detail-open` → `place-sheet`；`place-sheet-map` 新标签 |
+| TC-M10-E2E-06 | E2E | 助手接管后可见 `plan-constraints`；贴士四卡在骨架 + travel_tips fetch 之后 |
+| TC-M10-E2E-07 | E2E | 点「规划行程」即 discover；步骤 g 有 grounded 芯片（可晚于 b–f） |
 
 ### MVP-4 — Chat 双存储
 
@@ -255,6 +277,11 @@ MVP-1 不调 agent，但仍需真实 DB、真实 session、真实邮件路径（
 - [ ] 性别非必填（注册/资料）
 - [ ] Profile 兴趣在同一卡；标签「出行兴趣（多选）」；无两段已删说明文案
 - [ ] Replan 文案与分隔泡 i18n key 存在
+- [ ] MVP-10 Travor：`data-style="travor"` 于 App + Auth；无 legacy `plan-board` 默认路径
+- [ ] MVP-10：`plan-constraints`（12 项）+ `plan-travel-tips`（四卡）可见且 testid 正确
+- [ ] MVP-10：`plan-nav` intake（非页内 chat）；CTA 不直接 POST 生成
+- [ ] Register / Profile：`.register-card__photo` 头像 bowl（§3.2/§3.4）
+- [ ] Home：`auth-links` 注册链（§3.1）
 - [ ] Story 诚实性矩阵与 §8 一致
 
 ---
@@ -334,7 +361,44 @@ MVP-1 不调 agent，但仍需真实 DB、真实 session、真实邮件路径（
 | P10-E1 | E2E live | 生成多日：细节提示随 kind 变化；pending 可见；日提示仍为「正在安排第 d/N 天」 |
 | P10-E2 | E2E live | 同帧多条事件仍逐条揭示（无整日同 tick 刷屏） |
 
-**状态：** P10-U* 目标绿于 Fast CI；P10-E* 为 MVP-2 DoD / `plan-10` **E2E 待签** 门禁。
+**状态：** P10-U* 目标绿于 Fast CI；P10-E* 为 MVP-10 / plan-46 DoD 门禁。
+
+### 5.5 Agent 30 城 parity E2E（plan-46 · AC22–23）
+
+**真源：** agent [`e2e-test.md`](../../1.places-agent/agent-specs/e2e-test.md) §5 + [`e2e-test-result/INDEX.md`](../../1.places-agent/agent-specs/e2e-test-result/INDEX.md) + 各城 `NN-city.md`。
+
+**目标：** where2play Plan 页（BFF → agent 同工具链）产出与 agent 直连 E2E **可比**；用于回归 plan-46 消费端未扭曲 agent 结果。
+
+**运行方式（计划）：**
+
+```bash
+# agent 基线（已有）
+cd 1.places-agent && python3 scripts/e2e-places-agent.py --all
+
+# where2play parity（待实现）
+cd 3.where2play && python3 e2e/test_agent_parity_30.py [--only lisbon] [--compare]
+```
+
+**通过判据（每城）：**
+
+| # | 断言 | 说明 |
+| --- | --- | --- |
+| P30-01 | 链路 | UI/BFF 到达 `trip_complete`（或 honest 失败） |
+| P30-02 | 骨架 | 各 `day_theme` + stop **名称集合** 与 agent markdown「骨架」节一致（顺序可忽略子排序） |
+| P30-03 | 填充 | 各 stop 名称 + kind 与 agent「逐站填充」一致；时段 ±15min |
+| P30-04 | 交通 | transit 模式/时长档位与 agent 同行一致（`partial` 时双方均显式降级） |
+| P30-05 | 失败对齐 | agent INDEX 标记 ✗ 的城，where2play 不得 fixture 绿 |
+
+**用例矩阵（引用 agent INDEX，不重复 30 行输入）：**
+
+| 分组 | 城市 # | agent 结果 | where2play 期望 |
+| --- | --- | --- | --- |
+| 基线必过 | 1 Lisbon, 4 Rome, 11 Prague, 27 KL | ✓ | P30-01–04 全过 |
+| 长耗时 | 20 Kyoto, 1 Lisbon | ✓ | 墙钟允许 +50% vs agent INDEX |
+| 已知 agent 失败 | 2 Paris, 3 Tokyo, 21 Hanoi | ✗ | P30-05；UI 可读错误 |
+| 全量 | 01–30 | 27/30 ✓ | nightly opt-in；产出 `2play-specs/e2e-parity-result/INDEX.md` |
+
+**产物：** `2play-specs/e2e-parity-result/{NN}-{city}.md`（并排：agent 摘要 vs where2play 摘要 + diff 行）。
 
 ---
 
@@ -477,6 +541,72 @@ Agent 层 live 探针细节见 places-agent 测试文档 — 此处不重复 TC 
 | --- | --- | --- |
 | TC-M11-39-01 | 文档 | `[2play-design.md](./2play-design.md)` §3.5.6 含 BFF 契约与 i18n key 列表 |
 | TC-M11-39-02 | Mock | `ui-mockup/10-travel-advice.html` 含 `.visa-advice` 区块 |
+
+#### TC-M17（MVP-17 P0–P2 必去地单一源 + fill 契约）
+
+绑定 2play Feature 37 AC13b · agent Feature 67/69。Lisbon UI E2E 属 P5，本切片不做。
+
+| ID | 类型 | 主题 | 文件（目标） |
+| --- | --- | --- | --- |
+| TC-M17-ICONIC-01 | Unit | iconic helper 写 tips 后读 artifacts，不把 HTTP 体当 UI | `tests/plan-iconic.test.ts` |
+| TC-M17-ICONIC-02 | Unit | 助手建议名单与 tips `iconic_places` 同序 | `src/core/plan-iconic.ts` / plan-page 测 |
+| TC-M17-FILL-01 | Unit | `tripLedgerFields` 省略 null revision；fill 归一化 `end_time` | `tests/plan-agent-body.make-itinerary.test.ts` / `plan-skeleton-fill.test.ts` |
+| TC-M17-I18N-01 | Unit | `play.errors.invalid_input` 四 locale 存在 | catalog / i18n 测 |
+
+#### TC-M18（MVP-18 主干：fetch / 默认 / 时刻 / 预览）
+
+绑定 Feature 37 AC8c / AC13c / AC24–AC27 · agent F71/F72/F75–F77。
+
+| ID | 类型 | 主题 | 文件（目标） | 状态 |
+| --- | --- | --- | --- | --- |
+| TC-M18-71-01 | Component | 起飞预算默认 `mid`；顶栏无 `comfort` 英文键 | `tests/plan-page.test.tsx` | Done |
+| TC-M18-75-01 | Unit | 规划编排在 make/plan_next_stop 成功后调用 `fetchTripDetails` | `tests/plan-skeleton-fill.test.ts` | Done |
+| TC-M18-75-02 | Unit | 步骤 g 芯片来自 discover fetch `must_see`，不读 intake travel_tips | `tests/plan-page.test.tsx` / `plan-iconic-parse.test.ts` | Done |
+| TC-M18-75-03 | Unit | CTA `POST /api/plan/discover` 写后 fetch candidates | `tests/plan-start-discover.test.ts` | Done |
+| TC-M18-75-04 | Unit | 有 trip_id 则跳过二次 discover；travelTips 在 make 与 skeleton_done 之后 | `tests/plan-skeleton-fill.test.ts` | Done |
+| TC-M18-76-01 | Unit | 贴士四卡绑定 fetch artifacts，visa 卡不绑 visa HTTP | plan-page / travel-tips 测 | Done |
+| TC-M18-77-01 | Unit | intake `7:00 am` → `07:00` | `tests/plan-intake.test.ts` | Done |
+| TC-M18-72-01 | Unit | 骨架预览折叠重复酒店 stay | `tests/plan-skeleton-preview.test.ts` | Done |
+
+#### TC-M19（MVP-19：正交必去 + 骨架叙事 + 超时恢复）
+
+绑定 Feature 37 AC28–AC34 · Feature **40** · agent F78–F82。
+
+| ID | 类型 | 主题 | 文件（目标） | 状态 |
+| --- | --- | --- | --- | --- |
+| TC-M19-40-01 | Unit | 芯片 must_see 与 mustInclude 分列；3 处不覆盖 8 处 | `tests/plan-intake.test.ts` | **Done** |
+| TC-M19-40-02 | Unit | make 失败后 fetch 有骨架则续 fill | `tests/plan-skeleton-fill.test.ts` | **Done** |
+| TC-M19-40-03 | Component | 助手顺序：know_enough → 骨架文 → skeleton_ready → fill 行 | `tests/plan-page.test.tsx` | **Done** |
+| TC-M19-40-04 | Component | filling 主区同时有 skeletonStops 与 stay，非仅酒店 | `tests/plan-skeleton-stops.test.ts` / plan-page | **Done** |
+| TC-M19-40-05 | Unit | PlanSessionCache / current 含 trip_id | `tests/api-plan.test.ts` | **Done** |
+| TC-M19-40-06 | i18n | §4.6 叙事 key 四 locale | `tests/i18n-catalog.test.ts` | **Done** |
+| TC-M19-40-E2E | E2E | 里斯本 3 日：助手见多日骨架后再出 slot；芯片≠仅用户 2 处 | Playwright | **ToDo** |
+
+#### TC-M20（MVP-20：Plan 页重建 Feature 41）
+
+绑定 Feature **41**。Story 2 = TC-M20-41-10–15。Story 4 = TC-M20-41-16–20。TC-M19-40-03/04（fill 叙事）**保持跳过**至 fill 故事。
+
+| ID | 类型 | 主题 | 文件（目标） | 状态 |
+| --- | --- | --- | --- | --- |
+| TC-M20-41-01 | Component | CTA 后打开 `plan-nav`，隐藏起飞栏，不问 `POST /api/plan` | `tests/plan-page.test.tsx` | **Done** |
+| TC-M20-41-02 | Component | 约束条起飞 5 项有值；7 项 pending=`constraint_pending` | `tests/plan-page.test.tsx` / `plan-constraints.test.tsx` | **Done** |
+| TC-M20-41-03 | Unit | 未答 g 时必去格不用 `suggestedMustSee` | `tests/plan-intake.test.ts` | **Done** |
+| TC-M20-41-04 | Component | CTA 后无搜点句、无 chips、无 tips、不问 make；**允许**静默 discover | `tests/plan-page.test.tsx` | **Done** |
+| TC-M20-41-05 | i18n | `play.plan.constraint_pending` 四 locale | `tests/i18n-catalog.test.ts` | **Done** |
+| TC-M20-41-10 | Unit | discover 池内热度打标，must_see ≤ max_number；不二次搜点 | agent `discover-places.test.ts` | **Done** |
+| TC-M20-41-11 | Unit | startPlanDiscover 传 max_number=5；返回 pool；芯片 ≤5 | `tests/plan-start-discover.test.ts` | **Done** |
+| TC-M20-41-12 | Component | g 等池；芯片来自 `POST /api/plan/candidates`（fetch_trip_details） | `tests/plan-page.test.tsx` | **Done** |
+| TC-M20-41-13 | Component | 每答一题约束格回填；PATCH session | `tests/plan-page.test.tsx` | **Done** |
+| TC-M20-41-14 | Component | intake 完无 debug dump；Story 4 接 make-only | `tests/plan-page.test.tsx` | **Story 4** |
+| TC-M20-41-15 | i18n | know_enough 四 locale | `tests/i18n-catalog.test.ts` | **Done** |
+| TC-M20-41-16 | Unit | make-only 路径：make 后 fetch skeleton；不调用 plan_next_stop | `tests/plan-skeleton-only.test.ts` | **Story 4** |
+| TC-M20-41-17 | Unit | stay-only / make 失败 → error；不产出成功骨架 | `tests/plan-skeleton-only.test.ts` | **Story 4** |
+| TC-M20-41-18 | Component | 进度 elapsed 0.1s；超时/失败 i18n | `tests/plan-page.test.tsx` | **Story 4** |
+| TC-M20-41-19 | Component | headline + thread 骨架卡来自 fetch 切片 | `tests/plan-page.test.tsx` | **Story 4** |
+| TC-M20-41-20 | i18n | planning / headline / elapsed / make 失败 四 locale | `tests/i18n-catalog.test.ts` | **Story 4** |
+| TC-M21-41-21 | Unit | 空 b 不 search；非空命中 80km；未命中 not_found；禁无城市 geocode | `tests/plan-resolve-origin.test.ts` | **Done** |
+| TC-M21-41-22 | Unit/API | PATCH b 未命中 422；忽略空 b 前进；make origin 不二次无城市 geocode | `tests/plan-skeleton-only.test.ts` / session | **Done** |
+| TC-M21-41-23 | i18n | `intake_origin_not_found` / retry / skip 四 locale | `tests/i18n-catalog.test.ts` | **Done** |
 
 ---
 

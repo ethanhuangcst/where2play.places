@@ -1,4 +1,4 @@
-.PHONY: help dev up down db-bootstrap db-migrate db-migrate-test test test-coverage lint quality test-e2e-mvp1 test-e2e-mvp2-live test-e2e-mvp3-live test-e2e-chat02
+.PHONY: help dev up down db-bootstrap db-migrate db-migrate-test test test-coverage lint quality check-mvp10-css test-e2e-mvp1 test-e2e-mvp2-live test-e2e-mvp3-live test-e2e-mvp10-live test-e2e-parity test-e2e-chat02
 
 .DEFAULT_GOAL := help
 
@@ -38,7 +38,11 @@ db-migrate-test: db-bootstrap ## Apply migrations to where2play_test
 lint: ## Typecheck
 	npm run typecheck
 
-test: db-migrate-test ## Unit/integration tests
+check-mvp10-css: ## Verify app/mockup.css contains MVP-10 structural rules from spec
+	@chmod +x scripts/check-mvp10-css-sync.sh
+	@./scripts/check-mvp10-css-sync.sh
+
+test: db-migrate-test check-mvp10-css ## Unit/integration tests
 	npm test
 
 test-coverage: db-migrate-test ## Unit/integration tests with coverage thresholds
@@ -55,5 +59,14 @@ test-e2e-mvp3-live: up db-migrate ## MVP-3 live Mode H + transit + must-see prob
 
 test-e2e-chat02: up db-migrate ## MVP-4 chat-02 local draft (refresh + logout)
 	python3 e2e/run.py chat02
+
+test-e2e-mvp10-live: up db-migrate ## plan-46 Lisbon skeleton fill live probe
+	PLAN_PIPELINE=skeleton PLAN_SLOT_STAGE_MS=0 python3 e2e/probe_plan_lisbon.py
+
+test-e2e-mvp10-structure: up db-migrate ## TC-M10-E2E-06 plan UI structure gate
+	python3 e2e/run.py mvp10-structure
+
+test-e2e-parity: ## Agent 30-city parity (delegates to places-agent harness)
+	python3 e2e/test_agent_parity_30.py --only lisbon,rome,prague
 
 quality: lint test-coverage test-e2e-mvp1 ## MVP-1 quality gate

@@ -2951,7 +2951,7 @@ html[lang^="zh"] .app-user__tools .btn {
   width: 1.05rem;
   height: 1.05rem;
   flex-shrink: 0;
-  background: url("food-logo.png") center / contain no-repeat;
+  background: url("/food-logo.png") center / contain no-repeat;
 }
 
 .skeleton-stop--filled {
@@ -3381,15 +3381,26 @@ html[lang^="zh"] .app-user__tools .btn {
 }
 
 .travel-tips-must-see {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.15rem;
   margin: 0.35rem 0 0;
-  padding-left: 1.15rem;
+  padding-left: 0;
+  list-style: none;
   font-size: 0.84rem;
   line-height: 1.45;
   color: var(--ink-2);
 }
 
-.travel-tips-must-see li + li {
-  margin-top: 0.2rem;
+.travel-tips-must-see li {
+  display: inline;
+  margin: 0;
+}
+
+.travel-tips-must-see li:not(:last-child)::after {
+  content: " · ";
+  color: var(--ink-3, #8a7f74);
 }
 
 @media (prefers-reduced-motion: reduce) {

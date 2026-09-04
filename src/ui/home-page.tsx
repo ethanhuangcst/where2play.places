@@ -28,7 +28,7 @@ export default function HomePageClient({ signedIn = false }: Props) {
           </Link>
         </div>
         {!signedIn ? (
-          <p>
+          <p className="auth-links">
             <Link href="/register" data-testid="home-register">
               {t("play.home.register")}
             </Link>

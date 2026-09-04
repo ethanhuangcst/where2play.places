@@ -332,12 +332,13 @@ sequenceDiagram
 
 ### 16.1 管线替换
 
-| 现（本文件 §5 L2 管线，as-built） | 新（MVP-10 目标） |
+| 现（本文件 §5 L2 管线，as-built） | 新（MVP-10 目标 · ADR-046） |
 | --- | --- |
-| BFF 本地 `buildArrangeDayMessages` + OPENAI_CN 等满日 JSON | agent `make_itinerary` NDJSON 流式骨架 |
-| 解析后 staged `slot_preview`/`slot`（§5.4 sleep 假 progressive） | 骨架预览 → 循环 `plan_next_stop` + `display_current_stop` **真逐 stop** |
+| BFF 本地 `buildArrangeDayMessages` + OPENAI_CN 等满日 JSON | agent `make_itinerary` NDJSON 流式骨架 + `trip_id` |
+| 解析后 staged `slot_preview`/`slot`（§5.4 sleep 假 progressive） | 骨架预览 → 循环 `plan_next_stop` **真逐 stop**（F65 后无 `display_current_stop`） |
 | `enrich_arrange_transit`（BFF 调 agent） | 吸收进 `plan_next_stop`（agent 侧串行 directions） |
 | 起点藏在 `from_origin` transit 单行 | **起点 = 第一站标准 Stay stop 卡片**（§17.1） |
+| 宿主大包 JSON | BFF hydrate `fetch_trip_details` + 本地 Trip schema |
 
 ### 16.2 BFF NDJSON 事件（目标）
 
@@ -348,7 +349,7 @@ sequenceDiagram
 | `skeleton_start` | make_itinerary 开始 | `{ total_days }` |
 | `skeleton_day` | 骨架流式每完成一日 | `{ day_index, day_theme, stops: [{ name, kind, meal_slot? }] }` — **无时间** |
 | `skeleton_done` | 骨架 LLM 结束 | `{ days_count }` |
-| `stop_filled` | 每次 display_current_stop 完成 | `{ day_index, stop_index, stop, legs_to_here?, time_start?, time_end? }` |
+| `stop_filled` | 每次 `plan_next_stop` 写侧完成 | `{ day_index, stop_index, stop, legs_to_here?, time_start?, time_end?, revision? }` |
 | `day_done` | 当日末 stop 填充完 | `{ day_index }` |
 | `itinerary_done` | 全程结束 | `{ outcome }` |
 
@@ -363,13 +364,15 @@ sequenceDiagram
 
 ### 16.4 F42 校验迁移
 
-站间时序、同日餐厅去重、day-trip 补搜、午间窗口软提示 — 从 2play `plan-arrange-llm.ts` 重试回路迁至 agent `plan_next_stop`/`display_current_stop`（Feature 44）。2play 仅透传 agent 的 `transit_outcome` 与错误码。
+站间时序、同日餐厅去重、day-trip 补搜、午间窗口软提示 — 从 2play `plan-arrange-llm.ts` 重试回路迁至 agent `plan_next_stop`（Feature 44）。2play 仅透传 agent 的 `transit_outcome` 与错误码。
 
 ### 16.5 测试影响
 
 - 删除/替换：`plan-arrange-llm.test.ts` 中 2play 侧时序/去重重试 → agent 侧 TC-M10-44-*。
 - 更新：`plan-day-by-day` 事件测试 → 断言 `skeleton_day` / `stop_filled` 序列。
 - E2E（TC-M10-*）：生成 → 骨架预览 → 逐 stop 上屏 → 完成态；助手 8 步含默认跳过；起点 Stay stop + transit 单行格式（§17.2）。
+- **UI 结构门（2026-09-02）：** 签收前须通过 `plan-constraints`（12 项）、`plan-travel-tips`（四卡）、`plan-nav` intake；**禁止** legacy `plan-board` 默认路径 — 见 [`2play-design.md §4.2.1`](./2play-design.md)、[`2play-test-plan.md` TC-M10-E2E-06/07](./2play-test-plan.md)、stories W2.5a–f。
+- **必去地数据流（MVP-18）：** 写 `travel_tips` → fetch `artifacts.tips.iconic_places` → 步骤 g 与贴士 01 共用；discover 不参与展示名单。禁止把 `travel_tips` HTTP 当 UI。
 
 ---
 
@@ -413,5 +416,33 @@ sequenceDiagram
 | 已填充 stop | `[data-testid="stop-filled"]` 或 `.slot:not(.slot--pending)` |
 | Pending | `.slot--pending` |
 | Transit 行 | `.transit-line` |
-| 助手展开 | `[data-testid="plan-nav-panel"]` |
-| 起飞 CTA | `[data-testid="plan-takeoff-submit"]` |
+| 助手展开 | `[data-testid="plan-nav"]` |
+| 详情按钮 | `[data-testid="stop-detail-open"]` |
+| Place sheet | `[data-testid="place-sheet"]` |
+| 地图按钮 | `[data-testid="stop-map-open"]` |
+| 起飞 CTA | `[data-testid="plan-submit"]` |
+
+### 17.6 Stop 行操作（详情 / 地图）
+
+- **适用：** 所有非 `.slot--transit` 的 place/stay/meal stop（含 `stop-origin`）。
+- **详情：** 打开页内 place sheet（§17.7）；`data-testid="stop-detail-open"`。
+- **地图：** vendor deep link 新标签；`data-testid="stop-map-open"`；与 sheet 内 `place-sheet-map` 同源。
+- **布局：** `.slot-actions` 内两钮，分隔符「｜」视觉（mock：相邻 `.map-link`）。
+
+### 17.7 Place sheet（场所浮层）
+
+**真源：** [`2play-design.md §4.8`](./2play-design.md) · mock `06-plan-skeleton.html`。
+
+| 区块 | 内容 |
+| --- | --- |
+| Facts | 图、名、rating、kind、address、phone、hours、price、source |
+| 本行程安排 | Day index + 时段 + slot summary（来自 filled stop） |
+| 如何到达 | 复用紧邻上一 transit 的 `legs_to_here`（推荐 + `/` 备选） |
+| CTA | `place-sheet-map` 新标签；关闭回列表焦点 |
+
+**Enrich：** 打开 sheet 时若缺 address/rating，BFF `get_place_details`；loading/error i18n；禁止编造。
+
+### 17.8 MVP-18 数据源
+
+骨架预览、逐站列表、贴士四卡、签证卡、必去芯片均以 BFF 转发的 `fetch_trip_details` 切片为准（`skeleton` / `filled` / `artifacts` / `constraints`），见 `[2play-design.md §4.9](./2play-design.md)`。NDJSON 与写工具 JSON 只驱动「写完了、该 fetch」。Place sheet 的 **本行程安排** 来自 fetch 的 filled；场所百科事实可用 `get_place_details`（非行程散文）。
+

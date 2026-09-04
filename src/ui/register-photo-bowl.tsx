@@ -48,7 +48,7 @@ export function RegisterPhotoBowl({ photoUrl, onPhotoChange, onPhotoError }: Pro
   const hasPhoto = Boolean(preview);
 
   return (
-    <div className="register-photo">
+    <div className="register-photo" data-testid="field-photo">
       <input
         ref={inputRef}
         id="photo"

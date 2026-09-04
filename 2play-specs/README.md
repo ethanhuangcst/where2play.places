@@ -7,7 +7,7 @@
 **行程生成 / Progressive UX：** [`itinerary-design.md`](./itinerary-design.md)（MVP-3 **as-built** Mode H；**MVP-10 目标** §1.3 / §16–17 方案已确定 2026-08-31）  
 **用户故事 / AC：** [`2play-stories.md`](./2play-stories.md)（ATDD；格式对齐 2eat）  
 **测试计划：** [`2play-test-plan.md`](./2play-test-plan.md)（质量门、用例矩阵；扩展 common-test-strategy）  
-**部署（野草云3）：** [`2play-deployment-plan.md`](./2play-deployment-plan.md)（入口 [`6.deployment-plan.md`](./6.deployment-plan.md)）— stack `where2play`，宿主机 **`3005→3000`**，域名 `where2play.place`；Postgres **`where2play`**（[ADR-033](../../workspace-specs/adr/ADR-033-where2play-postgres-prisma.md)）；上游 `PLACES_AGENT_BASE_URL` / `PLACES_AGENT_CALLER_KEY`；L2/助手 `OPENAI_*` **仅 BFF 服务端**（ADR-036/037）。
+**部署（野草云3）：** [`2play-deployment-plan.md`](./2play-deployment-plan.md)（入口 [`6.deployment-plan.md`](./6.deployment-plan.md)）— stack `where2play`，宿主机 **`3005→3000`**，域名 `where2play.place`；Postgres **`where2play`**（[ADR-033](../../workspace-specs/adr/ADR-033-where2play-postgres-prisma.md)）；上游 `PLACES_AGENT_BASE_URL` / `PLACES_AGENT_CALLER_KEY`；L2/助手 `QWEN_*` **仅 BFF 服务端**（ADR-047）。
 
 ## Mock-up
 

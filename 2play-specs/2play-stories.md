@@ -18,7 +18,7 @@
 | 签证（Orizn）           | [ADR-044](../../workspace-specs/adr/ADR-044-orizn-visa-rest-adapter.md) · agent Feature **48** · 2play Feature **38–39** |
 
 
-**状态：** MVP-1（features 1–13）**Done**。MVP-2（features **14–22**, **30** + `plan-07` **AC1**）**Done**。**MVP-3**（**31–33** Mode H 完整排程路径）**Done**（2026-08-23）。MVP-4 已开工 — **24** `chat-02` **Done**；**23–26** / `plan-07` AC2–3 待办。MVP-5 Replan 未开工。**MVP-3r（34–36）** **34/36 Done**；**35 plan-15 并入 MVP-10**（2026-08-31 方案确定，不再独立交付）。**MVP-10（plan-46 / Feature 37）** **方案已确定**；**须与 agent MVP-16 / ADR-046 同窗**（`trip_id` + `fetch_trip_details`，**不**接 `display_current_stop`）— 见 agent [`0.refactor-plan.md`](../../1.places-agent/agent-specs/0.refactor-plan.md) 批次 11/16、[`e2e-test-result/04-rome.md`](../../1.places-agent/agent-specs/e2e-test-result/04-rome.md) 开发计划。**MVP-11（签证 + 国籍）** Feature **38–39** ToDo；agent Feature **48 Done** — [ADR-044](../../workspace-specs/adr/ADR-044-orizn-visa-rest-adapter.md)。
+**状态：** MVP-1（features 1–13）**Done**。 **Feature 41** Plan 页重建 Story 1 **规格 Done / 实现待批**。MVP-2（features **14–22**, **30** + `plan-07` **AC1**）**Done**。**MVP-3**（**31–33** Mode H 完整排程路径）**Done**（2026-08-23）。MVP-4 已开工 — **24** `chat-02` **Done**；**23–26** / `plan-07` AC2–3 待办。MVP-5 Replan 未开工。**MVP-3r（34–36）** **34/36 Done**；**35 plan-15 并入 MVP-10**（2026-08-31 方案确定，不再独立交付）。**MVP-10（plan-46 / Feature 37）** **ToDo**（Travor UI 未签收）。**须与 agent MVP-16 / ADR-046 同窗**。**MVP-18 P0–P1** Feature **75–77 / 74 / 71 / 72** **代码 Done**（2026-09-02）；P2 芯片 CSS / 文案 / 37f 签收未做。**2play 行程 UI 禁止以 LLM 散文或写工具 HTTP 为真源**（ADR-046 D6）。**MVP-11（签证 + 国籍）** Feature **38–39** ToDo；agent Feature **48 Done** — [ADR-044](../../workspace-specs/adr/ADR-044-orizn-visa-rest-adapter.md)。
 
 ## 人物角色
 
@@ -66,7 +66,7 @@
 | **MVP-4** | 页内 Chat 双存储                              | **23–26**, `plan-07` **AC2–3**       | Chat 改行程 → 刷新 local 仍在 → 保存含对话 → 详情只读；登出清 local                         | **In progress**（**24** Done）                                  |
 | **MVP-5** | Replan + PDF + Chat 高度                   | **27–29**                            | 重新规划确认 → Mode H progressive 新行程 + 分隔泡；PDF；拖拽调高 chat                      | **To-do**                                                            |
 | **MVP-3r** | Plan 边界透传 + 交通契约修复（MVP-3 补漏）   | **34–36**                            | 边界透传 + schema 保留 transit + F42 等价校验 | **Done**（34/36；**35 Superseded** → MVP-10） |
-| **MVP-10** | §12 轻骨架消费端（Travor UI + 新 agent 工具族） | **37** `plan-46`                     | 5 字段 + 助手 → make_itinerary → 逐 stop 填充；Lisbon 4D 性能基线 | **方案已确定**（2026-08-31），待立项 |
+| **MVP-10** | §12 轻骨架消费端（Travor UI + 新 agent 工具族） | **37** `plan-46`                     | 5 字段 + 助手 → make_itinerary → 逐 stop 填充；mock 100% 对齐；Lisbon 4D 性能基线 | **ToDo**（BFF 部分；UI 重做中） |
 | **MVP-11** | 国籍字段 + 出行建议页占位（签证展示后续） | **38–39**                            | 注册/资料页国籍下拉；DB 持久化；出行建议页 visa 占位（不开发查询 UI） | **规格已确定**（2026-09-01），待立项 |
 
 
@@ -106,7 +106,7 @@
 | **W2d**  | MVP-3 签收 | **ops** live harness → **31 AC3** | `make test-e2e-mvp3-live`；用户确认 MVP-3 usable     | ✓ Done（2026-08-23） |
 | **W3**   | MVP-4     | **24** → **23** → **25** AC2–3 → **26** | Chat 流式 + patch；保存 `messages[]`；详情只读对话                               | **24** Done；余 To-do                       |
 | **W2r**  | MVP-3r    | **34** ✅ → **36** ✅（**35 Superseded**） | 边界透传 + schema 保留 transit + 2play 侧 F42 等价 | **Done**（2026-08-24） |
-| **W2.5** | MVP-10    | **37** `plan-46` only | Travor UI + 新 BFF；**对齐 ADR-046**（`trip_id` / fetch，勿接 display） | **ToDo**（与 agent MVP-16 同窗） |
+| **W2.5** | MVP-10    | **37** `plan-46`（分阶段，见下） | Travor UI 100% mock 对齐 + 新 BFF；**对齐 ADR-046**（`trip_id` / fetch，勿接 display） | **ToDo**（37b 部分 Done） |
 | **W2.6** | MVP-11    | **38** → **39** | 国籍字段 → 出行建议签证位（agent `visa_requirement`） | **ToDo** |
 | **W4**   | MVP-5     | **27** → **28** → **29**    | Replan（同 MVP-3 管线）+ PDF + chat resize                                 | To-do                       |
 
@@ -124,7 +124,20 @@
 
 **W2r 说明（MVP-3r 补漏）：** **34** 边界透传 Done；**36** schema + 2play F42 等价 Done；**35** origin geocode **Superseded**（2026-08-31 并入 MVP-10 plan-46 / agent F44）。
 
-**W2.5 说明（MVP-10）：** **37** plan-46 — 见 `[itinerary-design.md §16–17](./itinerary-design.md)`、`[2play-design.md §4.7](./2play-design.md)`；**agent 交叉：** [`0.refactor-plan.md` 批次 16 where2play 任务](../../1.places-agent/agent-specs/0.refactor-plan.md)、[ADR-046](../../workspace-specs/adr/ADR-046-trip-store-pg-memory-fetch.md)、开放清单 [`04-rome.md` 开发计划](../../1.places-agent/agent-specs/e2e-test-result/04-rome.md)。一次一条至 DoD；live 基线 Lisbon 4D 首 stop < 30s、总 < 90s。
+**W2.5 说明（MVP-10 / plan-46）：** 真源 mock：`ui-mockup/index.html` 画廊；设计 [`2play-design.md §3.9 / §4.2.1 / §4.7`](./2play-design.md)；行程 [`itinerary-design.md §16–17`](./itinerary-design.md)。**冲突以 mock 为准。** Agent 侧 F43/44/65 **Done**；2play **禁止**在未对齐 mock 前标 Feature 37 Done。**2026-09-02 验收驳回：** 已有 React 组件与 BFF 骨架 ≠ UI 签收；须同步 `ui-mockup/assets/mockup.css` MVP-10 结构类至 `app/mockup.css`，且 `plan-nav` / `plan-takeoff` / `constraint-grid` 布局与 `06-plan*.html` 一致后方可标 W2.5c/d Done。
+
+**W2.5 分阶段交付（一次一条至 DoD；`incremental-delivery` 指子阶段内仍单 story，但 37 整体未 Done 前不得开 MVP-4/5 新 UI 债）：**
+
+| 子阶段 | 代号 | 交付物 | 状态 |
+| --- | --- | --- | --- |
+| **W2.5a** | spec/mock | §4.2.1 constraints、travel-tips 触发、注册/资料照片、Home register 链；mock `01–09` 更新 | **Done**（2026-09-02） |
+| **W2.5b** | BFF | `plan-skeleton-fill` + `/api/plan` skeleton 管线；client `makeItinerary`/`planNextStop`/`fetchTripDetails`；F65 无 display | **部分 Done** — 须联调验收 |
+| **W2.5c** | Travor shell | 全站 `data-style="travor"`（App + Auth）；`01–05`/`07–08` 结构对齐 mock | **重做 Done**（CSS 同步 + shell；2026-09-02） |
+| **W2.5d** | Plan UI | 删 legacy `plan-board`；`plan-takeoff` + `plan-nav` 8 步 intake；`plan-constraints` + `plan-travel-tips`；`plan-itinerary` v2 | **重做 Done**（布局/助手/mock 对齐；自动化门绿；**Feature 37 仍 ToDo** 待 live+usable） |
+| **W2.5e** | Saved + sheet | `09-saved-detail` 同构；place sheet 抛光 | ToDo |
+| **W2.5f** | 测试签收 | TC-M10-* + E2E mock 结构门 + Lisbon live + 30 城 parity；用户确认 usable | ToDo |
+
+**Agent 交叉：** [`0.refactor-plan.md`](../../1.places-agent/agent-specs/0.refactor-plan.md) 批次 11/16、[ADR-046](../../workspace-specs/adr/ADR-046-trip-store-pg-memory-fetch.md)。Live 基线：Lisbon 4D 首 stop < 30s、总 < 90s。
 
 **W2.6 说明（MVP-11）：** **38** 国籍 → **39** 签证展示位；依赖 agent Feature **48**（已 Done）。
 
@@ -424,10 +437,10 @@ Backlog 为 **features 1–39**。明确不在范围：SSO、双 Chat/FAB、一�
 
 **用户故事 — 按日与时段阅读行程**
 
-作为用户，我希望按 Day 查看 Highlights 与 Hour 行（含交通段、缩略图、详情/地图外链），以便执行当天安排。
+作为用户，我希望按 Day 查看 Highlights 与 Hour 行（含交通段、缩略图、详情/地图操作），以便执行当天安排。
 
 - **AC1:** 给定一条多日行程，当我切换 Day tab，则只显示对应日内容。
-- **AC2:** 给定场所时段，当渲染，则显示时段区间、场所名、说明，并提供详情与地图外链（新标签）。
+- **AC2:** 给定场所时段，当渲染，则显示时段区间、场所名、说明，并提供 **详情**（页内 place sheet，plan-46）与 **地图**（vendor 外链新标签）；legacy as-built 若仍外链详情，须在 plan-46 迁移后替换。
 - **AC3:** 给定交通段，当渲染，则使用交通样式且无场所缩略图要求。
 - **AC4:** 给定场所缩略图，当布局，则时间列宽与规划器「天数」列同宽约定（`--plan-col`），缩略图左缘对齐该列输入。
 - **AC5:** 给定生成进行中，When progressive 揭示，Then 当日列表行为满足 `plan-10` **AC4–AC5**（逐条 `slot`、同构 `.slot--pending`）。
@@ -754,20 +767,28 @@ Backlog 为 **features 1–39**。明确不在范围：SSO、双 Chat/FAB、一�
 
 # 37 — Plan — plan-46 — MVP-10 轻骨架消费端
 
-**类别：** Plan · **MVP-10** · Feature **37** · 完工：**ToDo**（2026-08-31 方案确定；**2026-09-02 对齐 ADR-046 / agent MVP-16**)
+**类别：** Plan · **MVP-10** · Feature **37** · 完工：**ToDo**（2026-08-31 方案确定；2026-09-02 mock/spec 锁定；BFF 部分落地；**UI 须 100% 对齐 mock 后签收**）
 
 **作为** where2play 用户  
 **我希望** 填 5 个必填项后由悬浮助手补全偏好，并看到骨架顺序再逐站填充的真实行程  
 **以便** 首站更快可见、交通与景点信息更准确
 
-**规格：** `[itinerary-design.md §16–17](./itinerary-design.md)` · `[2play-design.md §4.7](./2play-design.md)` · agent [`0.refactor-plan.md`](../../1.places-agent/agent-specs/0.refactor-plan.md) 批次 **11 + 16（where2play 任务）** · [ADR-046](../../workspace-specs/adr/ADR-046-trip-store-pg-memory-fetch.md) · 开放清单 [`04-rome.md` 开发计划](../../1.places-agent/agent-specs/e2e-test-result/04-rome.md) · 依赖 agent Feature **44**（Done）+ **63/64**（Trip Store / fetch；与 **65** 同窗）
+**规格：** `[itinerary-design.md §16–17](./itinerary-design.md)` · `[2play-design.md §4.2.1 / §4.7 / §3.9 / §4.9](./2play-design.md)` · mock [`ui-mockup/`](./ui-mockup/) · agent [`0.refactor-plan.md`](../../1.places-agent/agent-specs/0.refactor-plan.md) 批次 **11 + 16 + 18** · [ADR-046](../../workspace-specs/adr/ADR-046-trip-store-pg-memory-fetch.md) · 依赖 agent **44**（Done）+ **63/64**（Trip Store / fetch）+ **65**（Done，无 display）+ **75–77**（ToDo）
+
+**禁止（回归门禁）：** Plan 页不得保留 MVP-2/3 **双行 `plan-board`**（类型/节奏/交通/chips/限制/时段）；「规划行程」不得直接 POST 生成；不得用页内固定 `PlanChatPanel` 代替 `plan-nav` 做 intake；不得在未渲染 `plan-travel-tips` / `plan-constraints` 时标 Done。
 
 ## AC
 
+### UI — 全站 Travor 与公开页
+
+- **AC0:** 给定任意 App 或 Auth 路由，When 渲染，Then `body` 含 `data-style="travor"` + Travor token（§4.7）；结构类与 mock 画廊 `01–10` 一致（冲突以 mock 为准）。
+- **AC0b:** 给定注册页（`02-register.html`）或资料页（`07-profile.html`），When 渲染，Then `.register-card__grid` 含右侧 **头像 bowl**（可选；`data-testid="field-photo"`），与 §3.2/§3.4 一致。
+- **AC0c:** 给定 Home（`01-home.html`），When 渲染，Then CTA 行外另有 **注册链**（`auth-links` → `/register`）。
+
 ### UI — 起飞与助手
 
-- **AC1:** 给定 Plan 页，When 用户只填目的地/起始日期/天数/人数/预算并点「规划行程」，Then 调起悬浮助手（不直接生成）；5 字段 i18n key，无硬编码英文。
-- **AC2:** 给定助手展开，When 8 步问答（含默认值 chips），Then 任一步可「终止」或「使用默认」跳过；进度摘要可见。
+- **AC1:** 给定 Plan 页，When 用户只填目的地/起始日期/天数/人数/预算并点「规划行程」，Then 调起悬浮 **`plan-nav` 助手**（不直接生成）；仅 **`plan-takeoff` 单行 5 格**，无 legacy 双行字段；5 字段 i18n key，无硬编码英文。
+- **AC2:** 给定助手展开，When 8 步问答 b–h（[`performance.md §12.11`](../../1.places-agent/agent-specs/performance.md) / §4.2），Then 任一步可「终止」或「使用默认」跳过；`plan-nav__context` 进度摘要可见。
 - **AC3:** 给定助手，When 拖动左上角拉手，Then 面板可 resize（最小=默认 27×45rem）；`prefers-reduced-motion` 关 shimmer。
 
 ### UI — Travor 与行程列表
@@ -777,12 +798,53 @@ Backlog 为 **features 1–39**。明确不在范围：SSO、双 Chat/FAB、一�
 - **AC6:** 给定相邻两站已上屏，When 渲染 transit，Then 单行 `从 · {A} 前往 · {B}：[mode|dur|cost] / [mode|dur|cost]`；place 名加粗；降级显式 i18n（§17.2）。
 - **AC7:** 给定 panel 头，When 行程生成中或完成，Then 「重新规划 / 保存行程 / 导出 PDF」在 `panel__head-actions` 右侧；无底部 sticky 操作条。
 
+### UI — 出行限制与小贴士（mock：`plan-constraints` / `plan-travel-tips`）
+
+- **AC12:** 给定助手接管（点击「规划行程」）后，When Plan 主区渲染，Then **隐藏** `plan-takeoff`，显示只读 **出行限制** panel（`data-testid="plan-constraints"`）按 [`2play-design.md §4.2.1`](./2play-design.md)：**起飞 5 项** + **助手 b–h 七项**（12 格 `constraint-grid`）；问答进行中未答项 `—` 或默认值灰字；完成后全部只读。
+- **AC13:** 给定 `make_itinerary` 已写入骨架且 `travel_tips` 已写 `artifacts`，When Plan 主区为 `planning`/`done`，Then **出行小贴士** panel（`data-testid="plan-travel-tips"`）可见；四卡来自 **`fetch_trip_details` `artifacts`**（NDJSON `tips` 仅为进度信号）。**intake 期间不展示**贴士面板。
+- **AC13b:** 给定步骤 g 芯片与贴士 01，When 渲染，Then 芯片来自 fetch **`candidates` 上 `must_see` 名**；贴士 01 来自 fetch **`artifacts.tips.iconic_places`**（make 之后 grounded）。**禁止** intake 期 ungrounded `travel_tips` 当芯片；**禁止**把 discover HTTP 包络当 UI 真源。
+- **AC13c:** ~~给定点击「规划行程」，When 助手仍在 b–f，Then BFF 已开始 `POST /api/plan/discover`~~ **废止（Feature 41 Story 1）**：CTA 后、步骤 g 前 **不** discover。芯片改到 Feature 41 Story 3。仍禁止为展示调 tips-prose / OPENAI_CN。
+- **AC13d:** 给定问答结束，When `POST /api/plan`，Then body 带提前 discover 的 `trip_id`/`revision`；编排 **不**在有池时二次 discover；`travel_tips` 在 fetch 骨架之后。
+- **AC24 (MVP-18 F71):** 给定新会话或重新规划，When 渲染起飞栏预算，Then 默认选中 `mid`（适中）；约束条/助手顶栏显示 i18n「适中」，**不**显示英文 `comfort`/`mid`。
+- **AC25 (MVP-18 F77):** 给定助手步骤 c 用户输入 `7:00 am` 或「早上七点」，When 开始填站，Then `time_from` 为 `07:00`；无法解析则 `09:00`，**不**出现因口语时刻导致的 `play.errors.invalid_input`。
+- **AC26 (MVP-18 F72):** 给定 fetch 到的 skeleton 每天首位为同一酒店 stay，When 助手骨架预览，Then 每天突出景点/餐饮；相同酒店收成「从 {酒店} 出发」；亮点主标题不与副标题重复同一 `day_theme` 字符串。
+- **AC27 (MVP-18 F75):** 给定 `make_itinerary` 或 `plan_next_stop` 刚成功，When 更新预览或行程卡，Then 数据来自随后的 `fetch_trip_details`（`skeleton` / `filled`）；NDJSON 仅进度。
+- **AC28 (MVP-19):** 给定步骤 g，When 池上 8 处 `must_see` 且用户指定 3 处，Then 芯片仍为热门 `must_see`；`mustInclude` 仅为用户 3 处；**禁止**把芯片收成 3 处或让 BFF 把池标改成 3。
+- **AC29 (MVP-19):** 给定 make 非 200 且 `trip_id` 存在，When BFF 处理，Then 先 fetch skeleton；合法多站则续 fill；否则 `play.plan.phase_make_timeout`，不进入 filling。
+- **AC30 (MVP-19):** 给定 fetch 骨架成功，When 助手，Then 先出现 `assistant_know_enough`，再出现按日站名（每日非 stay ≥1 可见），再 `assistant_skeleton_ready`，**然后**才循环 fill。
+- **AC31 (MVP-19):** 给定 fill 进行中，When 主区，Then `plan-phase` + `plan-slot-preview` + 未填 `skeleton-stop`；不得只显示酒店一站。
+- **AC32 (MVP-19):** 给定一站 `plan_next_stop` 成功，When 助手与主区，Then 助手增加含 transit 的一行；主区 +1 slot；随后 fetch 只升 revision。
+- **AC33 (MVP-19):** 给定全部 fill 完成，When 助手，Then `assistant_plan_complete` 含目的地、天数、人数、行程类型。
+- **AC34 (MVP-19):** 给定规划 `done`，When 写入 `PlanSessionCache`，Then 含 `trip_id`/`revision`；`GET /api/plan/current` 可再 fetch。
+
+### BFF — 新管线
+- **AC14:** 给定填充阶段，When 渲染，Then `plan-phase` 左对齐 meta（如 `骨架 HH:MM · 填充中`）+ 进度文案；主列表含已填充 `.slot`、`.slot--transit`、pending `.skeleton-stop.is-pending`。
+
+### UI — Stop 行：详情 / 地图 / 场所浮层
+
+- **AC15:** 给定非 transit 的 place/stay/meal stop，When 渲染 `.slot-actions`，Then 显示 **详情**（`data-testid="stop-detail-open"`）与 **地图**（`data-testid="stop-map-open"`）两项；`.slot--transit` **无** 详情/地图按钮。
+- **AC16:** 给定用户点击 **详情**，When 交互，Then 打开页内 **place sheet** modal（`data-testid="place-sheet"`，`role="dialog"`）；**不**跳新标签；Escape /  backdrop / 关闭钮可关；焦点 trap 至 dialog。
+- **AC17:** 给定 place sheet 打开，When 渲染，Then 含：**场所事实**（图/名/评分/kind/地址/电话或开放/价格/source）、**本行程安排**（Day + 时段 + slot 摘要）、**如何到达**（复用当日 `legs_to_here` 推荐与备选，与列表 transit 行一致）；底部 **在地图中打开**（`data-testid="place-sheet-map"`，新标签 vendor URL）。
+- **AC18:** 给定用户点击 **地图**（列表行），When 交互，Then 直接新开标签打开 vendor 地图 URL（与 place sheet 内「在地图中打开」同源）；URL **不含** API key query。
+- **AC19:** 给定 BFF 拉取详情，When place sheet 需 enrich，Then BFF → agent `get_place_details`（或 `fetch_trip_details` fields 已含富信息则不再二次请求）；加载/失败态 i18n（`play.plan.place_sheet_*`）；缺失字段显式「不可用」非编造。
+
+### UI — 已保存详情同构（`09-saved-detail.html`）
+
+- **AC20:** 给定已保存详情页，When 渲染行程块，Then 与 Plan 完成态 **同构**：constraints + travel tips + day tabs + stay/transit/slot 列表 + 详情/地图/place sheet；panel 头为「返回列表 / 导出 PDF / 取消收藏」。
+- **AC21:** 给定 MVP-4 `saved-04` 已交付，When 打开含对话快照的保存项，Then 在行程块 **下方** 追加只读 DB 对话区（`data-testid="chat-transcript"`）；**MVP-10  mock 可无此块**，不阻塞 plan-46 签收。
+
 ### BFF — 新管线
 
-- **AC8:** 给定助手问答完成，When BFF 规划，Then 调用 agent `make_itinerary`（取得 `trip_id`）→ 循环 **`plan_next_stop`**，需要展示片段时调 **`fetch_trip_details`**；本地按 Trip schema hydrate 并 apply `revision`/patch；**不**调用 `display_current_stop`（agent F65 删除）；**不**再调本地 OPENAI_CN arrange 或 `enrich_arrange_transit`。
+- **AC8:** 给定助手问答完成且提前 discover 已有 `trip_id`，When BFF 规划，Then `make_itinerary`（带池）→ `travel_tips`（骨架后）→ 循环 **`plan_next_stop`**，**每步写成功后** **`fetch_trip_details`**；**不**调用 `display_current_stop`；**不**再调本地 OPENAI_CN arrange。
+- **AC8c (MVP-18):** 给定写工具返回 `trip_id`+`revision`，When UI 需要骨架、已填站、artifacts 或约束，Then **必须** fetch 对应 `fields[]`；禁止把生成工具响应或 BFF LLM 散文当作第二真相源。
 - **AC8b:** 给定 agent 尚未提供 `trip_id`（过渡双写期），When BFF 仍收到旧 `next_tool_call` 形态，Then 可临时兼容；**正式签收**以 `trip_id` 路径为准（与 agent MVP-16 P1 对齐）。
 - **AC9:** 给定 NDJSON 流，When 客户端消费，Then 处理 `skeleton_start`/`skeleton_day`/`skeleton_done`/`stop_filled`/`day_done`/`itinerary_done`（§16.2）；废弃 staged sleep 假 progressive。
 - **AC10:** 给定 agent 返回 `transit_outcome: partial|heuristic`，When UI 展示，Then 显式降级文案（i18n key），不静默成功。
+
+### 与 agent 30 城 E2E 对齐（parity）
+
+- **AC22:** 给定 agent [`e2e-test-result/INDEX.md`](../../1.places-agent/agent-specs/e2e-test-result/INDEX.md) 中 **27/30 通过** 场景的输入边界（城市/天数/节奏/预算/酒店/必去），When 经 where2play Plan 页完整走通（助手默认值 + 同边界），Then 到达 `trip_complete`；骨架日主题与 stop **名称集合** 与对应 agent markdown **一致**（允许 vendor 侧评分/图差异；时段 ±15min）。
+- **AC23:** 给定 agent 标记 **失败** 的三城（Paris #2 / Tokyo #3 / Hanoi #21），When where2play 复现，Then 失败原因同类（`make_itinerary` 超时或校验失败）；UI 展示可读 `data.detail`；**不**用 fixture 冒充成功。
 
 ### 性能（Lisbon 4D live 基线）
 
@@ -791,7 +853,8 @@ Backlog 为 **features 1–39**。明确不在范围：SSO、双 Chat/FAB、一�
 ### 明确排除
 
 - PDF 导出实现属 MVP-5；本 story 仅保留按钮占位或 disabled + i18n「即将推出」。
-- Chat 改行程（MVP-4）不在本 story；助手仅收集规划边界。
+- **MVP-4 改行程 Chat** 不在本 story；`plan-nav` 助手 **仅 intake**（8 步边界收集），非 post-plan 编辑。
+- Legacy Mode H progressive（候选池面板、`plan-board` 双行、页内 `PlanChatPanel` 直连 `/api/chat` 作 intake）须移除或 feature-flag 隔离，不得与 MVP-10 并存于默认路径。
 
 ---
 
@@ -830,8 +893,87 @@ Backlog 为 **features 1–39**。明确不在范围：SSO、双 Chat/FAB、一�
 
 ## AC（本切片 = spec + mock 占位，**不开发**运行时查询）
 
-- **AC1:** 给定 `[2play-design.md](./2play-design.md)`，When 阅读 §3.5.6，Then 描述出行建议页签证区块：输入 = `User.nationality` + 目的地 alpha-3；数据源 = BFF → agent `POST /v1/visa_requirement`；展示 requirement、免签天数、材料摘要、`last_verified`、官方来源链接。
+- **AC1:** 给定 `[2play-design.md](./2play-design.md)`，When 阅读 §3.5.6，Then 描述出行建议页签证区块：输入 = `User.nationality` + 目的地 alpha-3；**写** = BFF → agent `POST /v1/visa_requirement` 入 `artifacts.visa`；**展示** = `fetch_trip_details`；字段含 requirement、免签天数、材料摘要、`last_verified`、官方来源链接。
 - **AC2:** 给定 `[ui-mockup/](./ui-mockup/)`，When 新增或标注占位页（如 `10-travel-advice.html` 或在 design 文档 wireframe），Then 含 `.visa-advice` 区块与 i18n key 列表（`play.travel_advice.visa_*`）。
 - **AC3:** 给定 honesty 要求，When 规格描述配额/降级，Then 明确 Orizn 配额耗尽时显示 i18n 降级态（非编造签证事实）；无 nationality 时提示用户至资料页补充。
 
 **实现切片（后续立项，不在 MVP-11 spec 范围）：** BFF `/api/travel-advice/visa` + 真实 UI 渲染。
+
+---
+
+# 40 — Plan — plan-48 — 助手叙事 + 同流 fetch（MVP-19）
+
+**类别：** Plan · Feature **40** · 完工：**Done**  
+**规格：** `[2play-design.md](./2play-design.md)` §4.10–§4.11 · agent F78–F82  
+**依赖：** Feature 37 AC28–AC34；agent 批次 19
+
+**作为** 规划用户  
+**我希望** 每一步都知道系统在搜点、排骨架还是填站，并先看到完整骨架再出细节  
+**以便** make 慢或 fill 未完时也不会以为每天只有酒店
+
+## AC
+
+- **AC1:** 给定 CTA，When 助手打开，Then thread 可有 `assistant_discovering`；g 门闩 fetch candidates。**CTA 当秒 discover 已被 Feature 41 Story 1 废止**（intake 未完成前不搜点、约束条必去为 `—`）。
+- **AC2:** 给定 intake 结束，When 规划开始，Then 固定句 `assistant_know_enough`，主区 `phase_making`。
+- **AC3:** 给定 fetch skeleton，When 渲染助手，Then 文字骨架按日列出；来源为 fetch 不是 make 信封。
+- **AC4:** 给定 fill 循环，When 每站成功，Then 助手一行 + 主区 fetch 后累加 slot。
+- **AC5:** 给定全部 key，When catalog，Then §4.6 新 key 四 locale 存在（实现时补）。
+- **AC6:** 给定 mock `06-plan-skeleton.html`，When 抽检，Then 同时有 `plan-phase`、thread 叙事、多站 skeleton-day（非仅酒店）。
+
+---
+
+# 41 — Plan — plan-49 — 行程规划页重建（MVP-20）
+
+**类别：** Plan · Feature **41** · 完工：**ToDo**（Story 1 Done；Story 2 实现 Done；Story 4 本切片）  
+**规格：** `[2play-design.md](./2play-design.md)` §4.2.1 · §4.12  
+**背景：** 现网 Plan 在 CTA 即 `discover`、约束条可提前填必去推荐，且骨架常只有酒店。本 Feature **重建主路径**，不在旧 `plan-page` 上继续叠叙事。
+
+**作为** 规划用户  
+**我希望** 填起飞 5 项后先由助手接手问偏好，主区只展示已填起飞限制、其余为未答占位  
+**以便** 未完成 intake 时不会被搜点/必去推荐打断，也不会误以为行程已经开始生成
+
+## 本 Feature 故事清单
+
+| Story | 内容 | 状态 |
+| --- | --- | --- |
+| **1** | CTA → 助手接管；出行限制 12 格；未答（含必去）一律 `—`；无可见搜点文案 | **Done** |
+| **2** | 静默建 Trip + discover（池内热度打标 ≤5）∥ b–h；g 等池；完成后 know_enough；**不** make | **实现 Done**（debug dump 由 Story 4 删除） |
+| 3 | （已并入 Story 2） | — |
+| **4** | intake 完成后 make + fetch 骨架（thread 展示）；**不** fill | **实现 Done**（待 usable 确认） |
+| **5** | 步骤 b 目的地内确认起点；make 禁止无城市酒店 geocode | **Done**（2026-09-03，用户确认可用） |
+
+## Story 1 AC
+
+- **AC1:** 给定 Plan 起飞栏 5 项合法，When 点击「规划行程」（`play.plan.plan_cta`），Then **隐藏** `.plan-takeoff`，打开悬浮 `plan-nav`（`data-testid="plan-nav"`），助手 thread 仅问候 + 步骤 b（酒店）；**不**出现 `assistant_discovering` / `assistant_making` / `phase_making`。
+- **AC2:** 给定 AC1 之后，When 主区渲染，Then 显示出行限制 panel（`data-testid="plan-constraints"`）：起飞 5 项为用户刚填的值；助手 7 项（酒店、每日开始、行程类型、节奏、交通、必去、其他）`pending`，展示 `play.plan.constraint_pending`（源英 `—`）。
+- **AC3:** 给定 AC1 之后、步骤 g 尚未作答，When 渲染必去格（`data-testid="constraint-must-see"`），Then 值为 pending 占位，**不是**芯片名单、`must_see_suggestions`、或任何 POI 名。
+- **AC4:** 给定 AC1 之后，When 助手 thread / 主区，Then **无** `assistant_discovering` / making / 行程列表 / tips。允许后台静默 `POST /api/plan/discover`（Story 2）。**禁止** `POST /api/plan` make。步骤 b 时芯片区不出现。
+- **AC5:** 给定 AC1，When 文案，Then 全部用户可见串为 i18n key（四 locale）；测试断言 testid / key，不锁单一语言字面。
+
+**废止（Story 1）：** 可见的 CTA discover 文案。静默 init 见 Story 2。
+
+## Story 2 AC
+
+- **AC6:** 给定 CTA，When 后台 init，Then 静默 `POST /api/plan/discover`：起飞 5 项写入新 Trip（内存+PG）；`discover_places` 先类目搜建池，再内部 `findIconicPlaces` **按热度从该池打** `must_see`（`max_number` 默认 5）；**不再**搜附近热点或 LLM 提名。Session cache 含 `tripId`。助手 **不** 出现 `assistant_discovering`。走 JSON dual-write，不走 NDJSON discover。
+- **AC7:** 给定 b–h，When 用户每答一题，Then BFF `PATCH` 该限制入 Trip `constraints` + session；主区对应格从 pending 回填。
+- **AC8:** 给定答完 f，When 任务 1 未结束，Then **不**问 g、无芯片（仅 `must_see_loading`）。进入 g 时 **必须** `fetch_trip_details`（`fields: ["candidates"]`，经 `POST /api/plan/candidates`）；芯片 = 该次 fetch 的 `must_see`（≤5）、可多选；`mustInclude` 仅用户选择。
+- **AC9:** 给定 h 完成且任务 1 已结束，When 助手，Then **仅** `assistant_know_enough`（Story 4 立刻接 make）。步骤 g 仍须 `fetch_trip_details` `candidates`。**废止** Story 2 debug dump。
+
+## Story 4 AC（骨架 only）
+
+- **AC10:** 给定 h + discover 均完成，When 助手，Then 发送 i18n「已了解 / 正规划行程框架」（`assistant_know_enough` + `assistant_planning_skeleton`）；**禁止** `plan_next_stop` / fill / 贴士四卡；**无** debug dump。
+- **AC11:** 给定 AC10，When 生成骨架，Then BFF 对**已有** `trip_id` 调 `make_itinerary`（不再 discover）；UI 进度条 + 已耗时精确到 **0.1s**（`plan-make-elapsed`）。超时或报错：i18n 友好提示，不伪造骨架。
+- **AC12:** 给定 make 成功，When 助手下一条，Then i18n 标题插值目的地、天数、人数、行程类型（`assistant_skeleton_headline`）。
+- **AC13:** 给定 AC12，When 再下一条，Then **只**用 `fetch_trip_details` `{ fields: ["skeleton"] }` 渲染 thread 卡片（`plan-thread-skeleton`：日/主题/站）。主区可镜像同一切片。stay-only 骨架视为失败。写信封不得当展示源。
+- **AC14:** 全部新文案四 locale i18n；测试断言 key / testid。
+
+## Story 5 AC（起点在目的地内确认）
+
+- **AC15:** 给定步骤 b 空或默认，When 提交，Then **不**调用 `search_places` / 无城市 `geocode`；不设 `dailyStart`；进入 c。
+- **AC16:** 给定步骤 b 非空，When 提交，Then BFF `POST /v1/search_places`（`query`=输入，`address`=起飞目的地）。命中（城市锚点 80km 内）Then PATCH hotel/dailyStart 为检索名，session 存 `origin { name, lat, lng }`，进入 c。**禁止** `geocode({ query: 仅酒店名 })`。
+- **AC17:** 给定 b 非空且无命中，When 提交，Then **不** PATCH 起点、不进入 c；i18n `play.plan.intake_origin_not_found`；芯片 `play.plan.intake_origin_retry`（留在 b）与 `play.plan.intake_origin_skip`（按空 b 继续）。
+- **AC18:** 给定 search/geocode 超时或供应商失败，When 提交非空 b，Then 不卡死；可继续且 **只传 origin.name、不传坐标**。
+- **AC19:** 给定 Hills Hotel Lisboa + 目的地里斯本，When 目的地内搜索，Then **不得**因澳门同名点判未命中。
+- **AC20:** 给定 make，When 组装 origin，Then 使用 Story 5 已解析坐标，否则仅 name；**删除** skeleton 路径上对 `dailyStart` 的无城市 geocode。
+
+---

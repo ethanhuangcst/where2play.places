@@ -8,7 +8,9 @@ import { resolveErrorKey } from "@/src/i18n/error-key";
 import { useLocale, useT } from "@/src/i18n/use-t";
 import { authJson, AuthApiError } from "@/src/ui/auth-api";
 import { PlanItineraryView } from "@/src/ui/plan-itinerary-view";
+import { PlaceSheet } from "@/src/ui/place-sheet";
 import { usePageTitle } from "@/src/ui/use-page-title";
+import type { ItineraryPlaceSlot } from "@/src/core/itinerary-types";
 
 type DetailResponse = {
   itinerary: ItineraryDto;
@@ -39,6 +41,8 @@ export default function SavedDetailPage() {
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [confirmUnsave, setConfirmUnsave] = useState(false);
   const [unsaving, setUnsaving] = useState(false);
+  const [placeSheetSlot, setPlaceSheetSlot] = useState<ItineraryPlaceSlot | null>(null);
+  const [placeSheetDay, setPlaceSheetDay] = useState<number | null>(null);
 
   usePageTitle(detail?.title ?? "play.saved.page_title");
 
@@ -100,7 +104,23 @@ export default function SavedDetailPage() {
               date: formatSavedDate(detail.savedAt, locale),
             })}
           </p>
-          <PlanItineraryView itinerary={detail.itinerary} generating={false} />
+          <PlanItineraryView
+            itinerary={detail.itinerary}
+            generating={false}
+            onOpenPlaceSheet={(slot, dayIndex) => {
+              setPlaceSheetSlot(slot);
+              setPlaceSheetDay(dayIndex);
+            }}
+          />
+          <PlaceSheet
+            open={placeSheetSlot != null}
+            slot={placeSheetSlot}
+            dayIndex={placeSheetDay ?? undefined}
+            onClose={() => {
+              setPlaceSheetSlot(null);
+              setPlaceSheetDay(null);
+            }}
+          />
           <div className="plan-actions saved-detail-actions">
             <Link className="btn btn-quiet" href="/saved">
               {t("play.saved.back_to_list")}

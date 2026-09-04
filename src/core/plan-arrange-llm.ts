@@ -3,6 +3,7 @@ import type { PlanBoundaries } from "./itinerary-types";
 import { buildArrangeDayBody } from "./plan-agent-body";
 import { openaiConfigured as isOpenaiConfigured } from "./chat-assistant";
 import { openaiApiBaseUrl } from "./openai-config";
+import { resolveChatLlmConfig } from "./llm-chat-config";
 import { arrangeDay } from "../places-agent/client";
 
 export type ScheduleCandidate = {
@@ -637,9 +638,10 @@ async function callArrangeLlmBatch(args: {
   user: string;
   signal?: AbortSignal;
 }): Promise<string> {
-  const apiKey = process.env.OPENAI_API_KEY!.trim();
-  const base = openaiApiBaseUrl();
-  const model = process.env.OPENAI_CHAT_MODEL ?? "gpt-5.4";
+  const cfg = resolveChatLlmConfig();
+  const apiKey = cfg?.apiKey ?? process.env.OPENAI_API_KEY!.trim();
+  const base = cfg?.baseURL || openaiApiBaseUrl();
+  const model = cfg?.model ?? "qwen-plus";
 
   const res = await fetch(`${base}/chat/completions`, {
     method: "POST",
@@ -687,9 +689,10 @@ async function* streamArrangeLlmBlocks(args: {
     });
   }
 
-  const apiKey = process.env.OPENAI_API_KEY!.trim();
-  const base = openaiApiBaseUrl();
-  const model = process.env.OPENAI_CHAT_MODEL ?? "gpt-5.4";
+  const cfg = resolveChatLlmConfig();
+  const apiKey = cfg?.apiKey ?? process.env.OPENAI_API_KEY!.trim();
+  const base = cfg?.baseURL || openaiApiBaseUrl();
+  const model = cfg?.model ?? "qwen-plus";
 
   const res = await fetch(`${base}/chat/completions`, {
     method: "POST",

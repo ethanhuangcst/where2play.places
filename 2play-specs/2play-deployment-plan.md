@@ -67,7 +67,7 @@ release-bot **must not** start Portainer until artifacts exist in **`ethanhuangc
                 → Postgres `where2play` (ADR-033)
 ```
 
-Thin app: **no** map vendor keys. Itinerary **engine** stays on places-agent ([ADR-008](../../workspace-specs/adr/ADR-008-itinerary-ownership.md)). **No** product `OPENAI_*` on where2play ([`2play-design.md`](./2play-design.md) §2.1). Persistence: PostgreSQL **`where2play`** ([ADR-033](../../workspace-specs/adr/ADR-033-where2play-postgres-prisma.md)).
+Thin app: **no** map vendor keys. Itinerary **engine** stays on places-agent ([ADR-008](../../workspace-specs/adr/ADR-008-itinerary-ownership.md)). Product **Qwen** (`QWEN_*`) on this BFF (ADR-047). Persistence: PostgreSQL **`where2play`** ([ADR-033](../../workspace-specs/adr/ADR-033-where2play-postgres-prisma.md)).
 
 ---
 
@@ -138,7 +138,7 @@ Do **not** add `AMAP_*`, `GOOGLE_MAPS_*`, `GMAPS_MCP_*`, `TRIPADVISOR_*`. Do **n
 | `SESSION_SECRET` | **yes** | Consumer session cookie |
 | `PLACES_AGENT_TIMEOUT_MS` | no | Default 25000 |
 
-**Not used:** `OPENAI_*` (no product OPENAI_CN on where2play; chat/plan via places-agent).  
+**LLM:** `QWEN_*` on this BFF (ADR-047). `OPENAI_*` fallback only — do not delete.  
 
 **Forbidden:** map vendor keys; `NEXT_PUBLIC_PLACES_AGENT_*`; reusing DB names `what2eat` / `places_agent`.
 

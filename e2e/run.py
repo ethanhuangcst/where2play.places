@@ -127,6 +127,17 @@ def main() -> int:
             f"-- python3 e2e/test_chat02_local_draft.py"
         )
         return subprocess.call(cmd, shell=True, cwd=ROOT, env=env)
+    if target == "mvp10-structure":
+        env = e2e_env()
+        app_server = ""
+        if not app_ready():
+            app_server = f'--server "app|{app_dev_cmd()}|http://localhost:3030/" '
+        cmd = (
+            f"python3 scripts/with_server.py "
+            f"{app_server}"
+            f"-- python3 e2e/test_mvp10_structure.py"
+        )
+        return subprocess.call(cmd, shell=True, cwd=ROOT, env=env)
     print(f"Unknown target: {target}", file=sys.stderr)
     return 2
 

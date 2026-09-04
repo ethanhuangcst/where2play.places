@@ -38,6 +38,7 @@
           </header>
 
           <form class="register-card__form" action="06-plan.html" method="get" data-testid="register-form">
+            <div class="register-card__grid">
             <div class="register-card__fields">
               <p class="register-required-note">标 * 为必填</p>
 
@@ -126,6 +127,26 @@
                   <button type="button" class="chip">户外</button>
                 </div>
               </div>
+            </div>
+
+              <aside class="register-card__photo" aria-labelledby="photo-label">
+                <p class="register-photo__eyebrow" id="photo-label">头像（可选）</p>
+                <div class="register-photo" data-photo-panel>
+                  <input id="photo" name="photo" type="file" class="file-input-hidden" accept="image/*" tabindex="-1" aria-hidden="true" />
+                  <button type="button" class="register-photo__frame" data-photo-trigger data-photo-frame data-testid="field-photo">
+                    <span class="register-photo__steam" aria-hidden="true"></span>
+                    <img class="register-photo__img" data-photo-img alt="" hidden />
+                    <span class="register-photo__placeholder" data-photo-placeholder aria-hidden="true">
+                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25">
+                        <circle cx="12" cy="8" r="4" />
+                        <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+                      </svg>
+                    </span>
+                    <span class="register-photo__cta">添加照片</span>
+                  </button>
+                  <p class="register-photo__name" data-photo-name>未选择照片</p>
+                </div>
+              </aside>
             </div>
 
             <div class="register-card__actions">

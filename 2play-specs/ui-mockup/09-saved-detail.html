@@ -78,6 +78,34 @@
                 <dt>预算</dt>
                 <dd>$$ 中等</dd>
               </div>
+              <div class="constraint-item">
+                <dt>住宿 / 起终点</dt>
+                <dd>西门町附近酒店</dd>
+              </div>
+              <div class="constraint-item">
+                <dt>每日开始</dt>
+                <dd>09:30</dd>
+              </div>
+              <div class="constraint-item">
+                <dt>行程类型</dt>
+                <dd>情侣出游</dd>
+              </div>
+              <div class="constraint-item">
+                <dt>节奏</dt>
+                <dd>适中</dd>
+              </div>
+              <div class="constraint-item">
+                <dt>交通偏好</dt>
+                <dd>捷运 + 步行</dd>
+              </div>
+              <div class="constraint-item">
+                <dt>必去点</dt>
+                <dd>龙山寺、台北 101、北投温泉</dd>
+              </div>
+              <div class="constraint-item">
+                <dt>其他要求</dt>
+                <dd>无</dd>
+              </div>
             </dl>
           </div>
         </section>
@@ -183,7 +211,7 @@
                       <h3>台北车站附近酒店</h3>
                       <p>每日起点；捷运与台铁枢纽。</p>
                     </div>
-                    <div class="slot-actions"><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">详情</a><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">地图</a></div>
+                    <div class="slot-actions"><button type="button" class="map-link" data-open-place-sheet data-testid="stop-detail-open">详情</button><a class="map-link" href="#" target="_blank" rel="noopener noreferrer" data-testid="stop-map-open">地图</a></div>
                   </div>
                 </div>
               </div>
@@ -211,7 +239,7 @@
                       <h3>龙山寺</h3>
                       <p>开场参拜，避开正午。</p>
                     </div>
-                    <div class="slot-actions"><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">详情</a><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">地图</a></div>
+                    <div class="slot-actions"><button type="button" class="map-link" data-open-place-sheet data-testid="stop-detail-open">详情</button><a class="map-link" href="#" target="_blank" rel="noopener noreferrer" data-testid="stop-map-open">地图</a></div>
                   </div>
                 </div>
               </div>
@@ -237,7 +265,7 @@
                       <h3>宁夏夜市</h3>
                       <p>晚餐小吃。</p>
                     </div>
-                    <div class="slot-actions"><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">详情</a><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">地图</a></div>
+                    <div class="slot-actions"><button type="button" class="map-link" data-open-place-sheet data-testid="stop-detail-open">详情</button><a class="map-link" href="#" target="_blank" rel="noopener noreferrer" data-testid="stop-map-open">地图</a></div>
                   </div>
                 </div>
               </div>
@@ -260,7 +288,7 @@
                       <h3>台北车站附近酒店</h3>
                       <p>Day 2 起点。</p>
                     </div>
-                    <div class="slot-actions"><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">详情</a><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">地图</a></div>
+                    <div class="slot-actions"><button type="button" class="map-link" data-open-place-sheet data-testid="stop-detail-open">详情</button><a class="map-link" href="#" target="_blank" rel="noopener noreferrer" data-testid="stop-map-open">地图</a></div>
                   </div>
                 </div>
               </div>
@@ -286,7 +314,7 @@
                       <h3>北投温泉博物馆</h3>
                       <p>轻松收尾。</p>
                     </div>
-                    <div class="slot-actions"><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">详情</a><a class="map-link" href="#" target="_blank" rel="noopener noreferrer">地图</a></div>
+                    <div class="slot-actions"><button type="button" class="map-link" data-open-place-sheet data-testid="stop-detail-open">详情</button><a class="map-link" href="#" target="_blank" rel="noopener noreferrer" data-testid="stop-map-open">地图</a></div>
                   </div>
                 </div>
               </div>
@@ -295,6 +323,46 @@
         </section>
       </div>
     </main>
+
+    <div class="dialog-backdrop" data-testid="place-sheet" aria-hidden="true" role="presentation">
+      <div class="dialog dialog--place" role="dialog" aria-modal="true" aria-labelledby="place-sheet-title">
+        <header class="place-dialog__bar">
+          <h2 id="place-sheet-title" class="place-dialog__heading">场所详情</h2>
+          <button type="button" class="btn btn-quiet" data-close-place-sheet data-testid="place-sheet-close" aria-label="关闭">关闭</button>
+        </header>
+        <section class="place-panel place-panel--facts" aria-labelledby="place-facts-title">
+          <h3 id="place-facts-title" class="place-panel__title">龙山寺</h3>
+          <div class="place-split">
+            <div class="place-split__media">
+              <img src="assets/play-logo.png" alt="" width="420" height="320" loading="lazy" />
+            </div>
+            <div class="place-split__info">
+              <p class="place-split__name">龙山寺</p>
+              <p class="place-split__meta"><span class="place-split__rating">4.5</span><span aria-hidden="true">·</span><span>Temple</span></p>
+              <dl class="place-facts-compact">
+                <div class="place-facts-compact__row"><dt>地址</dt><dd>台北市万华区广州街211号</dd></div>
+                <div class="place-facts-compact__row"><dt>开放</dt><dd>06:00–22:00</dd></div>
+              </dl>
+            </div>
+          </div>
+        </section>
+        <section class="place-panel place-panel--itin" aria-labelledby="place-itin-title">
+          <h3 id="place-itin-title" class="place-panel__title">本行程安排</h3>
+          <p class="place-itin-window">Day 1 · 09:30–11:00</p>
+          <p>开场参拜，避开正午。</p>
+        </section>
+        <section class="place-panel place-panel--nav" aria-labelledby="place-nav-title">
+          <h3 id="place-nav-title" class="place-panel__title">如何到达</h3>
+          <ul class="place-nav-list">
+            <li>从 · <span class="transit-place">台北车站附近酒店</span> 前往 · <span class="transit-place">龙山寺</span>：<strong>[捷运 | 15min | $]</strong>（推荐） / [打车 | 8min | $$]</li>
+          </ul>
+        </section>
+        <div class="dialog__actions">
+          <a class="btn" href="#" target="_blank" rel="noopener noreferrer" data-testid="place-sheet-map">在地图中打开</a>
+          <button type="button" class="btn btn-quiet" data-close-place-sheet>关闭</button>
+        </div>
+      </div>
+    </div>
 
     <footer class="family-footer family-footer--app">
       <div class="family-footer__inner">

@@ -16,8 +16,10 @@ export function PublicShell({ children, bodyClass = "shell-public", localeCorner
 
   useEffect(() => {
     document.body.className = bodyClass;
+    document.body.dataset.style = "travor";
     return () => {
       document.body.className = "";
+      delete document.body.dataset.style;
     };
   }, [bodyClass]);
 

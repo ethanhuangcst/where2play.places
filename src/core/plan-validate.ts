@@ -91,7 +91,23 @@ export function validatePlanBoundaries(input: unknown): {
       ...(optionalString(body.constraints)
         ? { constraints: optionalString(body.constraints)!.slice(0, 500) }
         : {}),
+      ...(Array.isArray(body.mustInclude)
+        ? {
+            mustInclude: body.mustInclude.filter(
+              (x): x is string => typeof x === "string" && x.trim().length > 0,
+            ),
+          }
+        : {}),
       ...(optionalString(body.locale) ? { locale: optionalString(body.locale) } : {}),
+      ...(optionalString(body.trip_id) || optionalString(body.tripId)
+        ? { tripId: optionalString(body.trip_id) ?? optionalString(body.tripId) }
+        : {}),
+      ...(typeof body.revision === "number" && Number.isInteger(body.revision) && body.revision > 0
+        ? { revision: body.revision }
+        : {}),
+      ...(body.mode === "skeleton" || body.planMode === "skeleton"
+        ? { planMode: "skeleton" as const }
+        : {}),
     },
   };
 }

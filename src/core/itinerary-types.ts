@@ -14,7 +14,17 @@ export type PlanBoundaries = {
   timeTo?: string;
   interests?: string[];
   constraints?: string;
+  /** Must-see place names from assistant step g (MVP-10). */
+  mustInclude?: string[];
   locale?: string;
+  /** Early discover Trip (2play §4.10). */
+  tripId?: string;
+  revision?: number;
+  /** Feature 41 Story 4: stop after make + fetch skeleton. */
+  planMode?: "skeleton" | "full";
+  /** Story 5: origin resolved in destination (not hotel-only geocode). */
+  originLat?: number;
+  originLng?: number;
 };
 
 /** Progressive discover preview (isomorphic slot fields). */

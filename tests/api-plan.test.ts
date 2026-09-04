@@ -10,7 +10,9 @@ import {
   authedRequest,
   loginTestUser,
   registerTestUser,
+  TEST_USER,
 } from "./helpers/test-user";
+import { prisma } from "../src/db/client";
 
 /** Discover + optional agent tools — L2 Quanzil after Mode H host (MVP-3). */
 function agentFetchMockModeH() {
@@ -334,5 +336,174 @@ describe("GET /api/plan/current", () => {
     const body = await readJson<{ itinerary: null; criteria: null }>(res);
     expect(body.itinerary).toBeNull();
     expect(body.criteria).toBeNull();
+  });
+});
+
+function agentFetchMockSkeletonPipeline() {
+  return async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.includes("/v1/discover_places")) {
+      return new Response(
+        JSON.stringify({
+          agent: "places-agent",
+          ok: true,
+          data: {
+            candidates: { places: [{ name: "Tower" }], restaurants: [] },
+            trip_id: "trip-cache-1",
+            revision: 1,
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    if (url.includes("/v1/make_itinerary")) {
+      return new Response(
+        JSON.stringify({
+          agent: "places-agent",
+          ok: true,
+          data: {
+            skeleton: {
+              days: [{ day_index: 1, stops: [{ name: "Hotel", kind: "stay" }, { name: "Tower", kind: "attraction" }] }],
+            },
+            trip_id: "trip-cache-1",
+            revision: 2,
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    if (url.includes("/v1/travel_tips")) {
+      return new Response(
+        JSON.stringify({
+          agent: "places-agent",
+          ok: true,
+          data: { trip_id: "trip-cache-1", revision: 3 },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    if (url.includes("/v1/fetch_trip_details")) {
+      const body = init?.body ? JSON.parse(String(init.body)) : {};
+      const fields: string[] = body.fields ?? [];
+      if (fields.includes("artifacts")) {
+        return new Response(
+          JSON.stringify({
+            agent: "places-agent",
+            ok: true,
+            data: {
+              trip_id: "trip-cache-1",
+              revision: 3,
+              data: { artifacts: { tips: { intro: "Hi", iconic_places: ["Tower"] } } },
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (fields.includes("skeleton")) {
+        return new Response(
+          JSON.stringify({
+            agent: "places-agent",
+            ok: true,
+            data: {
+              trip_id: "trip-cache-1",
+              revision: 4,
+              data: {
+                skeleton: {
+                  days: [{ day_index: 1, stops: [{ name: "Hotel", kind: "stay" }, { name: "Tower", kind: "attraction" }] }],
+                },
+              },
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (fields.includes("filled") || fields.includes("cursor")) {
+        return new Response(
+          JSON.stringify({
+            agent: "places-agent",
+            ok: true,
+            data: { trip_id: "trip-cache-1", revision: 4, data: {} },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          agent: "places-agent",
+          ok: true,
+          data: { trip_id: "trip-cache-1", revision: 4, data: {} },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    if (url.includes("/v1/plan_next_stop")) {
+      return new Response(
+        JSON.stringify({
+          agent: "places-agent",
+          ok: true,
+          data: {
+            stop: { name: "Hotel", kind: "stay", card: null, deeplinks: {} },
+            slot: { start: "09:00", end: "09:00" },
+            legs: [],
+            trip_id: "trip-cache-1",
+            revision: 5,
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    return new Response(JSON.stringify({ agent: "places-agent", ok: false }), { status: 502 });
+  };
+}
+
+describe("PlanSessionCache trip ledger (TC-M19-81-02 / TC-M19-40-05)", () => {
+  beforeEach(() => {
+    setPlacesAgentFetchForTests(null);
+    delete process.env.PLAN_PIPELINE;
+  });
+
+  afterEach(() => {
+    setPlacesAgentFetchForTests(null);
+  });
+
+  it("should_persist_trip_id_in_cache_and_refresh_on_current", async () => {
+    await registerTestUser();
+    await loginTestUser();
+    setPlacesAgentFetchForTests(agentFetchMockSkeletonPipeline());
+
+    const res = await invokeRoute(
+      planRoute,
+      authedRequest("/api/plan", {
+        method: "POST",
+        headers: { Accept: "application/x-ndjson" },
+        body: { destination: "Lisbon", days: 1, startDate: "2026-10-10", locale: "EN" },
+      }),
+    );
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    const lines = text
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .map((l) => JSON.parse(l) as { type: string; key?: string });
+    expect(lines.some((l) => l.type === "ledger")).toBe(true);
+    expect(lines.some((l) => l.type === "error")).toBe(false);
+
+    const user = await prisma.user.findUnique({ where: { email: TEST_USER.email } });
+    expect(user).toBeTruthy();
+    const row = await prisma.planSessionCache.findUnique({ where: { userId: user!.id } });
+    expect(row).toBeTruthy();
+    const cachedCriteria = row!.criteriaJson as { tripId?: string; revision?: number };
+    expect(cachedCriteria.tripId).toBe("trip-cache-1");
+    expect(typeof cachedCriteria.revision).toBe("number");
+
+    const current = await invokeRoute(planCurrentRoute, authedRequest("/api/plan/current"));
+    expect(current.status).toBe(200);
+    const body = await readJson<{
+      criteria: { tripId?: string; revision?: number } | null;
+      itinerary: { days: Array<{ dayIndex: number }> } | null;
+    }>(current);
+    expect(body.criteria?.tripId).toBe("trip-cache-1");
+    expect(body.itinerary?.days.length).toBeGreaterThan(0);
   });
 });

@@ -1,40 +1,68 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/src/db/client";
 import { requireUser, authError } from "@/src/auth/user";
 import { normalizeLocale } from "@/src/core/locales";
 import { validatePlanBoundaries } from "@/src/core/plan-validate";
 import { planItineraryDayByDay, type PlanProgressEvent } from "@/src/core/plan-day-by-day";
-import type { ItineraryDto } from "@/src/core/itinerary-types";
+import {
+  planItinerarySkeletonFill,
+  planPipelineMode,
+  type SkeletonPlanProgressEvent,
+} from "@/src/core/plan-skeleton-fill";
+import { planItinerarySkeletonOnly } from "@/src/core/plan-skeleton-only";
+import type { ItineraryDto, PlanBoundaries } from "@/src/core/itinerary-types";
 import { providersForDestinationText } from "@/src/places-agent/client";
+import {
+  emptyPlanItinerary,
+  extractPlanLedgerFromEvent,
+  mergePlanCriteria,
+  shouldPersistPlanCacheEvent,
+  upsertPlanSessionCache,
+  type PlanLedger,
+} from "@/src/core/plan-session-cache";
 
 export const maxDuration = 300;
 
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-
 async function upsertPlanCache(
   userId: string,
-  criteria: unknown,
+  criteria: PlanBoundaries,
   itinerary: ItineraryDto,
 ): Promise<void> {
-  const expiresAt = new Date(Date.now() + CACHE_TTL_MS);
-  await prisma.planSessionCache.upsert({
-    where: { userId },
-    create: {
-      userId,
-      criteriaJson: criteria as object,
-      itineraryJson: itinerary as object,
-      expiresAt,
-    },
-    update: {
-      criteriaJson: criteria as object,
-      itineraryJson: itinerary as object,
-      expiresAt,
-    },
-  });
+  await upsertPlanSessionCache(userId, criteria, itinerary);
 }
 
-function encodeNdjson(event: PlanProgressEvent): Uint8Array {
+function encodeNdjson(event: PlanProgressEvent | SkeletonPlanProgressEvent): Uint8Array {
   return new TextEncoder().encode(`${JSON.stringify(event)}\n`);
+}
+
+function planStream(
+  criteria: PlanBoundaries,
+  locale: string,
+  providers: string[],
+): AsyncGenerator<PlanProgressEvent | SkeletonPlanProgressEvent> {
+  if (criteria.planMode === "skeleton") {
+    return planItinerarySkeletonOnly(criteria, { locale, providers });
+  }
+  if (planPipelineMode() === "legacy") {
+    return planItineraryDayByDay(criteria, { locale, providers });
+  }
+  return planItinerarySkeletonFill(criteria, { locale, providers });
+}
+
+function applyLedger(ledger: PlanLedger, patch: PlanLedger | null): PlanLedger {
+  if (!patch) return ledger;
+  return {
+    tripId: patch.tripId ?? ledger.tripId,
+    revision: patch.revision ?? ledger.revision,
+  };
+}
+
+async function persistPlanProgress(
+  userId: string,
+  baseCriteria: PlanBoundaries,
+  ledger: PlanLedger,
+  itinerary: ItineraryDto,
+): Promise<void> {
+  await upsertPlanCache(userId, mergePlanCriteria(baseCriteria, ledger), itinerary);
 }
 
 export async function POST(request: NextRequest) {
@@ -54,17 +82,29 @@ export async function POST(request: NextRequest) {
   const providers = providersForDestinationText(parsed.value.destination);
   const stream = request.headers.get("accept")?.includes("application/x-ndjson");
 
+  let ledger: PlanLedger = {
+    tripId: parsed.value.tripId,
+    revision: parsed.value.revision,
+  };
+  let lastItinerary: ItineraryDto = emptyPlanItinerary(parsed.value);
+
   if (!stream) {
     let last: ItineraryDto | null = null;
     let errorKey: string | null = null;
-    for await (const event of planItineraryDayByDay(parsed.value, { locale, providers })) {
+    for await (const event of planStream(parsed.value, locale, providers)) {
+      const ledgerPatch = extractPlanLedgerFromEvent(event);
+      if (ledgerPatch) {
+        ledger = applyLedger(ledger, ledgerPatch);
+        await persistPlanProgress(gate.user.id, parsed.value, ledger, lastItinerary);
+      }
       if (event.type === "error") {
         errorKey = event.key;
         break;
       }
-      if (event.type === "done" || event.type === "day_done" || event.type === "progress") {
+      if (shouldPersistPlanCacheEvent(event) && "itinerary" in event && event.itinerary) {
         last = event.itinerary;
-        await upsertPlanCache(gate.user.id, parsed.value, event.itinerary);
+        lastItinerary = event.itinerary;
+        await persistPlanProgress(gate.user.id, parsed.value, ledger, event.itinerary);
       }
     }
     if (!last) {
@@ -80,9 +120,15 @@ export async function POST(request: NextRequest) {
   const body = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        for await (const event of planItineraryDayByDay(parsed.value, { locale, providers })) {
-          if (event.type === "progress" || event.type === "day_done" || event.type === "done") {
-            await upsertPlanCache(gate.user.id, parsed.value, event.itinerary);
+        for await (const event of planStream(parsed.value, locale, providers)) {
+          const ledgerPatch = extractPlanLedgerFromEvent(event);
+          if (ledgerPatch) {
+            ledger = applyLedger(ledger, ledgerPatch);
+            await persistPlanProgress(gate.user.id, parsed.value, ledger, lastItinerary);
+          }
+          if (shouldPersistPlanCacheEvent(event) && "itinerary" in event && event.itinerary) {
+            lastItinerary = event.itinerary;
+            await persistPlanProgress(gate.user.id, parsed.value, ledger, event.itinerary);
           }
           controller.enqueue(encodeNdjson(event));
           if (event.type === "error" || event.type === "done") break;

@@ -1,18 +1,8 @@
-/** Normalize operator Quanzil gateway base URL for `/chat/completions`. */
+import { resolveChatLlmConfig } from "./llm-chat-config";
+
+/** Chat completions base URL — Qwen compatible-mode first (ADR-047). */
 export function openaiApiBaseUrl(): string {
-  const raw = (process.env.OPENAI_BASE_URL ?? "https://quanzil.com/v1").trim();
-  let base = raw.replace(/\/+$/, "");
-  if (!base) return "https://quanzil.com/v1";
-  if (base.endsWith("/v1")) return base;
-
-  try {
-    const u = new URL(base);
-    if (!u.pathname || u.pathname === "/") {
-      return `${base}/v1`;
-    }
-  } catch {
-    return "https://quanzil.com/v1";
-  }
-
-  return base;
+  const cfg = resolveChatLlmConfig();
+  if (cfg?.baseURL) return cfg.baseURL;
+  return "https://quanzil.com/v1";
 }
