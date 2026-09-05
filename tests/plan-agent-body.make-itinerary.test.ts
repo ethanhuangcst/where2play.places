@@ -77,5 +77,15 @@ describe("buildMakeItineraryBody agent enums", () => {
         originLng: -9.14,
       }),
     ).toEqual({ name: "Hills Hotel Lisboa", lat: 38.73, lng: -9.14 });
+    expect(
+      originFromPlanCriteria({
+        destination: "Lisbon",
+        days: 2,
+        startDate: "2026-10-10",
+        dailyStart: "__origin_pick__:0",
+        originLat: 38.7,
+        originLng: -9.18,
+      }),
+    ).toBeUndefined();
   });
 });

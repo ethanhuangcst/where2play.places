@@ -50,6 +50,7 @@ export function transitLineFromLeg(leg: AgentLeg, t: (key: string, vars?: Record
 export function mapStopDisplayToPlaceSlot(
   display: StopDisplayPayload,
   t: (key: string, vars?: Record<string, string>) => string,
+  opts?: { visit_part?: string },
 ): ItineraryPlaceSlot {
   const stop = display.stop ?? {};
   const card = stop.card ?? undefined;
@@ -61,12 +62,23 @@ export function mapStopDisplayToPlaceSlot(
   const placeKind =
     kind === "stay" ? "stay" : kind === "meal" ? "meal" : "attraction";
   const photoUrl = Array.isArray(card?.photos) ? card!.photos[0] : undefined;
+  const baseName = stop.name ?? card?.name ?? "?";
+  const visitPart = opts?.visit_part;
+  let name =
+    visitPart === "am"
+      ? t("play.plan.visit_part_am", { name: baseName })
+      : visitPart === "pm"
+        ? t("play.plan.visit_part_pm", { name: baseName })
+        : baseName;
+  if (placeKind === "stay") {
+    name = t("play.plan.origin_stop", { name: baseName });
+  }
   return {
     kind: "place",
     start: slot.start ?? "09:00",
-    end: slot.end ?? slot.start ?? "10:00",
+    end: slot.end ?? slot.start ?? "09:00",
     placeKind,
-    name: stop.name ?? card?.name ?? "?",
+    name,
     summary: "",
     photoUrl,
     provider,
@@ -81,12 +93,24 @@ export function mapLegsToTransitSlot(
   t: (key: string, vars?: Record<string, string>) => string,
 ): ItineraryTransitSlot | null {
   if (!legs?.length) return null;
-  const leg = legs.find((l) => l.recommended) ?? legs[0];
-  if (!leg) return null;
+  // F91 / F88 UI gate: hide walk>45 and transit|drive>120.
+  const kept = legs.filter((leg) => {
+    const min = leg.duration_min;
+    if (typeof min !== "number") return true;
+    if (leg.mode === "walk") return min <= 45;
+    return min <= 120;
+  });
+  if (!kept.length) return null;
+  const lines = kept.map((leg) => transitLineFromLeg(leg, t));
+  const or = t("play.plan.transit.or");
+  const text =
+    lines.length === 1
+      ? lines[0]!
+      : lines.join(t("play.plan.transit.options_join", { or }));
   return {
     kind: "transit",
     start: "",
-    text: transitLineFromLeg(leg, t),
+    text,
   };
 }
 

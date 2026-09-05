@@ -1,5 +1,6 @@
 import { coerceAgentTime } from "./coerce-agent-time";
 import type { PlanBoundaries } from "./itinerary-types";
+import { sanitizeDailyStartName } from "./plan-resolve-origin";
 
 function pad(n: number): string {
   return String(n).padStart(2, "0");
@@ -97,9 +98,7 @@ export function buildPlanItineraryBody(
     criteria.constraints,
   ].filter(Boolean);
 
-  const origin = criteria.dailyStart
-    ? { name: criteria.dailyStart }
-    : { name: criteria.destination };
+  const origin = originFromPlanCriteria(criteria) ?? { name: criteria.destination };
 
   const destination = criteria.dailyEnd
     ? { name: criteria.dailyEnd }
@@ -131,9 +130,7 @@ export function buildDiscoverPlacesBody(
   opts: { locale: string; providers: string[]; now?: Date },
 ): Record<string, unknown> {
   const { start, end } = boundsFromCriteria(criteria);
-  const origin = criteria.dailyStart
-    ? { name: criteria.dailyStart }
-    : { name: criteria.destination };
+  const origin = originFromPlanCriteria(criteria) ?? { name: criteria.destination };
 
   return {
     city: criteria.destination.trim(),
@@ -150,7 +147,7 @@ export function buildDiscoverPlacesBody(
 export function originFromPlanCriteria(
   criteria: PlanBoundaries,
 ): { name: string; lat?: number; lng?: number } | undefined {
-  const name = criteria.dailyStart?.trim();
+  const name = sanitizeDailyStartName(criteria.dailyStart);
   if (!name) return undefined;
   if (typeof criteria.originLat === "number" && typeof criteria.originLng === "number") {
     return { name, lat: criteria.originLat, lng: criteria.originLng };
@@ -201,9 +198,7 @@ export function buildArrangeDayBody(
     now?: Date;
   },
 ): Record<string, unknown> {
-  const origin = criteria.dailyStart
-    ? { name: criteria.dailyStart }
-    : { name: criteria.destination };
+  const origin = originFromPlanCriteria(criteria) ?? { name: criteria.destination };
   const destination = criteria.dailyEnd
     ? { name: criteria.dailyEnd }
     : { name: criteria.destination };

@@ -8,8 +8,14 @@ import {
 
 const t = (key: string, vars?: Record<string, string | number>) => {
   if (key === "play.plan.constraint_none") return "None";
+  if (key === "play.plan.fill_day_heading" && vars) {
+    return `Day ${vars.n} — ${vars.theme}`;
+  }
   if (key === "play.plan.assistant_plan_complete" && vars) {
     return `${vars.destination} · ${vars.days} days · ${vars.party} people · ${vars.tripType}. done`;
+  }
+  if (key === "play.plan.assistant_filling_stop" && vars) {
+    return `Arranging ${vars.name}`;
   }
   if (vars) {
     let text = key;
@@ -56,7 +62,7 @@ describe("plan-assistant-narrative (TC-M19-40-03)", () => {
     expect(twice).toEqual(["same"]);
   });
 
-  it("should_narrate_skeleton_days_before_skeleton_ready_then_fill_then_done", () => {
+  it("should_emit_fill_day_heading_then_skeleton_ready_then_fill_then_done (TC-M23-S1)", () => {
     let ctx = createPlanNarrativeContext({
       t,
       destination: "Lisbon",
@@ -82,11 +88,13 @@ describe("plan-assistant-narrative (TC-M19-40-03)", () => {
       ctx,
       lines,
     ));
-    ({ lines, ctx } = narrativeFromPlanEvent({ type: "skeleton_done" }, ctx, lines));
+    expect(lines).toContain("Day 1 — Belém");
+    expect(lines).not.toContain("Tower");
 
+    ({ lines, ctx } = narrativeFromPlanEvent({ type: "skeleton_done" }, ctx, lines));
     const skeletonReadyIdx = lines.indexOf("play.plan.assistant_skeleton_ready");
-    const towerIdx = lines.indexOf("Tower");
-    expect(skeletonReadyIdx).toBeGreaterThan(towerIdx);
+    const dayIdx = lines.indexOf("Day 1 — Belém");
+    expect(skeletonReadyIdx).toBeGreaterThan(dayIdx);
 
     ({ lines, ctx } = narrativeFromPlanEvent(
       { type: "stop_filled", slot: { name: "Tower" } },

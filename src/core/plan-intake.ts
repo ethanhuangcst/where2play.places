@@ -1,7 +1,7 @@
 import type { PlanBoundaries } from "./itinerary-types";
 import { coerceAgentTime } from "./coerce-agent-time";
 import { budgetOptionLabel, normalizeBudgetKey, type BudgetOptionKey } from "./plan-budget";
-import { ORIGIN_RETRY_CHIP } from "./plan-resolve-origin";
+import { ORIGIN_RETRY_CHIP, originPickChipValue, parseOriginPickIndex } from "./plan-resolve-origin";
 
 /** Assistant steps b–h per performance.md §12.11 / 2play-design §4.2.1 */
 export type IntakeStepId = "b" | "c" | "d" | "e" | "f" | "g" | "h";
@@ -118,6 +118,7 @@ export function resolveIntakeAnswer(
   t: (key: string) => string,
 ): string {
   const trimmed = raw?.trim() ?? "";
+  if (step === "b" && parseOriginPickIndex(trimmed) != null) return "";
   if (trimmed === INTAKE_DEFAULT_VALUES[step] || trimmed === "") {
     if (step === "d") return resolveDefaultTripType(t);
     if (step === "e") return resolveDefaultPace(t);
@@ -327,8 +328,23 @@ export function intakeQuickChips(
   step: IntakeStepId,
   t: (key: string) => string,
   suggestedMustSee?: string[],
-  opts?: { originNotFound?: boolean },
+  opts?: {
+    originNotFound?: boolean;
+    originCandidates?: Array<{ name: string }>;
+  },
 ): IntakeQuickChip[] {
+  if (step === "b" && opts?.originCandidates?.length) {
+    const letters = ["A", "B", "C"];
+    const picks = opts.originCandidates.slice(0, 3).map((c, i) => ({
+      label: `${letters[i] ?? String(i + 1)} - ${c.name}`,
+      value: originPickChipValue(i),
+    }));
+    return [
+      ...picks,
+      { labelKey: "play.plan.intake_origin_retry", value: ORIGIN_RETRY_CHIP },
+      { labelKey: "play.plan.intake_origin_skip", value: "" },
+    ];
+  }
   if (step === "b" && opts?.originNotFound) {
     return [
       { labelKey: "play.plan.intake_origin_retry", value: ORIGIN_RETRY_CHIP },

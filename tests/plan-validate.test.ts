@@ -29,6 +29,23 @@ describe("validatePlanBoundaries", () => {
     if (!res.ok) expect(res.errors.startDate).toBeTruthy();
   });
 
+  it("should_drop_origin_pick_chip_and_keep_origin_coords", () => {
+    const res = validatePlanBoundaries({
+      destination: "Lisbon",
+      days: 4,
+      startDate: "2026-10-10",
+      dailyStart: "__origin_pick__:0",
+      originLat: 38.707,
+      originLng: -9.136,
+    });
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.value.dailyStart).toBeUndefined();
+      expect(res.value.originLat).toBe(38.707);
+      expect(res.value.originLng).toBe(-9.136);
+    }
+  });
+
   it("should_accept_valid_boundaries", () => {
     const res = validatePlanBoundaries({
       destination: "Taipei",

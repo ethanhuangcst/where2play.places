@@ -49,9 +49,11 @@ export function skeletonIsFillable(raw: unknown): boolean {
     if (!day || typeof day !== "object") return false;
     const stops = (day as { stops?: unknown }).stops;
     if (!Array.isArray(stops) || stops.length === 0) return false;
-    return stops.some(
-      (s) => s && typeof s === "object" && (s as { kind?: string }).kind !== "stay",
-    );
+    return stops.some((s) => {
+      if (!s || typeof s !== "object") return false;
+      const kind = (s as { kind?: string }).kind;
+      return kind === "attraction" || kind === "place";
+    });
   });
 }
 

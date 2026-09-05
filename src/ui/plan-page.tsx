@@ -25,6 +25,11 @@ import {
   type PlanNarrativeContext,
 } from "@/src/core/plan-assistant-narrative";
 import { formatPlanElapsedSeconds, friendlyMakeErrorKey } from "@/src/core/format-plan-elapsed";
+import {
+  originNameFromPick,
+  parseOriginPickIndex,
+  sanitizeDailyStartName,
+} from "@/src/core/plan-resolve-origin";
 import { skeletonStopsForFocusedDay } from "@/src/core/plan-skeleton-stops";
 import { validatePlanBoundaries } from "@/src/core/plan-validate";
 import { resolveErrorKey } from "@/src/i18n/error-key";
@@ -89,6 +94,8 @@ export default function PlanPageClient() {
   const [intakeStep, setIntakeStep] = useState<IntakeStepId | null>(null);
   const [intakeAnswers, setIntakeAnswers] = useState<IntakeAnswers>({});
   const [originLookupFailed, setOriginLookupFailed] = useState(false);
+  const [originCandidates, setOriginCandidates] = useState<Array<{ name: string }>>([]);
+  const [originQuery, setOriginQuery] = useState("");
   const [originLat, setOriginLat] = useState<number | undefined>();
   const [originLng, setOriginLng] = useState<number | undefined>();
   const [intakeComplete, setIntakeComplete] = useState(false);
@@ -189,6 +196,12 @@ export default function PlanPageClient() {
             setTripRevision(c.revision);
             tripRevisionRef.current = c.revision;
           }
+          const hotel = sanitizeDailyStartName(c.dailyStart);
+          if (hotel) {
+            setIntakeAnswers((prev) => ({ ...prev, b: hotel }));
+          }
+          if (typeof c.originLat === "number") setOriginLat(c.originLat);
+          if (typeof c.originLng === "number") setOriginLng(c.originLng);
         }
         if (data.itinerary) {
           setItinerary(data.itinerary);
@@ -362,7 +375,7 @@ export default function PlanPageClient() {
                 });
                 return next.sort((a, b) => a.dayIndex - b.dayIndex);
               });
-              if (criteria.planMode !== "skeleton") applyNarrative(event);
+              applyNarrative(event);
             } else if (event.type === "skeleton_done") {
               if (event.itinerary) setItinerary(event.itinerary);
               if (criteria.planMode === "skeleton") {
@@ -410,7 +423,7 @@ export default function PlanPageClient() {
               setLiveSlots([]);
               setDayPending(false);
               setFocusDayIndex(null);
-              if (criteria.planMode !== "skeleton") applyNarrative(event);
+              applyNarrative(event);
             } else if (event.type === "error") {
               sawError = event.key ?? "errors.provider_failed";
             }
@@ -585,19 +598,29 @@ export default function PlanPageClient() {
   }, [intakeStep, loadCandidatesFromTrip]);
 
   async function onIntakeAnswer(step: IntakeStepId, value: string): Promise<boolean> {
-    if (step === "b") setOriginLookupFailed(false);
+    if (step === "b") {
+      setOriginLookupFailed(false);
+      if (!value.startsWith("__origin_pick__:")) {
+        setOriginCandidates([]);
+        setOriginQuery(value.trim());
+      }
+    }
     try {
       const res = await authJson<{
         ok?: boolean;
         revision?: number;
         originLat?: number;
         originLng?: number;
+        origin_name?: string;
+        origin_candidates?: Array<{ name: string; lat?: number; lng?: number }>;
+        stay_on_step?: boolean;
       }>("/api/plan/session", {
         method: "PATCH",
         body: JSON.stringify({
           step,
           value,
           locale,
+          destination: takeoff.destination,
           trip_id: tripIdRef.current,
           revision: tripRevision,
         }),
@@ -606,7 +629,13 @@ export default function PlanPageClient() {
         setTripRevision(res.revision);
         tripRevisionRef.current = res.revision;
       }
+      if (step === "b" && res.stay_on_step && res.origin_candidates?.length) {
+        setOriginCandidates(res.origin_candidates.map((c) => ({ name: c.name })));
+        setOriginLookupFailed(false);
+        return false;
+      }
       if (step === "b") {
+        setOriginCandidates([]);
         if (typeof res.originLat === "number" && typeof res.originLng === "number") {
           setOriginLat(res.originLat);
           setOriginLng(res.originLng);
@@ -615,13 +644,24 @@ export default function PlanPageClient() {
           setOriginLng(undefined);
         }
       }
-      setIntakeAnswers((prev) => ({ ...prev, [step]: value }));
+      const fromChip = originNameFromPick(value, originCandidates);
+      const stored =
+        step === "b"
+          ? fromChip ||
+            (typeof res.origin_name === "string" ? res.origin_name : "") ||
+            (parseOriginPickIndex(value) != null ? "" : value)
+          : value;
+      setIntakeAnswers((prev) => ({ ...prev, [step]: stored }));
       const next = nextIntakeStep(step);
       setIntakeStep(next);
       return true;
     } catch (err) {
-      if (err instanceof AuthApiError && err.key === "play.plan.intake_origin_not_found") {
-        setOriginLookupFailed(true);
+      // S7: never advance past step b on origin lookup / session errors.
+      if (step === "b") {
+        if (err instanceof AuthApiError && err.key === "play.plan.intake_origin_not_found") {
+          setOriginLookupFailed(true);
+          setOriginCandidates([]);
+        }
         return false;
       }
       setIntakeAnswers((prev) => ({ ...prev, [step]: value }));
@@ -662,7 +702,6 @@ export default function PlanPageClient() {
         ...boundaries,
         tripId: tripIdRef.current,
         revision: tripRevisionRef.current,
-        planMode: "skeleton",
         originLat,
         originLng,
       });
@@ -864,6 +903,7 @@ export default function PlanPageClient() {
           currentStep={intakeStep}
           answers={intakeAnswers}
           intakeComplete={intakeComplete || pagePhase === "planning" || pagePhase === "done"}
+          fillingLocked={loading && (intakeComplete || pagePhase === "planning")}
           skeletonDays={skeletonDays}
           statusLines={navStatusLines}
           suggestedMustSee={suggestedMustSee.length ? suggestedMustSee : undefined}
@@ -875,7 +915,12 @@ export default function PlanPageClient() {
           onClose={() => setNavOpen(false)}
           onAnswer={onIntakeAnswer}
           originNotFound={originLookupFailed}
-          onRetryOrigin={() => setOriginLookupFailed(false)}
+          originCandidates={originCandidates.length ? originCandidates : undefined}
+          originQuery={originQuery}
+          onRetryOrigin={() => {
+            setOriginLookupFailed(false);
+            setOriginCandidates([]);
+          }}
           onTerminate={requestTerminateIntake}
           onComplete={onIntakeComplete}
         />

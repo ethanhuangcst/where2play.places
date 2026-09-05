@@ -1,5 +1,5 @@
 import type { ItineraryDayDto, ItineraryDto, PlanBoundaries } from "./itinerary-types";
-import { buildMakeItineraryBody } from "./plan-agent-body";
+import { buildMakeItineraryBody, originFromPlanCriteria } from "./plan-agent-body";
 import { makeItinerary, fetchTripDetails } from "../places-agent/client";
 import { skeletonDayHighlights } from "./itinerary-skeleton-map";
 import {
@@ -76,15 +76,7 @@ export async function* planItinerarySkeletonOnly(
   yield { type: "phase", phase: "skeleton" };
   yield { type: "ledger", tripId, revision };
 
-  let origin: { name: string; lat?: number; lng?: number } | undefined;
-  if (criteria.dailyStart?.trim()) {
-    origin = {
-      name: criteria.dailyStart.trim(),
-      ...(typeof criteria.originLat === "number" && typeof criteria.originLng === "number"
-        ? { lat: criteria.originLat, lng: criteria.originLng }
-        : {}),
-    };
-  }
+  const origin = originFromPlanCriteria(criteria);
 
   const fetchedPool = await fetchTripDetails({
     trip_id: tripId,

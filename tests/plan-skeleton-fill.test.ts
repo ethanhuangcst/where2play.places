@@ -627,4 +627,235 @@ describe("make failure fetch recovery (TC-M19-78-02)", () => {
     expect(err).toEqual({ type: "error", key: "play.plan.phase_make_timeout" });
     expect(events.some((e) => e.type === "skeleton_done")).toBe(false);
   });
+
+  it("should_pass_used_restaurant_names_after_first_meal (TC-M23-89)", async () => {
+    vi.spyOn(client, "geocode").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: { lat: 1, lng: 2, crs: "WGS84" },
+    });
+    vi.spyOn(client, "discoverPlaces").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: {
+        candidates: { places: [{ name: "Tower" }, { name: "Castle" }], restaurants: [] },
+        trip_id: "t1",
+        revision: 1,
+      },
+    });
+    const stops = [
+      { name: "Hotel", kind: "stay" },
+      { name: "Tower", kind: "attraction" },
+      { name: "lunch", kind: "meal", meal_slot: "lunch" },
+      { name: "Castle", kind: "attraction" },
+      { name: "dinner", kind: "meal", meal_slot: "dinner" },
+    ];
+    vi.spyOn(client, "makeItinerary").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: { skeleton: { days: [{ day_index: 1, day_theme: "D1", stops }] }, trip_id: "t1", revision: 2 },
+    });
+    vi.spyOn(client, "fetchTripDetails").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: {
+        trip_id: "t1",
+        revision: 2,
+        data: { skeleton: { days: [{ day_index: 1, day_theme: "D1", stops }] } },
+      },
+    });
+    const planCalls: Record<string, unknown>[] = [];
+    vi.spyOn(client, "planNextStop").mockImplementation(async (body) => {
+      planCalls.push(body as Record<string, unknown>);
+      const next = (body as { next_stop?: { name?: string; kind?: string; meal_slot?: string } }).next_stop;
+      const isStay = next?.kind === "stay";
+      const isMeal = next?.kind === "meal" || next?.meal_slot;
+      const name = isMeal
+        ? next?.meal_slot === "dinner"
+          ? "Dinner House"
+          : "Lunch House"
+        : (next?.name ?? "?");
+      return {
+        agent: "places-agent",
+        ok: true,
+        data: {
+          stop: { name, kind: isMeal ? "meal" : (next?.kind ?? "attraction"), card: null, deeplinks: {} },
+          slot: { start: "09:00", end: isStay ? "09:00" : "12:00" },
+          legs: isStay ? [] : [{ mode: "transit", duration_min: 12, recommended: true }],
+          next_stop: { name, location: { lat: 1, lng: 2 } },
+        },
+      };
+    });
+
+    for await (const ev of planItinerarySkeletonFill(
+      { destination: "Lisbon", days: 1, startDate: "2026-10-10", dailyStart: "Hotel", budget: "economy" },
+      { locale: "EN", providers: ["GOOGLE_MAPS"] },
+    )) {
+      if (ev.type === "error") break;
+    }
+
+    const dinnerCall = planCalls.find((c) => {
+      const n = c.next_stop as { meal_slot?: string; name?: string };
+      return n?.meal_slot === "dinner" || n?.name === "dinner";
+    });
+    expect(dinnerCall?.used_restaurant_names).toEqual(expect.arrayContaining(["Lunch House"]));
+    expect(dinnerCall?.budget).toBe("budget");
+    expect(dinnerCall?.day_stops).toBeTruthy();
+  });
+
+  it("should_geocode_city_for_stay_coords_when_no_origin (TC-M23-92-02)", async () => {
+    const geoSpy = vi.spyOn(client, "geocode").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: { lat: 38.7223, lng: -9.1393, crs: "WGS84" },
+    });
+    vi.spyOn(client, "discoverPlaces").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: {
+        candidates: {
+          places: [{ name: "Torre de Belém", location: { lat: 38.6916, lng: -9.216, crs: "WGS84" } }],
+          restaurants: [],
+        },
+        trip_id: "t1",
+        revision: 1,
+      },
+    });
+    const stops = [
+      { name: "Lisbon", kind: "stay" },
+      { name: "Torre de Belém", kind: "attraction" },
+    ];
+    vi.spyOn(client, "makeItinerary").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: { skeleton: { days: [{ day_index: 1, day_theme: "D1", stops }] }, trip_id: "t1", revision: 2 },
+    });
+    vi.spyOn(client, "fetchTripDetails").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: {
+        trip_id: "t1",
+        revision: 2,
+        data: { skeleton: { days: [{ day_index: 1, day_theme: "D1", stops }] } },
+      },
+    });
+    const planCalls: Record<string, unknown>[] = [];
+    vi.spyOn(client, "planNextStop").mockImplementation(async (body) => {
+      planCalls.push(body as Record<string, unknown>);
+      const next = (body as { next_stop?: { name?: string; kind?: string } }).next_stop;
+      const isStay = next?.kind === "stay" || (body as { origin_mode?: boolean }).origin_mode;
+      return {
+        agent: "places-agent",
+        ok: true,
+        data: {
+          stop: { name: next?.name ?? "?", kind: isStay ? "stay" : "attraction", card: null, deeplinks: {} },
+          slot: { start: "09:00", end: isStay ? "09:00" : "10:00" },
+          legs: isStay ? [] : [{ mode: "transit", duration_min: 20, recommended: true }],
+          next_stop: {
+            name: next?.name,
+            location: isStay
+              ? { lat: 38.7223, lng: -9.1393 }
+              : { lat: 38.6916, lng: -9.216 },
+          },
+        },
+      };
+    });
+
+    for await (const ev of planItinerarySkeletonFill(
+      { destination: "Lisbon", days: 1, startDate: "2026-10-10" },
+      { locale: "EN", providers: ["GOOGLE_MAPS"] },
+    )) {
+      if (ev.type === "error") break;
+    }
+
+    expect(geoSpy).toHaveBeenCalledWith(expect.objectContaining({ query: expect.stringMatching(/Lisbon/i) }));
+    const attractionCall = planCalls.find((c) => {
+      const n = c.next_stop as { kind?: string; name?: string };
+      return n?.kind === "attraction" || n?.name === "Torre de Belém";
+    });
+    expect(attractionCall).toBeTruthy();
+    expect(attractionCall?.origin_mode).not.toBe(true);
+    const current = attractionCall?.current_stop as { lat?: number; lng?: number; name?: string };
+    expect(typeof current?.lat).toBe("number");
+    expect(typeof current?.lng).toBe("number");
+    expect(Math.abs((current?.lat ?? 0) - 38.7223)).toBeLessThan(0.01);
+  });
+
+  it("should_pass_intake_origin_coords_on_stay_current_stop (TC-M23-92-01)", async () => {
+    vi.spyOn(client, "geocode").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: { lat: 1, lng: 2, crs: "WGS84" },
+    });
+    vi.spyOn(client, "discoverPlaces").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: {
+        candidates: {
+          places: [{ name: "Torre de Belém", location: { lat: 38.6916, lng: -9.216, crs: "WGS84" } }],
+          restaurants: [],
+        },
+        trip_id: "t1",
+        revision: 1,
+      },
+    });
+    const stops = [
+      { name: "Hills Hotel Lisboa", kind: "stay" },
+      { name: "Torre de Belém", kind: "attraction" },
+    ];
+    vi.spyOn(client, "makeItinerary").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: { skeleton: { days: [{ day_index: 1, day_theme: "D1", stops }] }, trip_id: "t1", revision: 2 },
+    });
+    vi.spyOn(client, "fetchTripDetails").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: {
+        trip_id: "t1",
+        revision: 2,
+        data: { skeleton: { days: [{ day_index: 1, day_theme: "D1", stops }] } },
+      },
+    });
+    const planCalls: Record<string, unknown>[] = [];
+    vi.spyOn(client, "planNextStop").mockImplementation(async (body) => {
+      planCalls.push(body as Record<string, unknown>);
+      const next = (body as { next_stop?: { name?: string; kind?: string } }).next_stop;
+      const isStay = (body as { origin_mode?: boolean }).origin_mode === true;
+      return {
+        agent: "places-agent",
+        ok: true,
+        data: {
+          stop: { name: next?.name ?? "?", kind: isStay ? "stay" : "attraction", card: null, deeplinks: {} },
+          slot: { start: "09:00", end: isStay ? "09:00" : "10:00" },
+          legs: isStay ? [] : [{ mode: "transit", duration_min: 25, recommended: true }],
+          next_stop: { name: next?.name, location: { lat: 38.7, lng: -9.2 } },
+        },
+      };
+    });
+
+    for await (const ev of planItinerarySkeletonFill(
+      {
+        destination: "Lisbon",
+        days: 1,
+        startDate: "2026-10-10",
+        dailyStart: "Hills Hotel Lisboa",
+        originLat: 38.73,
+        originLng: -9.14,
+        timeFrom: "09:00",
+      },
+      { locale: "EN", providers: ["GOOGLE_MAPS"] },
+    )) {
+      if (ev.type === "error") break;
+    }
+
+    const attractionCall = planCalls.find((c) => {
+      const n = c.next_stop as { name?: string };
+      return n?.name === "Torre de Belém";
+    });
+    expect(attractionCall?.origin_mode).not.toBe(true);
+    const current = attractionCall?.current_stop as { lat?: number; lng?: number };
+    expect(current?.lat).toBe(38.73);
+    expect(current?.lng).toBe(-9.14);
+  });
 });

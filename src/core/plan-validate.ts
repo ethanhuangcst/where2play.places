@@ -1,4 +1,5 @@
 import type { PlanBoundaries } from "./itinerary-types";
+import { sanitizeDailyStartName } from "./plan-resolve-origin";
 
 export type PlanFieldErrors = Partial<
   Record<"destination" | "days" | "startDate" | "timeFrom" | "timeTo", string>
@@ -83,7 +84,15 @@ export function validatePlanBoundaries(input: unknown): {
       ...(optionalString(body.budget) ? { budget: optionalString(body.budget) } : {}),
       ...(optionalString(body.pace) ? { pace: optionalString(body.pace) } : {}),
       ...(optionalString(body.transport) ? { transport: optionalString(body.transport) } : {}),
-      ...(optionalString(body.dailyStart) ? { dailyStart: optionalString(body.dailyStart) } : {}),
+      ...(sanitizeDailyStartName(optionalString(body.dailyStart))
+        ? { dailyStart: sanitizeDailyStartName(optionalString(body.dailyStart)) }
+        : {}),
+      ...(typeof body.originLat === "number" && Number.isFinite(body.originLat)
+        ? { originLat: body.originLat }
+        : {}),
+      ...(typeof body.originLng === "number" && Number.isFinite(body.originLng)
+        ? { originLng: body.originLng }
+        : {}),
       ...(optionalString(body.dailyEnd) ? { dailyEnd: optionalString(body.dailyEnd) } : {}),
       ...(timeFrom ? { timeFrom } : {}),
       ...(timeTo ? { timeTo } : {}),

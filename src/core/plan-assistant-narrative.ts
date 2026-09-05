@@ -94,21 +94,12 @@ export function narrativeFromPlanEvent(
       return { lines, ctx: nextCtx };
     }
     nextCtx.narratedSkeletonDays.add(dayIndex);
-    let out = lines;
-    if (event.theme?.trim()) {
-      out = appendAssistantLine(out, event.theme.trim());
-    }
-    for (const stop of event.stops ?? []) {
-      if (stop.kind === "stay") {
-        out = appendAssistantLine(
-          out,
-          nextCtx.t("play.plan.depart_from_stay", { name: stop.name }),
-        );
-      } else {
-        out = appendAssistantLine(out, stop.name);
-      }
-    }
-    return { lines: out, ctx: nextCtx };
+    const theme = event.theme?.trim() || "";
+    const heading = nextCtx.t("play.plan.fill_day_heading", {
+      n: dayIndex,
+      theme: theme || String(dayIndex),
+    });
+    return { lines: appendAssistantLine(lines, heading), ctx: nextCtx };
   }
 
   if (event.type === "skeleton_done" && !nextCtx.skeletonReadyAnnounced) {

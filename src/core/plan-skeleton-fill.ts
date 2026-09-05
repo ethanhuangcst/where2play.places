@@ -3,17 +3,21 @@ import type { SlotPreviewPayload } from "./itinerary-map";
 import {
   buildDiscoverPlacesBody,
   buildMakeItineraryBody,
+  mapPace,
+  mapSpend,
   normalizeAgentTime,
   planDayDates,
   tripLedgerFields,
 } from "./plan-agent-body";
 import { previewForSkeletonStop, previewForTransitLeg } from "./plan-slot-preview";
+import { sanitizeDailyStartName } from "./plan-resolve-origin";
 import {
   discoverPlaces,
   makeItinerary,
   planNextStop,
   fetchTripDetails,
   travelTips,
+  geocode,
   type AgentEnvelope,
 } from "../places-agent/client";
 import {
@@ -51,7 +55,16 @@ export type SkeletonPlanProgressEvent =
   | { type: "tips"; data: Record<string, unknown> }
   | { type: "error"; key: string };
 
-type SkeletonStop = { name: string; kind?: string; meal_slot?: string };
+type SkeletonStop = {
+  name: string;
+  kind?: string;
+  meal_slot?: string;
+  provider?: string;
+  native_id?: string;
+  visit_part?: "am" | "pm" | string;
+  lat?: number;
+  lng?: number;
+};
 type SkeletonDay = { day_index: number; day_theme?: string; stops: SkeletonStop[] };
 type Skeleton = { days: SkeletonDay[] };
 
@@ -101,6 +114,53 @@ function asSkeleton(raw: unknown): Skeleton | null {
   return { days: days as SkeletonDay[] };
 }
 
+function stopPointerFields(stop: SkeletonStop): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (stop.provider) out.provider = stop.provider;
+  if (stop.native_id) out.native_id = stop.native_id;
+  if (stop.visit_part === "am" || stop.visit_part === "pm") out.visit_part = stop.visit_part;
+  if (typeof stop.lat === "number") out.lat = stop.lat;
+  if (typeof stop.lng === "number") out.lng = stop.lng;
+  return out;
+}
+
+function enrichStopFromPool(stop: SkeletonStop, pool: CandidatePools): SkeletonStop {
+  const card = [...pool.places, ...pool.restaurants].find(
+    (p) => (p as { name?: string }).name === stop.name,
+  ) as
+    | {
+        provider?: string;
+        location?: { lat?: number; lng?: number };
+        sources?: Array<{ provider?: string; native_id?: string }>;
+      }
+    | undefined;
+  if (!card) return stop;
+  const src = card.sources?.find((s) => s.native_id);
+  return {
+    ...stop,
+    provider: stop.provider ?? src?.provider ?? card.provider,
+    native_id: stop.native_id ?? src?.native_id,
+    lat: stop.lat ?? card.location?.lat,
+    lng: stop.lng ?? card.location?.lng,
+  };
+}
+
+/** F92: stamp stay stops with origin/city coords so first attraction gets real legs. */
+function stampStayCoords(
+  skeleton: Skeleton,
+  origin: { lat?: number; lng?: number } | undefined,
+): void {
+  if (typeof origin?.lat !== "number" || typeof origin?.lng !== "number") return;
+  for (const day of skeleton.days) {
+    for (const stop of day.stops) {
+      if (stop.kind === "stay") {
+        stop.lat = origin.lat;
+        stop.lng = origin.lng;
+      }
+    }
+  }
+}
+
 function slimPool(pool: CandidatePools): CandidatePools {
   const slim = (c: Record<string, unknown>) => {
     const o: Record<string, unknown> = { name: c.name };
@@ -123,6 +183,7 @@ type PlanNextStopData = StopDisplayPayload & {
   legs?: unknown[];
   trip_id?: string;
   revision?: number;
+  next_stop?: { name?: string; location?: { lat?: number; lng?: number } | null };
 };
 
 export async function* planItinerarySkeletonFill(
@@ -135,14 +196,26 @@ export async function* planItinerarySkeletonFill(
 
   yield { type: "phase", phase: "discovering" };
 
-  let origin: { name: string; lat?: number; lng?: number } | undefined;
-  if (criteria.dailyStart?.trim()) {
-    origin = {
-      name: criteria.dailyStart.trim(),
-      ...(typeof criteria.originLat === "number" && typeof criteria.originLng === "number"
-        ? { lat: criteria.originLat, lng: criteria.originLng }
-        : {}),
-    };
+  // F92: stay = intake origin coords, else city geocode (never hotel-name-only geocode).
+  let origin: { name: string; lat?: number; lng?: number } = {
+    name:
+      sanitizeDailyStartName(criteria.dailyStart) || criteria.destination.trim(),
+  };
+  if (typeof criteria.originLat === "number" && typeof criteria.originLng === "number") {
+    origin = { ...origin, lat: criteria.originLat, lng: criteria.originLng };
+  } else {
+    try {
+      const geo = await geocode({
+        query: criteria.destination.trim(),
+        locale: opts.locale,
+        providers: opts.providers,
+      });
+      if (geo.ok && geo.data && typeof geo.data.lat === "number" && typeof geo.data.lng === "number") {
+        origin = { ...origin, lat: geo.data.lat, lng: geo.data.lng };
+      }
+    } catch {
+      /* stay may remain name-only */
+    }
   }
 
   const pool: CandidatePools = { places: [], restaurants: [] };
@@ -214,7 +287,7 @@ export async function* planItinerarySkeletonFill(
   const mkBody = buildMakeItineraryBody(criteria, {
     ...opts,
     candidates: slimPool(pool),
-    ...(origin ? { origin } : {}),
+    origin,
     tripId,
     revision,
   });
@@ -249,6 +322,8 @@ export async function* planItinerarySkeletonFill(
     return;
   }
 
+  stampStayCoords(skeleton, origin);
+
   if (tripId) {
     const fetched = await fetchTripDetails({
       trip_id: tripId,
@@ -263,6 +338,7 @@ export async function* planItinerarySkeletonFill(
         const storeStops = skeletonStopCount(fromStore);
         if (storeStops >= envelopeStops) {
           skeleton.days = fromStore.days;
+          stampStayCoords(skeleton, origin);
         }
       }
       if (typeof nextRev === "number") revision = nextRev;
@@ -321,6 +397,8 @@ export async function* planItinerarySkeletonFill(
   yield { type: "phase", phase: "filling", dayIndex: 1, daysTotal };
 
   const dates = planDayDates(daysTotal, criteria.startDate);
+  const usedRestaurantNames: string[] = [];
+  const MEAL_SLOT_IDS = new Set(["lunch", "dinner", "afternoon_tea"]);
 
   for (const skDay of skeleton.days) {
     const dayIndex = skDay.day_index;
@@ -329,8 +407,9 @@ export async function* planItinerarySkeletonFill(
     let daySlots: ItinerarySlot[] = [];
     let prevEndTime: string | undefined;
     let prevStop: SkeletonStop | undefined;
+    let stopIndex = 0;
 
-    for (let stopIndex = 0; stopIndex < skDay.stops.length; stopIndex++) {
+    while (stopIndex < skDay.stops.length) {
       const stop = skDay.stops[stopIndex]!;
       const isOriginStay = stopIndex === 0 && stop.kind === "stay";
 
@@ -339,6 +418,10 @@ export async function* planItinerarySkeletonFill(
         dayIndex,
         ...previewForSkeletonStop(stop, t),
       };
+
+      const lookahead = skDay.stops
+        .slice(stopIndex + 1)
+        .find((s) => s.kind !== "stay" && s.kind !== "meal" && !MEAL_SLOT_IDS.has(s.name));
 
       const fill = await fillStop({
         stop,
@@ -353,6 +436,8 @@ export async function* planItinerarySkeletonFill(
         isOriginStay,
         tripId,
         revision,
+        usedRestaurantNames,
+        lookahead,
       });
       if (!fill.ok) {
         yield { type: "error", key: fill.key ?? "errors.provider_failed" };
@@ -360,6 +445,37 @@ export async function* planItinerarySkeletonFill(
       }
       tripId = fill.tripId ?? tripId;
       revision = fill.revision ?? revision;
+
+      if (fill.skeletonPatched) {
+        const beforeKey = skDay.stops.map((s) => `${s.kind}:${s.name}:${s.meal_slot}`).join("|");
+        if (tripId) {
+          const fetchedSk = await fetchTripDetails({
+            trip_id: tripId,
+            fields: ["skeleton", "cursor"],
+            locale: opts.locale,
+          });
+          if (fetchedSk.ok) {
+            const { slice, revision: r } = tripFetchSlice(fetchedSk);
+            if (typeof r === "number") revision = r;
+            const raw = (slice as { skeleton?: unknown })?.skeleton ?? slice;
+            const refreshed = asSkeleton(raw);
+            if (refreshed) {
+              const refreshedDay = refreshed.days.find((d) => d.day_index === dayIndex);
+              if (refreshedDay) {
+                skDay.stops = refreshedDay.stops;
+                skeleton.days = refreshed.days;
+              }
+            }
+          }
+        } else if (fill.patchedDayStops?.length) {
+          skDay.stops = fill.patchedDayStops;
+        }
+        const afterKey = skDay.stops.map((s) => `${s.kind}:${s.name}:${s.meal_slot}`).join("|");
+        // No-op / failed patch: do not spin — advance (agent should fill on no-op move).
+        if (beforeKey === afterKey) stopIndex += 1;
+        continue;
+      }
+
       if (tripId) {
         const fetchedFill = await fetchTripDetails({
           trip_id: tripId,
@@ -370,6 +486,33 @@ export async function* planItinerarySkeletonFill(
           const { revision: r } = tripFetchSlice(fetchedFill);
           if (typeof r === "number") revision = r;
         }
+      }
+
+      if (fill.mealSkipped) {
+        const placeSlot = mapStopDisplayToPlaceSlot(
+          {
+            stop: {
+              name: stop.meal_slot ?? stop.name,
+              kind: "meal",
+              card: null,
+              deeplinks: {},
+            },
+            slot: fill.display?.slot ?? { start: prevEndTime ?? "12:00", end: prevEndTime ?? "12:00" },
+            legs_to_here: [],
+          },
+          t,
+        );
+        daySlots = [...daySlots, placeSlot];
+        prevStop = stop;
+        itinerary = mergeDay(itinerary, {
+          dayIndex,
+          highlights: skeletonDayHighlights(dayIndex, skDay.day_theme, t),
+          slots: daySlots,
+          meta: { window: dates[dayIndex - 1] },
+        });
+        yield { type: "stop_filled", dayIndex, stopIndex, slot: placeSlot, itinerary };
+        stopIndex += 1;
+        continue;
       }
 
       if (!isOriginStay && fill.legs?.length) {
@@ -390,12 +533,32 @@ export async function* planItinerarySkeletonFill(
         }
       }
 
-      const placeSlot = mapStopDisplayToPlaceSlot(fill.display ?? {}, t);
+      const placeSlot = mapStopDisplayToPlaceSlot(fill.display ?? {}, t, {
+        visit_part: stop.visit_part,
+      });
       daySlots = [...daySlots, placeSlot];
       prevEndTime = fill.display?.slot?.end
         ? normalizeAgentTime(fill.display.slot.end)
         : prevEndTime;
-      prevStop = stop;
+      const venueLoc = (fill.display as PlanNextStopData | undefined)?.next_stop?.location;
+      prevStop =
+        stop.kind === "meal" || stop.meal_slot
+          ? {
+              ...stop,
+              name: placeSlot.name,
+              ...(typeof venueLoc?.lat === "number" && typeof venueLoc?.lng === "number"
+                ? { lat: venueLoc.lat, lng: venueLoc.lng }
+                : {}),
+            }
+          : stop;
+
+      if (
+        (stop.kind === "meal" || stop.meal_slot || MEAL_SLOT_IDS.has(stop.name)) &&
+        placeSlot.name &&
+        !MEAL_SLOT_IDS.has(placeSlot.name)
+      ) {
+        usedRestaurantNames.push(placeSlot.name);
+      }
 
       itinerary = mergeDay(itinerary, {
         dayIndex,
@@ -404,6 +567,7 @@ export async function* planItinerarySkeletonFill(
         meta: { window: dates[dayIndex - 1] },
       });
       yield { type: "stop_filled", dayIndex, stopIndex, slot: placeSlot, itinerary };
+      stopIndex += 1;
     }
 
     yield { type: "day_done", dayIndex, daysTotal, itinerary };
@@ -425,6 +589,8 @@ async function fillStop(input: {
   isOriginStay: boolean;
   tripId?: string;
   revision?: number;
+  usedRestaurantNames?: string[];
+  lookahead?: SkeletonStop;
 }): Promise<{
   ok: boolean;
   key?: string;
@@ -432,37 +598,61 @@ async function fillStop(input: {
   legs?: Array<{ mode?: string; duration_min?: number; recommended?: boolean }>;
   tripId?: string;
   revision?: number;
+  skeletonPatched?: boolean;
+  mealSkipped?: boolean;
+  patchedDayStops?: SkeletonStop[];
 }> {
+  const pace = mapPace(input.criteria.pace);
+  const budget = mapSpend(input.criteria.budget);
+  const nextEnriched = enrichStopFromPool(input.stop, input.pool);
   const body: Record<string, unknown> = {
     locale: input.opts.locale,
     providers: input.opts.providers,
     city: input.criteria.destination.trim(),
     candidates: input.pool,
     next_stop: {
-      name: input.stop.name,
-      kind: input.stop.kind,
-      ...(input.stop.meal_slot ? { meal_slot: input.stop.meal_slot } : {}),
+      name: nextEnriched.name,
+      kind: nextEnriched.kind,
+      ...(nextEnriched.meal_slot ? { meal_slot: nextEnriched.meal_slot } : {}),
+      ...stopPointerFields(nextEnriched),
     },
     ...tripLedgerFields(input.tripId, input.revision),
     transit_preference: input.criteria.transport,
+    day_index: input.dayIndex,
+    day_stops: input.skDay.stops,
+    used_restaurant_names: input.usedRestaurantNames ?? [],
+    ...(pace ? { pace } : {}),
+    ...(budget ? { budget } : {}),
   };
+
+  if (input.lookahead) {
+    const look = enrichStopFromPool(input.lookahead, input.pool);
+    body.lookahead_stop = {
+      name: look.name,
+      kind: look.kind ?? "attraction",
+      ...stopPointerFields(look),
+    };
+  }
 
   if (input.isOriginStay) {
     body.origin_mode = true;
     body.time_from = normalizeAgentTime(input.criteria.timeFrom ?? "09:00");
     body.stay_role = input.stopIndex === 0 ? "day_origin" : "return";
   } else if (input.prevStop) {
+    const prev = enrichStopFromPool(input.prevStop, input.pool);
     const endTime = input.prevEndTime ? normalizeAgentTime(input.prevEndTime) : undefined;
     body.current_stop = {
-      name: input.prevStop.name,
-      kind: input.prevStop.kind,
+      name: prev.name,
+      kind: prev.kind,
       ...(endTime ? { end_time: endTime } : {}),
+      ...stopPointerFields(prev),
     };
     body.previous_stop = {
-      name: input.prevStop.name,
-      kind: input.prevStop.kind,
+      name: prev.name,
+      kind: prev.kind,
       ...(endTime ? { end_time: endTime } : {}),
     };
+    if (endTime) body.arrival_clock = endTime;
   }
 
   let res = await planNextStop(body);
@@ -482,6 +672,9 @@ async function fillStop(input: {
   if (!res.ok) return { ok: false, key: res.outcome?.key };
   const data = res.data as PlanNextStopData & {
     legs?: Array<{ mode?: string; duration_min?: number; recommended?: boolean }>;
+    skeleton_patched?: boolean;
+    meal_skipped?: boolean;
+    patched_day_stops?: SkeletonStop[];
   };
   return {
     ok: true,
@@ -489,6 +682,9 @@ async function fillStop(input: {
     legs: data.legs,
     tripId: data.trip_id ?? input.tripId,
     revision: data.revision ?? input.revision,
+    skeletonPatched: data.skeleton_patched === true,
+    mealSkipped: data.meal_skipped === true,
+    patchedDayStops: Array.isArray(data.patched_day_stops) ? data.patched_day_stops : undefined,
   };
 }
 

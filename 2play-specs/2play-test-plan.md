@@ -580,11 +580,12 @@ Agent 层 live 探针细节见 places-agent 测试文档 — 此处不重复 TC 
 | TC-M19-40-04 | Component | filling 主区同时有 skeletonStops 与 stay，非仅酒店 | `tests/plan-skeleton-stops.test.ts` / plan-page | **Done** |
 | TC-M19-40-05 | Unit | PlanSessionCache / current 含 trip_id | `tests/api-plan.test.ts` | **Done** |
 | TC-M19-40-06 | i18n | §4.6 叙事 key 四 locale | `tests/i18n-catalog.test.ts` | **Done** |
-| TC-M19-40-E2E | E2E | 里斯本 3 日：助手见多日骨架后再出 slot；芯片≠仅用户 2 处 | Playwright | **ToDo** |
+| TC-M19-40-E2E | E2E | **骨架 only（取代 fill）：** 里斯本或杭州 3 日助手见 fetch 骨架；每日 ≥1 attraction；餐档 i18n slot。不要求 `plan_next_stop` | Live / `signoff-hangzhou-lisbon-3d.md` | **Done** |
+| TC-M22-SIGN-UI | Gate | `skeletonIsFillable` 要求每日至少一站 `kind=attraction` 或遗留 `place`（仅 stay+meal 不算过） | `tests/plan-fetch-trip.test.ts` | **Done** |
 
 #### TC-M20（MVP-20：Plan 页重建 Feature 41）
 
-绑定 Feature **41**。Story 2 = TC-M20-41-10–15。Story 4 = TC-M20-41-16–20。TC-M19-40-03/04（fill 叙事）**保持跳过**至 fill 故事。
+绑定 Feature **41**。Story 2 = TC-M20-41-10–15。Story 4 骨架 = TC-M20-41-16–20；**fill 接线 = 批次 23-S1（TC-M23-S1-*)**。
 
 | ID | 类型 | 主题 | 文件（目标） | 状态 |
 | --- | --- | --- | --- | --- |
@@ -597,16 +598,28 @@ Agent 层 live 探针细节见 places-agent 测试文档 — 此处不重复 TC 
 | TC-M20-41-11 | Unit | startPlanDiscover 传 max_number=5；返回 pool；芯片 ≤5 | `tests/plan-start-discover.test.ts` | **Done** |
 | TC-M20-41-12 | Component | g 等池；芯片来自 `POST /api/plan/candidates`（fetch_trip_details） | `tests/plan-page.test.tsx` | **Done** |
 | TC-M20-41-13 | Component | 每答一题约束格回填；PATCH session | `tests/plan-page.test.tsx` | **Done** |
-| TC-M20-41-14 | Component | intake 完无 debug dump；Story 4 接 make-only | `tests/plan-page.test.tsx` | **Story 4** |
+| TC-M20-41-14 | Component | intake 完无 debug dump；默认 fill 流（无 mode=skeleton） | `tests/plan-page.test.tsx` | **Done**（23-S1） |
 | TC-M20-41-15 | i18n | know_enough 四 locale | `tests/i18n-catalog.test.ts` | **Done** |
 | TC-M20-41-16 | Unit | make-only 路径：make 后 fetch skeleton；不调用 plan_next_stop | `tests/plan-skeleton-only.test.ts` | **Story 4** |
 | TC-M20-41-17 | Unit | stay-only / make 失败 → error；不产出成功骨架 | `tests/plan-skeleton-only.test.ts` | **Story 4** |
 | TC-M20-41-18 | Component | 进度 elapsed 0.1s；超时/失败 i18n | `tests/plan-page.test.tsx` | **Story 4** |
-| TC-M20-41-19 | Component | headline + thread 骨架卡来自 fetch 切片 | `tests/plan-page.test.tsx` | **Story 4** |
+| TC-M20-41-19 | Component | thread 骨架卡来自 fetch；无「骨架预览」标题 | `tests/plan-page.test.tsx` | **Done**（23-S1） |
 | TC-M20-41-20 | i18n | planning / headline / elapsed / make 失败 四 locale | `tests/i18n-catalog.test.ts` | **Story 4** |
 | TC-M21-41-21 | Unit | 空 b 不 search；非空命中 80km；未命中 not_found；禁无城市 geocode | `tests/plan-resolve-origin.test.ts` | **Done** |
 | TC-M21-41-22 | Unit/API | PATCH b 未命中 422；忽略空 b 前进；make origin 不二次无城市 geocode | `tests/plan-skeleton-only.test.ts` / session | **Done** |
 | TC-M21-41-23 | i18n | `intake_origin_not_found` / retry / skip 四 locale | `tests/i18n-catalog.test.ts` | **Done** |
+| TC-M23-S6A-01 | Unit/API | 无坐标/远地/search 失败 → not_found；空发送 skip；留在步骤 b | `tests/plan-resolve-origin.test.ts` · `api-plan-session-origin.test.ts` | **Done** |
+| TC-M23-S6B-01 | Unit (agent) | 餐硬上限 5km；拒远城店 | agent `plan-next-stop.test.ts` | **Done** |
+| TC-M23-S7-01 | Unit | 凯悦↔Hyatt 自动 hit；湖滨凯悦→里斯本凯悦 → candidates | `plan-origin-name-match` · `plan-resolve-origin` | **Done** |
+| TC-M23-S7-02 | API/UI | candidates 200 留 b；空发送 origin=城市坐标；选 A 前进 | `api-plan-session-origin` · plan-nav | **Done** |
+| TC-M23-S7-03 | Unit | `__origin_pick__:N` 不得作为 `dailyStart` / make origin 名；PATCH 存 `origin_name` | `plan-resolve-origin` · `plan-validate` · `plan-intake` · session | **Done** |
+| TC-M23-S8-01 | Unit | 单景点 reseat 不把 lunch 插到景点前；split AM-lunch-PM | agent `make-itinerary.test.ts` | **Done** |
+| TC-M23-S8-02 | Unit | 罗卡角午餐拒市区店；空则 lunch 槽；晚餐可用酒店附近 | agent `plan-next-stop.test.ts` | **Done** |
+| TC-M23-S1-01 | Unit | `skeleton_day` → fill_day_heading；`skeleton_done` → skeleton_ready | `tests/plan-assistant-narrative.test.ts` | **Done** |
+| TC-M23-S1-02 | Component | 助手日标题 + 步 j + filling；无骨架预览标题 | `tests/plan-page.test.tsx` | **Done** |
+| TC-M23-S1-03 | Component | fill 流进行中 `plan-nav-send` disabled；done 后 enabled | `tests/plan-page.test.tsx` | **Done** |
+| TC-M19-40-03 | Component | 叙事顺序：骨架就绪 → fill → complete（原 skip 已恢复） | `tests/plan-page.test.tsx` | **Done** |
+| TC-M19-40-04 | Component | filling 主区 stay + pending skeleton stop | `tests/plan-page.test.tsx` | **Done** |
 
 ---
 

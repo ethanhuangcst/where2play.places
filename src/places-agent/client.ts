@@ -132,14 +132,18 @@ export async function geocode(input: {
 export async function searchPlaces(input: {
   query: string;
   address?: string;
+  near?: { lat: number; lng: number; crs?: string };
   locale: string;
   providers?: string[];
+  bias_radius_m?: number;
 }): Promise<AgentEnvelope<Array<{ name: string; location?: { lat?: number; lng?: number } }>>> {
   return postV1("search_places", {
     query: input.query,
     address: input.address,
+    near: input.near,
     locale: input.locale,
     providers: input.providers,
+    bias_radius_m: input.bias_radius_m,
   });
 }
 

@@ -14,6 +14,12 @@ const NARRATIVE_KEYS = [
   "play.plan.phase_making",
 ] as const;
 
+const F85_MEAL_SLOT_KEYS = [
+  "play.plan.meal_slot_lunch",
+  "play.plan.meal_slot_dinner",
+  "play.plan.meal_slot_afternoon_tea",
+] as const;
+
 const STORY4_KEYS = [
   "play.plan.assistant_know_enough",
   "play.plan.assistant_planning_skeleton",
@@ -23,6 +29,17 @@ const STORY4_KEYS = [
   "play.plan.assistant_make_failed",
   "play.plan.assistant_fetch_failed",
 ] as const;
+
+describe("i18n F85 meal slot labels (TC-M22-85-04)", () => {
+  it("should_define_meal_slot_keys_in_all_locales", () => {
+    for (const key of F85_MEAL_SLOT_KEYS) {
+      expect(EN[key]).toBeTruthy();
+      expect(CN[key]).toBeTruthy();
+      expect(HK[key]).toBeTruthy();
+      expect(TW[key]).toBeTruthy();
+    }
+  });
+});
 
 describe("i18n Story 4 skeleton copy (TC-M20-41-20)", () => {
   it("should_define_planning_headline_elapsed_and_errors_in_all_locales", () => {
@@ -39,6 +56,7 @@ describe("i18n origin lookup (TC-M21-41-23)", () => {
   it("should_define_origin_not_found_retry_skip_in_all_locales", () => {
     for (const key of [
       "play.plan.intake_origin_not_found",
+      "play.plan.intake_origin_candidates",
       "play.plan.intake_origin_retry",
       "play.plan.intake_origin_skip",
     ] as const) {

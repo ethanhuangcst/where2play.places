@@ -180,6 +180,28 @@ describe("TC-M10-46-08 plan intake", () => {
     expect(displayIntakeAnswer("c", "09:30", tt)).toBe("09:30");
   });
 
+  it("should_not_store_origin_pick_chip_as_hotel_name", () => {
+    expect(resolveIntakeAnswer("b", "__origin_pick__:0", tt)).toBe("");
+    const boundaries = mergeIntakeToBoundaries(
+      {
+        destination: "Lisbon",
+        startDate: "2026-09-20",
+        days: 4,
+        partySize: 2,
+        budget: "$$ Mid-range",
+      },
+      { b: "__origin_pick__:0" },
+      tt,
+      "EN",
+    );
+    expect(boundaries.dailyStart).toBeUndefined();
+    expect(tripConstraintsFromIntakeStep("b", "__origin_pick__:0", tt)).toEqual({
+      hotel: "",
+      dailyStart: "",
+    });
+    expect(displayIntakeAnswer("b", "__origin_pick__:0", tt)).toBe(tt("play.plan.constraint_no_hotel"));
+  });
+
   it("should_offer_retry_and_skip_chips_when_origin_not_found", () => {
     const chips = intakeQuickChips("b", tt, undefined, { originNotFound: true });
     expect(chips.map((c) => c.labelKey)).toEqual([
@@ -187,6 +209,19 @@ describe("TC-M10-46-08 plan intake", () => {
       "play.plan.intake_origin_skip",
     ]);
     expect(chips[1]?.value).toBe("");
+  });
+
+  it("should_offer_lettered_candidate_chips_when_origin_candidates (S7)", () => {
+    const chips = intakeQuickChips("b", tt, undefined, {
+      originCandidates: [{ name: "Hyatt Regency Lisbon" }, { name: "Other Inn" }],
+    });
+    expect(chips[0]?.label).toBe("A - Hyatt Regency Lisbon");
+    expect(chips[0]?.value).toBe("__origin_pick__:0");
+    expect(chips[1]?.label).toBe("B - Other Inn");
+    expect(chips.map((c) => c.labelKey).filter(Boolean)).toEqual([
+      "play.plan.intake_origin_retry",
+      "play.plan.intake_origin_skip",
+    ]);
   });
 
   it("should_map_intake_step_to_trip_constraint_patch", () => {

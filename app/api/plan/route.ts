@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser, authError } from "@/src/auth/user";
+import { prisma } from "@/src/db/client";
 import { normalizeLocale } from "@/src/core/locales";
 import { validatePlanBoundaries } from "@/src/core/plan-validate";
+import { sanitizeDailyStartName } from "@/src/core/plan-resolve-origin";
 import { planItineraryDayByDay, type PlanProgressEvent } from "@/src/core/plan-day-by-day";
 import {
   planItinerarySkeletonFill,
@@ -79,23 +81,38 @@ export async function POST(request: NextRequest) {
   }
 
   const locale = normalizeLocale(parsed.value.locale ?? gate.user.locale);
-  const providers = providersForDestinationText(parsed.value.destination);
+  const cached = await prisma.planSessionCache.findUnique({
+    where: { userId: gate.user.id },
+  });
+  const prev = (cached?.criteriaJson ?? {}) as PlanBoundaries;
+  const dailyStart =
+    sanitizeDailyStartName(parsed.value.dailyStart) ||
+    sanitizeDailyStartName(prev.dailyStart);
+  const criteria: PlanBoundaries = {
+    ...parsed.value,
+    ...(dailyStart ? { dailyStart } : { dailyStart: undefined }),
+    originLat:
+      typeof parsed.value.originLat === "number" ? parsed.value.originLat : prev.originLat,
+    originLng:
+      typeof parsed.value.originLng === "number" ? parsed.value.originLng : prev.originLng,
+  };
+  const providers = providersForDestinationText(criteria.destination);
   const stream = request.headers.get("accept")?.includes("application/x-ndjson");
 
   let ledger: PlanLedger = {
-    tripId: parsed.value.tripId,
-    revision: parsed.value.revision,
+    tripId: criteria.tripId,
+    revision: criteria.revision,
   };
-  let lastItinerary: ItineraryDto = emptyPlanItinerary(parsed.value);
+  let lastItinerary: ItineraryDto = emptyPlanItinerary(criteria);
 
   if (!stream) {
     let last: ItineraryDto | null = null;
     let errorKey: string | null = null;
-    for await (const event of planStream(parsed.value, locale, providers)) {
+    for await (const event of planStream(criteria, locale, providers)) {
       const ledgerPatch = extractPlanLedgerFromEvent(event);
       if (ledgerPatch) {
         ledger = applyLedger(ledger, ledgerPatch);
-        await persistPlanProgress(gate.user.id, parsed.value, ledger, lastItinerary);
+        await persistPlanProgress(gate.user.id, criteria, ledger, lastItinerary);
       }
       if (event.type === "error") {
         errorKey = event.key;
@@ -104,7 +121,7 @@ export async function POST(request: NextRequest) {
       if (shouldPersistPlanCacheEvent(event) && "itinerary" in event && event.itinerary) {
         last = event.itinerary;
         lastItinerary = event.itinerary;
-        await persistPlanProgress(gate.user.id, parsed.value, ledger, event.itinerary);
+        await persistPlanProgress(gate.user.id, criteria, ledger, event.itinerary);
       }
     }
     if (!last) {
@@ -120,15 +137,15 @@ export async function POST(request: NextRequest) {
   const body = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        for await (const event of planStream(parsed.value, locale, providers)) {
+        for await (const event of planStream(criteria, locale, providers)) {
           const ledgerPatch = extractPlanLedgerFromEvent(event);
           if (ledgerPatch) {
             ledger = applyLedger(ledger, ledgerPatch);
-            await persistPlanProgress(gate.user.id, parsed.value, ledger, lastItinerary);
+            await persistPlanProgress(gate.user.id, criteria, ledger, lastItinerary);
           }
           if (shouldPersistPlanCacheEvent(event) && "itinerary" in event && event.itinerary) {
             lastItinerary = event.itinerary;
-            await persistPlanProgress(gate.user.id, parsed.value, ledger, event.itinerary);
+            await persistPlanProgress(gate.user.id, criteria, ledger, event.itinerary);
           }
           controller.enqueue(encodeNdjson(event));
           if (event.type === "error" || event.type === "done") break;

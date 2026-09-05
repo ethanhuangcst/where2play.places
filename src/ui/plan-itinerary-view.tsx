@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useLocale, useT } from "@/src/i18n/use-t";
 import type { ItineraryDto, ItinerarySlot } from "@/src/core/itinerary-types";
+import { skeletonStopLabel } from "@/src/core/meal-slot-label";
 
 export type LiveHighlights = {
   label: string;
@@ -300,8 +301,10 @@ export function PlanItineraryView({
                   className={`skeleton-stop${stop.filled ? " skeleton-stop--filled" : ""}${stop.pending ? " is-pending" : ""}${stop.mealSlot ? " skeleton-stop--meal" : ""}`}
                 >
                   <span className="skeleton-stop__idx">{String(idx).padStart(2, "0")}</span>
-                  <span className="skeleton-stop__name">{stop.name}</span>
-                  {stop.mealSlot ? <span className="skeleton-stop__slot">{stop.mealSlot}</span> : null}
+                  <span className="skeleton-stop__name">{skeletonStopLabel(stop, t)}</span>
+                  {stop.mealSlot ? (
+                    <span className="skeleton-stop__slot">{skeletonStopLabel(stop, t)}</span>
+                  ) : null}
                   {stop.pending ? (
                     <span className="skeleton-stop__slot">{t("play.plan.stop_filling")}</span>
                   ) : null}

@@ -7,14 +7,23 @@ import {
   emptyPlanItinerary,
   upsertPlanSessionCache,
 } from "@/src/core/plan-session-cache";
-import { geocode, patchTrip, searchPlaces, providersForDestinationText } from "@/src/places-agent/client";
+import { geocode, patchTrip, searchPlaces, providersForPin } from "@/src/places-agent/client";
 import {
   INTAKE_STEP_ORDER,
   tripConstraintsFromIntakeStep,
   type IntakeStepId,
 } from "@/src/core/plan-intake";
-import { resolvePlanOrigin } from "@/src/core/plan-resolve-origin";
+import {
+  parseOriginPickIndex,
+  resolveOriginPick,
+  resolvePlanOrigin,
+  type OriginCard,
+} from "@/src/core/plan-resolve-origin";
 import { t as catalogT } from "@/src/i18n/catalog";
+
+type CriteriaWithOriginPick = PlanBoundaries & {
+  originCandidates?: OriginCard[];
+};
 
 export async function PATCH(request: NextRequest) {
   const gate = await requireUser(request);
@@ -35,38 +44,65 @@ export async function PATCH(request: NextRequest) {
   const existing = await prisma.planSessionCache.findUnique({
     where: { userId: gate.user.id },
   });
-  const prev = (existing?.criteriaJson ?? {}) as PlanBoundaries;
+  const prev = (existing?.criteriaJson ?? {}) as CriteriaWithOriginPick;
 
-  if (step === "b" && value.trim()) {
-    const dest = prev.destination ?? "";
-    const resolved = await resolvePlanOrigin(
-      {
-        query: value,
-        destination: dest,
-        locale,
-        providers: dest ? providersForDestinationText(dest) : undefined,
-      },
-      { searchPlaces, geocode },
-    );
+  if (step === "b") {
+    const destFromBody = typeof raw.destination === "string" ? raw.destination.trim() : "";
+    const dest = destFromBody || prev.destination || "";
+    if (dest) prev.destination = dest;
+    const pickIdx = parseOriginPickIndex(value.trim());
+
+    let resolved =
+      pickIdx != null
+        ? resolveOriginPick(prev.originCandidates ?? [], pickIdx)
+        : await resolvePlanOrigin(
+            {
+              query: value,
+              destination: dest,
+              locale,
+            },
+            { searchPlaces, geocode, providersForPin },
+          );
+
     if (resolved.kind === "not_found") {
+      delete prev.originCandidates;
       return NextResponse.json(
         { ok: false, error: { key: "play.plan.intake_origin_not_found" } },
         { status: 422 },
       );
     }
+
+    if (resolved.kind === "candidates") {
+      prev.originCandidates = resolved.cards;
+      await upsertPlanSessionCache(
+        gate.user.id,
+        prev,
+        (existing?.itineraryJson as ItineraryDto) ?? emptyPlanItinerary(prev),
+      );
+      return NextResponse.json({
+        ok: true,
+        origin_candidates: resolved.cards.map((c) => ({
+          name: c.name,
+          lat: c.location?.lat,
+          lng: c.location?.lng,
+        })),
+        stay_on_step: true,
+      });
+    }
+
     if (resolved.kind === "hit") {
       resolvedValue = resolved.name;
       prev.originLat = resolved.lat;
       prev.originLng = resolved.lng;
-    } else if (resolved.kind === "degraded") {
-      resolvedValue = resolved.name;
-      delete prev.originLat;
-      delete prev.originLng;
+      delete prev.originCandidates;
     }
-  }
-  if (step === "b" && !value.trim()) {
-    delete prev.originLat;
-    delete prev.originLng;
+
+    if (resolved.kind === "skip") {
+      resolvedValue = "";
+      prev.originLat = resolved.lat;
+      prev.originLng = resolved.lng;
+      delete prev.originCandidates;
+    }
   }
 
   const patch = tripConstraintsFromIntakeStep(step as IntakeStepId, resolvedValue, t);
@@ -74,7 +110,7 @@ export async function PATCH(request: NextRequest) {
     typeof raw.trip_id === "string" && raw.trip_id.trim()
       ? raw.trip_id.trim()
       : prev.tripId;
-  const criteria: PlanBoundaries = {
+  const criteria: CriteriaWithOriginPick = {
     ...prev,
     ...("hotel" in patch ? { dailyStart: String(patch.hotel ?? "") } : {}),
     ...("timeFrom" in patch ? { timeFrom: String(patch.timeFrom) } : {}),
@@ -122,6 +158,7 @@ export async function PATCH(request: NextRequest) {
       revision: written.data?.revision,
       originLat: criteria.originLat,
       originLng: criteria.originLng,
+      ...(step === "b" ? { origin_name: resolvedValue } : {}),
     });
   }
 
@@ -130,5 +167,6 @@ export async function PATCH(request: NextRequest) {
     trip_id: tripId,
     originLat: criteria.originLat,
     originLng: criteria.originLng,
+    ...(step === "b" ? { origin_name: resolvedValue } : {}),
   });
 }

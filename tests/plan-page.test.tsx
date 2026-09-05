@@ -486,7 +486,7 @@ describe("TC-M20-41 Feature 41 Story 2 silent init", () => {
     ).toBe(true);
   });
 
-  it("TC-M20-41-14/19 should_start_make_only_and_show_fetch_skeleton_card", async () => {
+  it("TC-M20-41-14/19 should_start_fill_stream_and_show_skeleton_card_without_preview_title", async () => {
     authJson.mockImplementation(async (url: string) => {
       if (url === "/api/plan/current") return { ok: true, criteria: null, itinerary: null };
       if (url === "/api/plan/discover") {
@@ -532,6 +532,26 @@ describe("TC-M20-41 Feature 41 Story 2 silent init", () => {
         tripId: "t1",
         revision: 4,
       });
+      onEvent({ type: "phase", phase: "filling", dayIndex: 1, daysTotal: 2 });
+      onEvent({
+        type: "stop_filled",
+        dayIndex: 1,
+        slot: {
+          kind: "place",
+          start: "10:00",
+          end: "11:00",
+          placeKind: "attraction",
+          name: "Tower",
+          summary: "",
+        },
+        itinerary: {
+          title: "Lisbon",
+          destination: "Lisbon",
+          daysCount: 2,
+          updatedAt: new Date().toISOString(),
+          days: [],
+        },
+      });
       onEvent({
         type: "done",
         itinerary: {
@@ -559,21 +579,21 @@ describe("TC-M20-41 Feature 41 Story 2 silent init", () => {
     const planCall = authNdjsonEvents.mock.calls.find((c) => c[0] === "/api/plan");
     expect(planCall).toBeTruthy();
     const body = JSON.parse(String((planCall?.[1] as { body?: string })?.body ?? "{}"));
-    expect(body.mode).toBe("skeleton");
+    expect(body.mode).not.toBe("skeleton");
     expect(document.body.querySelector('[data-testid="plan-nav-debug-dump"]')).toBeNull();
 
     await waitFor(() => {
       const thread = document.body.querySelector('[data-testid="plan-nav-thread"]')?.textContent ?? "";
-      expect(thread).not.toContain("I have enough to draft your day outline.");
       expect(thread).toContain("I understand your request and am drafting the itinerary outline");
-      expect(thread).toContain("Here is a 2-day outline for Lisbon");
+      expect(thread).toMatch(/Day 1/);
+      expect(thread).toContain("Now I'll plan each day's details");
+      expect(thread).toContain("Arranging Tower");
       expect(document.body.querySelector('[data-testid="plan-thread-skeleton"]')?.textContent).toContain(
         "Tower",
       );
     });
-    expect(document.body.querySelector('[data-testid="plan-thread-skeleton"]')?.textContent).not.toContain(
-      "Arranging",
-    );
+    const skel = document.body.querySelector('[data-testid="plan-thread-skeleton"]')?.textContent ?? "";
+    expect(skel).not.toContain("Skeleton preview");
   });
 
   it("TC-M20-41-18 should_show_elapsed_then_friendly_error_when_make_fails", async () => {
@@ -613,7 +633,7 @@ describe("TC-M20-41 Feature 41 Story 2 silent init", () => {
   });
 });
 
-describe.skip("TC-M19-40-03 assistant narrative thread order (Feature 41 Story 4)", () => {
+describe("TC-M19-40-03 / TC-M23-S1 assistant narrative thread order (fill)", () => {
   const shellItinerary = {
     title: "Lisbon",
     destination: "Lisbon",
@@ -660,7 +680,7 @@ describe.skip("TC-M19-40-03 assistant narrative thread order (Feature 41 Story 4
     delete document.body.dataset.style;
   });
 
-  it("should_show_know_enough_skeleton_ready_then_fill_before_plan_complete", async () => {
+  it("should_show_day_heading_skeleton_ready_then_fill_before_plan_complete", async () => {
     authNdjsonEvents.mockImplementation(async (_url, _init, onEvent) => {
       onEvent({ type: "phase", phase: "skeleton" });
       onEvent({
@@ -690,17 +710,55 @@ describe.skip("TC-M19-40-03 assistant narrative thread order (Feature 41 Story 4
     const thread = document.body.querySelector('[data-testid="plan-nav-thread"]') as HTMLElement;
     expect(thread).toBeTruthy();
     const text = thread.textContent ?? "";
-    expect(text).toContain("I have enough to draft your day outline.");
-    expect(text).toContain("Building the day outline");
-    expect(text).toContain("Belém Tower");
-    expect(text).toContain("The outline is ready. Filling stop details next.");
-    expect(text).not.toContain("Got it — I'll build your itinerary.");
+    expect(text).toContain("I understand your request and am drafting the itinerary outline");
+    expect(text).toMatch(/Day 1/);
+    expect(text).toContain("Belém");
+    expect(text).toContain("Now I'll plan each day's details");
+    expect(text).not.toContain("Skeleton preview");
 
-    const skeletonReadyIdx = text.indexOf("The outline is ready");
+    const skeletonReadyIdx = text.indexOf("Now I'll plan each day's details");
     const fillIdx = text.indexOf("Arranging Belém Tower");
     expect(skeletonReadyIdx).toBeGreaterThan(-1);
     expect(fillIdx).toBeGreaterThan(skeletonReadyIdx);
     expect(text).toContain("Your itinerary is ready.");
+  });
+
+  it("should_disable_send_while_fill_stream_open_then_enable_after_done", async () => {
+    let releaseDone: () => void = () => undefined;
+    const holdDone = new Promise<void>((resolve) => {
+      releaseDone = resolve;
+    });
+
+    authNdjsonEvents.mockImplementation(async (_url, _init, onEvent) => {
+      onEvent({ type: "phase", phase: "skeleton" });
+      onEvent({
+        type: "skeleton_day",
+        dayIndex: 1,
+        theme: "Belém",
+        itinerary: shellItinerary,
+        stops: [{ name: "Belém Tower", kind: "attraction" }],
+      });
+      onEvent({ type: "skeleton_done", itinerary: shellItinerary });
+      onEvent({ type: "phase", phase: "filling", dayIndex: 1, daysTotal: 1 });
+      await holdDone;
+      onEvent({ type: "done", itinerary: shellItinerary });
+    });
+
+    const { getByTestId } = renderWithLocale(<PlanPageClient />);
+    await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
+    await submitTakeoff(getByTestId);
+    await completeIntake(getByTestId);
+
+    await waitFor(() => {
+      const send = getByTestId("plan-nav-send") as HTMLButtonElement;
+      expect(send.disabled).toBe(true);
+    });
+
+    releaseDone();
+    await waitFor(() => {
+      const send = getByTestId("plan-nav-send") as HTMLButtonElement;
+      expect(send.disabled).toBe(false);
+    });
   });
 
   it("should_show_phase_making_during_skeleton_subphase", async () => {
@@ -741,7 +799,7 @@ describe.skip("TC-M19-40-03 assistant narrative thread order (Feature 41 Story 4
   });
 });
 
-describe.skip("TC-M19-40-04 filling main list skeleton stops (Feature 41 Story 4)", () => {
+describe("TC-M19-40-04 / TC-M23-S1 filling main list skeleton stops", () => {
   const shellItinerary = {
     title: "Lisbon",
     destination: "Lisbon",

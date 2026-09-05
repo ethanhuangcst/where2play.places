@@ -8,6 +8,7 @@ Product requirements live under `2play-specs/`. Architecture decisions live unde
 | Doc | Topic | Updated |
 |-----|--------|---------|
 | [next-env-css-mvp1.md](./next-env-css-mvp1.md) | Empty `SESSION_SECRET=` override; Tailwind + Google `@import` conflict | 2026-08-21 |
+| [vitest-db-wipe.md](./vitest-db-wipe.md) | Vitest inherited app `DATABASE_URL` → `deleteMany` wiped real users | 2026-09-04 |
 | [mvp1-quality-gate.md](./mvp1-quality-gate.md) | Coverage include scope, `make quality`, with_server reuse | 2026-08-21 |
 | [where2play-mvp1-close.md](./where2play-mvp1-close.md) | MVP-1 slice close notes + DoD confirmation | 2026-08-21 |
 | [identical-multiday-itinerary.md](./identical-multiday-itinerary.md) | 旧 N× `plan_itinerary` 同日复制；现 ADR-037 = discover + BFF OPENAI_CN + `usedNames` | 2026-08-23 |

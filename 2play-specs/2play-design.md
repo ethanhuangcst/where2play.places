@@ -863,7 +863,7 @@ Profile / Register 标签固定为 **出行兴趣（多选）**。Plan 块标题
 | g | 有没有特别想去的地点？ | 芯片 = fetch `candidates` 上 **`must_see`（热门，可 8 处）**；**等** discover+fetch 完成。用户手填 3 处写入 `mustInclude`，**不**把芯片改成只剩 3 处、也**不**回写抹掉池上 `must_see` |
 | h | 还有别的要求吗？例如有老人、有婴儿、有轮椅，请说明 | 无 |
 | i | 现在我了解您的要求了，让我帮您推荐适合的行程 | 本步触发 `make_itinerary`（非再问一题） |
-| j | 大致行程已经安排完毕，现在开始逐天逐行程安排细节 | fetch 骨架进对话之后 |
+| j | 现在开始为您规划每日行程细节，加入交通和餐厅，并更合理的调整行程细节 | fetch 骨架进对话之后、fill 开始时（**不要**再出「骨架预览」四字） |
 | k | `[目的地][天数][人数][类型]行程已规划完毕，告诉我你的想法，我可以再做调整` | fill `done` 之后 |
 
 **跳过交互：** 每步支持快捷「使用默认」或直接回车采用默认值；用户也可文字输入自定义。
@@ -906,7 +906,7 @@ Profile / Register 标签固定为 **出行兴趣（多选）**。Plan 块标题
 | `play.plan.confirm_replan_confirm` | Start over | 重新开始 |
 | `play.plan.confirm_replan_cancel` | Keep planning | 继续规划 |
 
-- 助手任何一步都可被终止（discover / make_itinerary / plan_next_stop 中均可中断）。
+- 助手任何一步都可被终止（discover / make_itinerary 中可中断）。**Fill 进行中发送键禁用**（§4.11），用户不能中途喊停；仅失败中断。
 
 ### 4.4 渐进行程展示 — 骨架 + 逐 stop
 
@@ -948,7 +948,7 @@ Profile / Register 标签固定为 **出行兴趣（多选）**。Plan 块标题
 | `play.plan.constraint_hotel` … `play.plan.constraint_other` | constraints 面板标签（§4.2.1） |
 | `play.plan.assistant_use_default` | 「使用默认」快捷 |
 | `play.plan.assistant_defaults_hint` | 默认值提示（如「默认：适中」） |
-| `play.plan.skeleton_preview_title` | 骨架预览标题 |
+| `play.plan.skeleton_preview_title` | **不再展示**（批次 23：助手消息去掉「骨架预览」；列表可无标题） |
 | `play.plan.stop_filling` | stop 填充中提示 |
 | `play.plan.nav_resize` | 拉手 a11y label「拖动调整助手尺寸」 |
 | `play.plan.nav_collapse` | 「收起」 |
@@ -1174,7 +1174,7 @@ flowchart TD
 | **4（本切片）** | make + fetch 骨架；thread 进度（0.1s）+ 标题 + 骨架卡 | fill / `plan_next_stop`；stay-only 当成功；写信封当骨架 |
 | **5** | 步骤 b 目的地内 `search_places`；未命中重输/忽略 | 无城市酒店 geocode；AMAP 澳门点当「找不到」 |
 
-**Story 5 顺序：** 非空 b → BFF `search_places(query, address=目的地)` → 80km 内命中则 PATCH + session origin；未命中 422 + 重输/忽略。空 b 不搜。`plan-skeleton-only` / `plan-skeleton-fill` **不得**再对酒店名无城市 geocode。供应商失败只传 name。agent 硬闸见 ADR-048 / F83。
+**Story 5 / S7 顺序：** 非空 b → geocode 目的地 → `search_places(query, near=目的地坐标)`（可带 address）→ 仅留 ≤80km 有坐标卡，最多 3。**自动前进**仅当用户输入每个 token 被结果名覆盖（包含或品牌别名：凯悦↔Hyatt）；例 `凯悦`+`Hyatt Regency Lisbon` → hit。`湖滨凯悦`+里斯本凯悦 → **停在 b**，返回 `origin_candidates`，助手列 A/B/C（i18n），可重输或空 Send。无卡/全远 → 停在 b，`intake_origin_not_found`（`{destination}` `{query}`）。空 Send / 忽略 = **无酒店名**，`originLat/Lng` = **目的地 geocode**。禁止 silent degraded。A/B/C 的 `__origin_pick__:N` 仅作 intake 芯片值；确认后 `dailyStart` / 约束条 / stay / make origin **必须**是候选店名（或 `origin_name`），禁止把 chip token 写入行程或刷新后的 session。
 
 **Story 1 组件（沿用，不新皮肤）：** `PlanTakeoffForm`、`PlanAssistantNav`、`PlanConstraintsPanel`。约束 `dd` 未答用 `play.plan.constraint_pending`；必去格 `data-testid="constraint-must-see"`。
 
@@ -1182,9 +1182,45 @@ flowchart TD
 
 **Story 2 顺序：** CTA 同时打开助手与静默 JSON discover；步骤 g `POST /api/plan/candidates` → agent `fetch_trip_details`（不复用 CTA 信封）。
 
-**Story 4 顺序：** intake+discover 完成后 `POST /api/plan` 带 `mode: "skeleton"`（make-only）。BFF：`make_itinerary` → `fetch_trip_details` `fields: ["skeleton"]` → NDJSON `phase: skeleton` / `skeleton_done`（载荷来自 fetch 切片）。UI：know_enough + planning 文案 + `plan-make-elapsed`；成功后 headline 再 `plan-thread-skeleton`。**不**调用 fill。`prefers-reduced-motion` 仍适用。
+**Story 4 骨架：** `mode: "skeleton"` make + fetch，`plan-thread-skeleton`，**当时不 fill**（签收已通）。**Fill** 见 §4.11（批次 23）：骨架后同一会话继续 `plan_next_stop` 循环。
+
+**F85 骨架餐档（agent Feature 85）：** fetch 餐站只有 `kind=meal` + `meal_slot`，`name` 为 slot id。预览展示 `t("play.plan.meal_slot_lunch"|…)`，不展示餐馆店名。本切片**不** `plan_next_stop` 搜餐（F86）。
+
+**F86：** 邻站搜餐基础仍在 agent；产品 fill 见 **§4.11**（批次 23）。Story 4 骨架切片不 fill；**下一故事接线 fill**。
+
+### 4.11 规划行程细节（MVP-23 fill）
+
+**真源：** agent [§25](../../1.places-agent/agent-specs/agent-design.md) · refactor-plan 批次 23。BFF 无规划 LLM。
+
+**管线：** `skeleton_done` → 助手步 j（无「骨架预览」）→ 按日：`第 {n} 天 - {theme}` → 对每个非 stay 骨架站：`plan_next_stop` → `fetch_trip_details`（`filled` / 当日切片）→ 助手一行 + 主区加 slot → 日尽 → 全部日尽 → 步 k。酒店 stay 为 00「从 {酒店} 出发」，填站从 01 起。
+
+**助手逐站（i18n 拼装，CN 时刻 24h）：**
+
+```
+01. {start}，从{prev}出发，前往{next}
+交通：{留下的模式并列，如 电车 35min，或 打车 15min}
+建议游览时间：{dwell} min
+```
+
+主区与助手 **同一 fetch slot**，结构仍 §3.5.2 / mock `06-plan-skeleton.html`。
+
+**发送键：** fill 完成前 `plan-nav-send` disabled。失败：当天停、已填行保留、键恢复、outcome key。
+
+**禁止：** 用 `plan_next_stop` 信封当真源；2play 调 HTTP `patch_trip` 插餐；把打卡串合成一个 UI stop。
+
+**S4 / F91：** 骨架站除 name 外带 `provider` + `native_id`（从池抄）。`plan_next_stop` 的 current/next 带编号；坐标由 agent 读池，2play 也可抄 `location`。单景点日主区两行同名（上午/下午 i18n）。交通行不展示 >45 步行 / >120 公交打车。餐必须落店（无 skip）。
+
+**S5 / F92：** 首站 stay 文案为 **起点**（i18n `play.plan.origin_stop`），可带地点名；有 intake origin 用其坐标，无则城市 geocode。第一站 **池景点** 在 stay **之后**，须算路并展示 ≤45/120 交通。餐搜圆心用当天景点卡坐标（agent 侧），非酒店。
+
+**S6B：** 日游午餐贴上一景点；搜环 800m→2km→**5km**；命中距圆心 >5km 丢掉（不再 80km）；禁止 stay 作午餐圆心/走廊终点。
+
+**S7：** 起点确认见 Story 5 / S7；空发送起点=城市坐标。
+
+**S8：** 单景点日 stay→上午→lunch→下午→dinner（F61 不插午餐到景点前）。午餐圆心=景点；5km 空可再搜 cafe；仍空留槽。晚餐可用酒店附近 ≤5km。
+
 
 ---
+
 
 ## 相关文档
 

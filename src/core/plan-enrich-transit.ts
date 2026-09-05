@@ -1,4 +1,5 @@
 import type { PlanBoundaries } from "./itinerary-types";
+import { originFromPlanCriteria } from "./plan-agent-body";
 import { enrichArrangeTransit, geocode as agentGeocode } from "../places-agent/client";
 import type { AgentEnvelope, GeocodeResult } from "../places-agent/client";
 import type { ArrangeDayLlmResult, ScheduleCandidatePools } from "./plan-arrange-llm";
@@ -48,9 +49,8 @@ export async function enrichArrangedDay(input: {
   locale: string;
   candidates: ScheduleCandidatePools;
 }): Promise<ArrangeDayLlmResult> {
-  const originName = input.criteria.dailyStart
-    ? input.criteria.dailyStart
-    : input.criteria.destination;
+  const originName =
+    originFromPlanCriteria(input.criteria)?.name ?? input.criteria.destination;
   const destinationName = input.criteria.dailyEnd
     ? input.criteria.dailyEnd
     : input.criteria.destination;

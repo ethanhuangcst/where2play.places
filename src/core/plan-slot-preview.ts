@@ -1,4 +1,5 @@
 import type { SlotPreviewPayload } from "./itinerary-map";
+import { skeletonStopLabel } from "./meal-slot-label";
 
 type PreviewT = (key: string, vars?: Record<string, string>) => string;
 
@@ -43,7 +44,7 @@ export function previewForSkeletonStop(
         : "lunch";
     return {
       kind: "meal",
-      name: stop.name,
+      name: skeletonStopLabel(stop, t),
       reason,
       window: "…",
       mealLabel,
@@ -59,17 +60,35 @@ export function previewForSkeletonStop(
 
 export function previewForTransitLeg(
   toName: string,
-  legs: Array<{ mode?: string; duration_min?: number }> | undefined,
+  legs: Array<{ mode?: string; duration_min?: number; recommended?: boolean }> | undefined,
   t: PreviewT,
 ): SlotPreviewPayload {
-  const durationMin = legs?.reduce((sum, leg) => sum + (leg.duration_min ?? 0), 0);
-  const window = durationMin ? `~${durationMin} min` : "…";
-  const mode = legs?.[0]?.mode ?? "transit";
+  if (!legs?.length) {
+    return {
+      kind: "transit",
+      name: toName,
+      reason: t("play.plan.transit_directions"),
+      window: "…",
+      transportLabel: "transit",
+    };
+  }
+  const lines = legs.map((leg) => {
+    const mode = leg.mode ?? "transit";
+    const modeLabel = t(`play.plan.transit.mode.${mode}`);
+    const minutes = leg.duration_min != null ? String(leg.duration_min) : "?";
+    return t("play.plan.transit.line", { mode: modeLabel, minutes });
+  });
+  const or = t("play.plan.transit.or");
+  const joined =
+    lines.length === 1
+      ? lines[0]!
+      : lines.join(t("play.plan.transit.options_join", { or }));
+  const primary = legs.find((l) => l.recommended) ?? legs[0]!;
   return {
     kind: "transit",
     name: toName,
     reason: t("play.plan.transit_directions"),
-    window,
-    transportLabel: mode,
+    window: primary.duration_min != null ? `~${primary.duration_min} min` : "…",
+    transportLabel: joined,
   };
 }

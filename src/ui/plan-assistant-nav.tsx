@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useT } from "@/src/i18n/use-t";
 import { budgetOptionLabel, normalizeBudgetKey } from "@/src/core/plan-budget";
 import { collapseSkeletonPreviewDays } from "@/src/core/plan-skeleton-preview";
+import { skeletonStopLabel } from "@/src/core/meal-slot-label";
 import {
   INTAKE_DEFAULT_I18N,
   INTAKE_DEFAULT_VALUES,
@@ -34,6 +35,8 @@ type Props = {
   currentStep: IntakeStepId | null;
   answers: IntakeAnswers;
   intakeComplete: boolean;
+  /** True while plan NDJSON stream is in flight after intake (disable send). */
+  fillingLocked?: boolean;
   skeletonDays: SkeletonPreviewDay[];
   statusLines: string[];
   suggestedMustSee?: string[];
@@ -42,6 +45,8 @@ type Props = {
   onOpen: () => void;
   onClose: () => void;
   originNotFound?: boolean;
+  originCandidates?: Array<{ name: string }>;
+  originQuery?: string;
   onRetryOrigin?: () => void;
   onAnswer: (step: IntakeStepId, value: string) => void | Promise<boolean | void>;
   onTerminate: () => void;
@@ -59,12 +64,15 @@ export function PlanAssistantNav({
   currentStep,
   answers,
   intakeComplete,
+  fillingLocked = false,
   skeletonDays,
   statusLines,
   suggestedMustSee,
   mustSeeLoading,
   makeElapsedSeconds,
   originNotFound,
+  originCandidates,
+  originQuery,
   onRetryOrigin,
   onOpen,
   onClose,
@@ -186,7 +194,10 @@ export function PlanAssistantNav({
         ? t(INTAKE_DEFAULT_I18N[activeStep])
         : undefined;
   const quickChips = activeStep
-    ? intakeQuickChips(activeStep, t, suggestedMustSee, { originNotFound })
+    ? intakeQuickChips(activeStep, t, suggestedMustSee, {
+        originNotFound,
+        originCandidates,
+      })
     : [];
 
   const railPct = intakeComplete
@@ -289,9 +300,23 @@ export function PlanAssistantNav({
                     ) : null}
                   </p>
                 ) : null}
+                {originCandidates?.length ? (
+                  <p className="msg-group__line" data-testid="plan-origin-candidates">
+                    {t("play.plan.intake_origin_candidates", {
+                      destination: takeoff.destination.trim() || "—",
+                      list: originCandidates
+                        .slice(0, 3)
+                        .map((c, i) => `${String.fromCharCode(65 + i)} - ${c.name}`)
+                        .join(", "),
+                    })}
+                  </p>
+                ) : null}
                 {originNotFound ? (
                   <p className="msg-group__line" data-testid="plan-origin-not-found">
-                    {t("play.plan.intake_origin_not_found")}
+                    {t("play.plan.intake_origin_not_found", {
+                      destination: takeoff.destination.trim() || "—",
+                      query: (originQuery ?? "").trim() || "—",
+                    })}
                   </p>
                 ) : null}
               </div>
@@ -355,7 +380,6 @@ export function PlanAssistantNav({
 
               {skeletonDays.length > 0 ? (
                 <div className="plan-nav__skeleton" data-testid="plan-thread-skeleton">
-                  <p className="skeleton-preview-title">{t("play.plan.skeleton_preview_title")}</p>
                   {collapseSkeletonPreviewDays(skeletonDays).map((day) => (
                     <div key={day.dayIndex} className="skeleton-day">
                       {day.theme ? <p className="skeleton-day__theme">{day.theme}</p> : null}
@@ -366,11 +390,11 @@ export function PlanAssistantNav({
                         >
                           <span className="skeleton-stop__idx">{String(idx).padStart(2, "0")}</span>
                           <span className="skeleton-stop__name">
-                            {stop.kind === "stay_origin"
-                              ? t("play.plan.depart_from_stay", { name: stop.name })
-                              : stop.name}
+                            {skeletonStopLabel(stop, t)}
                           </span>
-                          {stop.mealSlot ? <span className="skeleton-stop__slot">{stop.mealSlot}</span> : null}
+                          {stop.mealSlot ? (
+                            <span className="skeleton-stop__slot">{skeletonStopLabel(stop, t)}</span>
+                          ) : null}
                           {stop.pending ? (
                             <span className="skeleton-stop__slot">{t("play.plan.stop_filling")}</span>
                           ) : null}
@@ -405,7 +429,7 @@ export function PlanAssistantNav({
             ) : null}
           </div>
 
-          {!intakeComplete && activeStep ? (
+          {(!intakeComplete && activeStep) || intakeComplete ? (
             <form className="chat-composer plan-nav__composer" onSubmit={submitAnswer}>
               <label className="sr-only" htmlFor="nav-input">
                 {t("play.chat.input_label")}
@@ -417,12 +441,17 @@ export function PlanAssistantNav({
                 data-testid="plan-nav-input"
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
+                disabled={fillingLocked}
               />
               <button
                 className="btn"
                 type="submit"
                 data-testid="plan-nav-send"
-                disabled={sending || (activeStep === "g" && Boolean(mustSeeLoading))}
+                disabled={
+                  fillingLocked ||
+                  sending ||
+                  (activeStep === "g" && Boolean(mustSeeLoading))
+                }
               >
                 {t("play.chat.send")}
               </button>

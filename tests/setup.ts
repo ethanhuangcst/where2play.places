@@ -1,5 +1,6 @@
 import { execSync } from "node:child_process";
 import { beforeEach, vi } from "vitest";
+import { assertSafeTestDatabaseUrl } from "./helpers/test-database-url";
 
 vi.mock("server-only", () => ({}));
 
@@ -31,11 +32,14 @@ export function getTestCookie(name: string): string | undefined {
 }
 
 async function resetDb() {
+  assertSafeTestDatabaseUrl(process.env.DATABASE_URL ?? "");
   await prisma.planSessionCache.deleteMany();
   await prisma.passwordResetToken.deleteMany();
   await prisma.interestProfile.deleteMany();
   await prisma.user.deleteMany();
 }
+
+assertSafeTestDatabaseUrl(process.env.DATABASE_URL ?? "");
 
 execSync("npx prisma migrate deploy", {
   stdio: "pipe",
