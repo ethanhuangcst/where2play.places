@@ -39,7 +39,7 @@ function encodeNdjson(event: PlanProgressEvent | SkeletonPlanProgressEvent): Uin
 function planStream(
   criteria: PlanBoundaries,
   locale: string,
-  providers: string[],
+  providers?: string[],
 ): AsyncGenerator<PlanProgressEvent | SkeletonPlanProgressEvent> {
   if (criteria.planMode === "skeleton") {
     return planItinerarySkeletonOnly(criteria, { locale, providers });
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
     originLng:
       typeof parsed.value.originLng === "number" ? parsed.value.originLng : prev.originLng,
   };
-  const providers = providersForDestinationText(criteria.destination);
+  const providers = providersForDestinationText(criteria.destination) ?? undefined;
   const stream = request.headers.get("accept")?.includes("application/x-ndjson");
 
   let ledger: PlanLedger = {

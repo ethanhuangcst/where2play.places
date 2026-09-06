@@ -597,7 +597,7 @@ describe("make failure fetch recovery (TC-M19-78-02)", () => {
     expect(events.some((e) => e.type === "error")).toBe(false);
   });
 
-  it("should_error_phase_make_timeout_when_make_fails_and_fetch_stay_only", async () => {
+  it("should_error_make_failed_when_make_fails_and_fetch_stay_only", async () => {
     vi.spyOn(client, "makeItinerary").mockResolvedValue({
       agent: "places-agent",
       ok: false,
@@ -624,8 +624,38 @@ describe("make failure fetch recovery (TC-M19-78-02)", () => {
     }
 
     const err = events.find((e) => e.type === "error");
-    expect(err).toEqual({ type: "error", key: "play.plan.phase_make_timeout" });
+    expect(err).toEqual({ type: "error", key: "errors.make_itinerary_failed" });
     expect(events.some((e) => e.type === "skeleton_done")).toBe(false);
+  });
+
+  it("should_error_phase_make_timeout_when_make_aborts", async () => {
+    vi.spyOn(client, "makeItinerary").mockResolvedValue({
+      agent: "places-agent",
+      ok: false,
+      outcome: { key: "play.plan.phase_make_timeout" },
+    });
+    vi.spyOn(client, "fetchTripDetails").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: {
+        trip_id: "t1",
+        revision: 2,
+        data: {
+          skeleton: { days: [{ day_index: 1, stops: [{ name: "Hotel", kind: "stay" }] }] },
+        },
+      },
+    });
+
+    const events: SkeletonPlanProgressEvent[] = [];
+    for await (const ev of planItinerarySkeletonFill(
+      { destination: "Lisbon", days: 1, startDate: "2026-10-10" },
+      { locale: "EN", providers: ["GOOGLE_MAPS"] },
+    )) {
+      events.push(ev);
+    }
+
+    const err = events.find((e) => e.type === "error");
+    expect(err).toEqual({ type: "error", key: "play.plan.phase_make_timeout" });
   });
 
   it("should_pass_used_restaurant_names_after_first_meal (TC-M23-89)", async () => {

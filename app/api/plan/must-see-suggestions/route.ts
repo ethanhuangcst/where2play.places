@@ -32,7 +32,9 @@ export async function POST(request: NextRequest) {
     startDate,
     days,
     locale,
-    providers: providersForDestinationText(destination),
+    ...(providersForDestinationText(destination)?.length
+      ? { providers: providersForDestinationText(destination) }
+      : {}),
   });
 
   return NextResponse.json({ ok: true, suggestions });

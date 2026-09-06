@@ -61,7 +61,7 @@ function slimPool(places: unknown[], restaurants: unknown[]) {
  */
 export async function* planItinerarySkeletonOnly(
   criteria: PlanBoundaries,
-  opts: { locale: string; providers: string[] },
+  opts: { locale: string; providers?: string[] },
 ): AsyncGenerator<SkeletonPlanProgressEvent> {
   const t = (key: string, vars?: Record<string, string>) => catalogT(opts.locale, key, vars);
   let itinerary = emptyItinerary(criteria);

@@ -48,7 +48,9 @@ export async function POST(request: NextRequest) {
     startDate,
     days,
     locale,
-    providers: providersForDestinationText(destination),
+    ...(providersForDestinationText(destination)?.length
+      ? { providers: providersForDestinationText(destination) }
+      : {}),
     partySize: Number.isFinite(partySize) ? partySize : undefined,
     budget,
     max_number: Number.isFinite(maxNumber) ? maxNumber : 5,

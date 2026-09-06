@@ -1,6 +1,5 @@
 import "server-only";
 import { AGENT_ID } from "../core/locales";
-import { isChinaMainland } from "../core/region";
 import { placesAgentBaseUrl, placesAgentCallerKey } from "./config";
 
 export type AgentEnvelope<T = unknown> = {
@@ -64,8 +63,13 @@ async function postV1<T>(
   } catch (err) {
     const aborted =
       (err instanceof Error && err.name === "AbortError") || controller.signal.aborted;
-    const key =
-      aborted && tool === "arrange_day" ? "errors.arrange_timeout" : "errors.provider_failed";
+    const key = aborted
+      ? tool === "arrange_day"
+        ? "errors.arrange_timeout"
+        : tool === "make_itinerary"
+          ? "play.plan.phase_make_timeout"
+          : "errors.provider_failed"
+      : "errors.provider_failed";
     return { agent: AGENT_ID, ok: false, outcome: { key } };
   } finally {
     clearTimeout(timer);
@@ -160,20 +164,14 @@ export function defaultProviders(): string[] {
   return ["GOOGLE_MAPS"];
 }
 
-export function providersForPin(lat: number, lng: number): string[] {
-  if (isChinaMainland(lat, lng)) {
-    return ["AMAP", "GOOGLE_MAPS"];
-  }
-  return defaultProviders();
+export function providersForPin(_lat: number, _lng: number): string[] | undefined {
+  // ADR-052: omit providers[] — places-agent resolves by region.
+  return undefined;
 }
 
-/** Heuristic providers from free-text destination (no geocode round-trip). */
-export function providersForDestinationText(destination: string): string[] {
-  const text = destination.trim();
-  if (/[\u4e00-\u9fff]/.test(text) && !/台北|臺灣|台湾|香港|澳门|澳門/.test(text)) {
-    return ["AMAP", "GOOGLE_MAPS"];
-  }
-  return defaultProviders();
+/** @deprecated ADR-052 — never assemble CJK dual-source lists; always omit. */
+export function providersForDestinationText(_destination: string): string[] | undefined {
+  return undefined;
 }
 
 const DEFAULT_PLAN_TIMEOUT_MS = 120_000;

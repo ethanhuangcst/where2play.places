@@ -36,4 +36,24 @@ describe("TC-M10-46-10 plan-travel-tips", () => {
     fireEvent.click(toggle);
     expect(body.hidden).toBe(true);
   });
+
+  it("should_dedupe_iconic_places_so_list_keys_stay_unique", () => {
+    const { container } = renderWithLocale(
+      <PlanTravelTipsPanel
+        destination="大同"
+        startDate="2026-09-20"
+        days={3}
+        data={{
+          iconic_places: ["华严寺塔", "华严寺塔", "云冈石窟"],
+        }}
+        loading={false}
+        errorKey={null}
+      />,
+    );
+
+    const items = container.querySelectorAll(".travel-tips-must-see li");
+    expect(items).toHaveLength(2);
+    expect(items[0]?.textContent).toBe("华严寺塔");
+    expect(items[1]?.textContent).toBe("云冈石窟");
+  });
 });

@@ -119,7 +119,7 @@ export function buildPlanItineraryBody(
     destination,
     bounds: { start, end },
     locale: opts.locale,
-    providers: opts.providers,
+    ...(opts.providers?.length ? { providers: opts.providers } : {}),
     ...(criteria.partySize != null ? { party_size: criteria.partySize } : {}),
     ...(Object.keys(preferences).length ? { preferences } : {}),
   };
@@ -127,7 +127,7 @@ export function buildPlanItineraryBody(
 
 export function buildDiscoverPlacesBody(
   criteria: PlanBoundaries,
-  opts: { locale: string; providers: string[]; now?: Date },
+  opts: { locale: string; providers?: string[]; now?: Date },
 ): Record<string, unknown> {
   const { start, end } = boundsFromCriteria(criteria);
   const origin = originFromPlanCriteria(criteria) ?? { name: criteria.destination };
@@ -137,7 +137,7 @@ export function buildDiscoverPlacesBody(
     bounds: { start, end },
     origin,
     locale: opts.locale,
-    providers: opts.providers,
+    ...(opts.providers?.length ? { providers: opts.providers } : {}),
     numDays: Math.max(1, criteria.days),
     ...(criteria.mustInclude?.length ? { must_include: criteria.mustInclude } : {}),
   };
@@ -146,7 +146,17 @@ export function buildDiscoverPlacesBody(
 /** Intake-resolved origin, or name-only. Never geocode hotel without city. */
 export function originFromPlanCriteria(
   criteria: PlanBoundaries,
-): { name: string; lat?: number; lng?: number } | undefined {
+): { name: string; lat?: number; lng?: number; provider?: string; native_id?: string } | undefined {
+  const stay = criteria.originStay;
+  if (stay?.name?.trim() && typeof stay.lat === "number" && typeof stay.lng === "number") {
+    return {
+      name: stay.name.trim(),
+      lat: stay.lat,
+      lng: stay.lng,
+      ...(stay.provider ? { provider: stay.provider } : {}),
+      ...(stay.native_id ? { native_id: stay.native_id } : {}),
+    };
+  }
   const name = sanitizeDailyStartName(criteria.dailyStart);
   if (!name) return undefined;
   if (typeof criteria.originLat === "number" && typeof criteria.originLng === "number") {
@@ -159,9 +169,9 @@ export function buildMakeItineraryBody(
   criteria: PlanBoundaries,
   opts: {
     locale: string;
-    providers: string[];
+    providers?: string[];
     candidates: { places: unknown[]; restaurants: unknown[] };
-    origin?: { name: string; lat?: number; lng?: number };
+    origin?: { name: string; lat?: number; lng?: number; provider?: string; native_id?: string };
     tripId?: string;
     revision?: number;
   },
@@ -176,7 +186,7 @@ export function buildMakeItineraryBody(
     numDays: Math.max(1, criteria.days),
     candidates: opts.candidates,
     locale: opts.locale,
-    providers: opts.providers,
+    ...(opts.providers?.length ? { providers: opts.providers } : {}),
     origin,
     ...(pace ? { pace } : {}),
     ...(budget ? { budget } : {}),
@@ -190,7 +200,7 @@ export function buildArrangeDayBody(
   criteria: PlanBoundaries,
   opts: {
     locale: string;
-    providers: string[];
+    providers?: string[];
     dayIndex: number;
     date: string;
     candidates: { places: unknown[]; restaurants: unknown[] };
@@ -221,7 +231,7 @@ export function buildArrangeDayBody(
     origin,
     destination,
     locale: opts.locale,
-    providers: opts.providers,
+    ...(opts.providers?.length ? { providers: opts.providers } : {}),
     ...(pace ? { pace } : {}),
     ...(budget ? { budget } : {}),
     ...(criteria.partySize != null ? { party_size: criteria.partySize } : {}),

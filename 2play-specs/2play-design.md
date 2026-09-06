@@ -256,7 +256,7 @@ App DB ← User, InterestProfile, SavedItinerary + ItineraryChatMessage (commit 
 1. requireUser + CSRF
 2. Zod 校验 PlanBoundaries（目的地*、天数* 1–14、起始日期* `YYYY-MM-DD`；可选人数/类型/预算/节奏/交通/起终点/时段/兴趣/限制）
 3. 读 InterestProfile（若表单未带兴趣，可用作默认 chips）
-4. providers[]: caller-driven（大陆倾向 ["AMAP","GOOGLE_MAPS"]；海外 ["GOOGLE_MAPS"]；ADR-005）
+4. providers[]: **省略**（[ADR-052](../../workspace-specs/adr/ADR-052-map-provider-routing.md)）；agent 按区选择。禁止 BFF 汉字双源。大陆 discover **不得**扩 Google。
 5. Phase Discover — POST places-agent /v1/discover_places（numDays = N；locale；city；bounds 自 startDate）
      - Accept: application/x-ndjson → 每找到一个 POI 推一条 candidate
      - BFF 转发给浏览器：同态 slot 预览（见 §3.5.2 / §3.5.5）
@@ -510,7 +510,7 @@ type ChatMessage = {
 | `/login` | `03-login.html` | email/password | `login-submit` | account-02 |
 | `/reset-password` | `04-reset.html` | 发信 / sent | `reset-sent` | account-03 |
 | `/set-password` | `05-set-password.html` | 新密码 | — | account-04 |
-| `/plan` | `06-plan.html`；`06-plan-skeleton.html`；`06-plan-qa.html` | 起飞条 5 字段、骨架填充、助手问答、place sheet（Travor §4.7–§4.8） | `plan-form`, `plan-dest`, `plan-start-date`, `plan-days`, `plan-party`, `plan-budget`, `plan-submit`, `plan-constraints`, `plan-travel-tips`, `plan-nav`, `stop-detail-open`, `stop-map-open`, `place-sheet`, `place-sheet-map`, `replan-dialog`, … | plan-46 |
+| `/plan` | `06-plan.html`；`06-plan-skeleton.html`；`06-plan-fill-timeline.html`；`06-plan-qa.html` | 起飞条、骨架/fill 助手 spine、问答、place sheet（Travor §4.7；助手 SoT=`06-plan-fill-timeline`） | `plan-form`, `plan-dest`, `plan-start-date`, `plan-days`, `plan-party`, `plan-budget`, `plan-submit`, `plan-constraints`, `plan-travel-tips`, `plan-nav`, `plan-thread-skeleton`, `plan-thread-fill-timeline`, `stop-detail-open`, `stop-map-open`, `place-sheet`, `place-sheet-map`, `replan-dialog`, … | plan-46 |
 | `/profile` | `07-profile.html` | 单列用户资料（含兴趣） | `profile-save`, `profile-nationality` | profile-01, profile-03 |
 | `/saved` | `08-saved.html` | 行程卡网格 | `trip-card`（实现时加） | saved-01 |
 | `/saved/[id]` | `09-saved-detail.html` | constraints + tips + Day/Hour（同 Plan 完成态）+ place sheet | `stop-detail-open`, `place-sheet`, `plan-export` | saved-02, plan-46 |
@@ -696,10 +696,10 @@ Mock SoT（**已删除，历史参考**）：`06-plan-discover.html`（图1）�
 | **行程日提示** | `.plan-phase.is-busy` · `phase` arranging | 「正在安排第 d/N 天…」；钮 `.is-generating` | 用候选池统计替换日提示 |
 | **1 Discover** | `candidate_place` | 「正在搜索… 已找到 N 处」；`.slot--candidate`；表单 `.is-dimmed` | chip 主展示；等整包再刷 |
 | **2.0 Arrange 日初** | `arrange_day_start` · `day_highlights` | Day tabs 预建（未排日 `· 排队`）；Highlights 骨架；细节提示 `play.plan.arrange_planning_day`（尚无 `slot_preview` 时） | **`候选池 P/U` 作主文案**（`arrange_pool_summary` 默认隐藏） |
-| **2.1 细节提示** | `slot_preview` | `.plan-slot-preview`：按 kind 插值 `preview_place` / `preview_transit` / `preview_meal` | 整日同 tick 刷屏 |
+| **2.1 细节提示** | `slot_preview` | `.plan-slot-preview`：按 kind 插值 `preview_place` / `preview_transit` / `preview_meal`（**无**原因字段）；助手线程 **全日一条覆盖**（同句） | 助手堆叠多条 preview；入选/选择/推荐原因 |
 | **2.2 行程 + 加载中** | `slot` · pending | 每 `slot` +1 行；底栏 `plan-slot-pending` **同构 skeleton**（非虚线框） | 等整天 JSON 再整日替换 |
 | **2.x 切日** | `day_done` | 自动高亮下一日 tab，重复 2.0–2.2 | 须手动点 tab 才继续 |
-| **完成态** | `done` | Updated；无候选主面板 / 无 pending | — |
+| **完成态** | `done` | Updated；无候选主面板 / 无 pending；助手去掉进行中行，仅留 `assistant_plan_complete` | 完成后仍留 preview 堆 |
 
 **再生成：** 再次「生成行程」时立即清空中部行程，再进入 progressive。
 
@@ -962,7 +962,13 @@ Profile / Register 标签固定为 **出行兴趣（多选）**。Plan 块标题
 | `play.plan.assistant_making` | 正在排大致行程（等 make） |
 | `play.plan.assistant_filling_stop` | 正在安排第 {name} 站（含交通） |
 | `play.plan.phase_making` | 主区 `plan-phase`：正在生成骨架 |
-| `play.plan.phase_make_timeout` | make 失败且 fetch 无骨架 |
+| `play.plan.phase_make_timeout` | make abort/超时（非泛失败） |
+| `play.plan.preview_place` | 正在加入行程：{name}，预计游览时间：{window}（**无**入选原因） |
+| `play.plan.preview_transit` | 正在安排下一段行程的交通：{label}，预计耗时：{duration}（**无**选择原因） |
+| `play.plan.preview_meal` | 正在安排{meal}，推荐：{name}，预计用餐时间：{window}（**无**推荐原因） |
+| `play.plan.kind_stay` / `kind_attraction` | 站类型标签（勿裸露 STAY/ATTRACTION） |
+| `play.plan.meal_slot_lunch` / `dinner` / `afternoon_tea` | 餐档标签（MEAL 须分档） |
+| `play.plan.composer_locked_fill` | fill/discover/make 进行中 composer placeholder |
 
 ### 4.7 UI 视觉（Frontend Design 确认稿，2026-08-31 — Travor 皮肤定稿）
 
@@ -1009,7 +1015,7 @@ Profile / Register 标签固定为 **出行兴趣（多选）**。Plan 块标题
 
 **出行小贴士（`plan-travel-tips`）：** 四卡 grid；visa 链 + hover popover；`plan-travel-tips-toggle` 折叠。数据来自 **`fetch_trip_details` `artifacts`**（写路径：`travel_tips` / `visa_requirement` 各至多一次）。`iconic_places` 与助手步骤 g 芯片同一有序数组。完整面板仅 `planning`/`done` 展示；intake 可写 tips 后 fetch iconic。禁止用 `inferred_must_see` merge。禁止用 tips/visa HTTP 体或 OPENAI_CN 散文填卡。MVP-11 前 visa 可静态占位。
 
-**Stop 行（`.slot`）：** 见 §4.8；`.slot-actions` 仅非 transit；缩略图 `slot-thumb-link` 可链地图或打开 sheet（实现二选一，mock 默认 thumb 链 `#`）。
+**Stop 行（`.slot`）：** 见 §4.8；`.slot-actions` 仅非 transit；缩略图 **1:1**（24-P0-ui-C）；点击 thumb 或详情打开 place sheet；地图新标签。
 
 **重提交/终止弹窗：** 沿用 `.dialog`；文案 §4.3 i18n（4 key）。
 
@@ -1037,7 +1043,7 @@ Profile / Register 标签固定为 **出行兴趣（多选）**。Plan 块标题
 
 | 区块 | 来源 |
 | --- | --- |
-| 事实字段 | BFF → agent `get_place_details`（place_id / name+latlng）；或 trip filled 已带富信息则优先 |
+| 事实字段 | BFF → agent `get_place_details`（**槽位** `provider` + `native_id` + UI locale）；或 trip filled 已带富信息则优先。不换供应商。CJK 槽位名不被拉丁文详情覆盖（ADR-052 D9/D10）。 |
 | 行程上下文 | 当前 `ItinerarySlot`（dayIndex、start/end、summary） |
 | 如何到达 | 同 stop 前一条 `.slot--transit` / `legs_to_here` |
 | 地图 URL | vendor deep link（Google/AMAP 等）；无 key query |
@@ -1174,7 +1180,9 @@ flowchart TD
 | **4（本切片）** | make + fetch 骨架；thread 进度（0.1s）+ 标题 + 骨架卡 | fill / `plan_next_stop`；stay-only 当成功；写信封当骨架 |
 | **5** | 步骤 b 目的地内 `search_places`；未命中重输/忽略 | 无城市酒店 geocode；AMAP 澳门点当「找不到」 |
 
-**Story 5 / S7 顺序：** 非空 b → geocode 目的地 → `search_places(query, near=目的地坐标)`（可带 address）→ 仅留 ≤80km 有坐标卡，最多 3。**自动前进**仅当用户输入每个 token 被结果名覆盖（包含或品牌别名：凯悦↔Hyatt）；例 `凯悦`+`Hyatt Regency Lisbon` → hit。`湖滨凯悦`+里斯本凯悦 → **停在 b**，返回 `origin_candidates`，助手列 A/B/C（i18n），可重输或空 Send。无卡/全远 → 停在 b，`intake_origin_not_found`（`{destination}` `{query}`）。空 Send / 忽略 = **无酒店名**，`originLat/Lng` = **目的地 geocode**。禁止 silent degraded。A/B/C 的 `__origin_pick__:N` 仅作 intake 芯片值；确认后 `dailyStart` / 约束条 / stay / make origin **必须**是候选店名（或 `origin_name`），禁止把 chip token 写入行程或刷新后的 session。
+**Story 5 / S7 顺序（ADR-053）：** 非空 b → geocode 目的地 → `search_places(query=去括号核心名, near=目的地坐标, address=目的地)`，**省略** `providers[]`（ADR-052）→ 仅留 ≤80km 有坐标、住宿合格卡，最多 3。**自动前进**仅当用户输入每个 token 被结果名覆盖（包含或品牌别名：凯悦↔Hyatt）；例 `凯悦`+`Hyatt Regency Lisbon` → hit。`湖滨凯悦`+里斯本凯悦 → **停在 b**，返回 `origin_candidates`，助手列 A/B/C（i18n），可重输或空 Send。无卡/全远 → 停在 b，`intake_origin_not_found`。空 Send / 忽略 = **无酒店名**，`originLat/Lng` = **目的地 geocode**，无 `originStay` 店卡。禁止 silent degraded。
+
+**`originStay`（session + trip constraints）：** `{ name, lat, lng, provider, native_id, photos?[0] }`。`OriginCard` / hit 须带 `provider` + `sources[].native_id`（及可选已解析 `photos`）。确认后 `dailyStart` / 约束条 / stay / make origin **必须**是候选店名；骨架与 fill **只抄**指针；A/B/C 的 `__origin_pick__:N` 禁止写入行程。
 
 **Story 1 组件（沿用，不新皮肤）：** `PlanTakeoffForm`、`PlanAssistantNav`、`PlanConstraintsPanel`。约束 `dd` 未答用 `play.plan.constraint_pending`；必去格 `data-testid="constraint-must-see"`。
 
@@ -1192,21 +1200,31 @@ flowchart TD
 
 **真源：** agent [§25](../../1.places-agent/agent-specs/agent-design.md) · refactor-plan 批次 23。BFF 无规划 LLM。
 
-**管线：** `skeleton_done` → 助手步 j（无「骨架预览」）→ 按日：`第 {n} 天 - {theme}` → 对每个非 stay 骨架站：`plan_next_stop` → `fetch_trip_details`（`filled` / 当日切片）→ 助手一行 + 主区加 slot → 日尽 → 全部日尽 → 步 k。酒店 stay 为 00「从 {酒店} 出发」，填站从 01 起。
+**管线：** `skeleton_done` → 助手步 j（无「骨架预览」）→ 按日：`第 {n} 天 - {theme}` → 对每个非 stay 骨架站：`plan_next_stop` → `fetch_trip_details`（`filled` / 当日切片）→ 主区加 slot；助手 **覆盖** 全日唯一进行中行（与 `.plan-slot-preview` 同句）→ 日尽 → 全部日尽 → 步 k。酒店 stay 为 00「从 {酒店} 出发」，填站从 01 起。
 
-**助手逐站（i18n 拼装，CN 时刻 24h）：**
+**助手 fill 进度（24-P0-ui-A，i18n；无原因字段）：**
 
 ```
-01. {start}，从{prev}出发，前往{next}
-交通：{留下的模式并列，如 电车 35min，或 打车 15min}
-建议游览时间：{dwell} min
+正在加入行程：{name}，预计游览时间：{window}
+正在安排下一段行程的交通：{label}，预计耗时：{duration}
+正在安排{meal}，推荐：{name}，预计用餐时间：{window}
 ```
 
-主区与助手 **同一 fetch slot**，结构仍 §3.5.2 / mock `06-plan-skeleton.html`。
+整趟 fill **只保留最新一条**；`done` 后清除进行中行，仅留 `assistant_plan_complete`。
 
-**发送键：** fill 完成前 `plan-nav-send` disabled。失败：当天停、已填行保留、键恢复、outcome key。
+**助手完成态时间线（24-P0-ui-B）：** 助手线程用 **route-spine** UI（真源 mock `ui-mockup/06-plan-fill-timeline.html`）。
 
-**禁止：** 用 `plan_next_stop` 信封当真源；2play 调 HTTP `patch_trip` 插餐；把打卡串合成一个 UI stop。
+- **骨架预览：** 同 spine 组件；仅日主题 + 站珠（起点 / 景点 / 午餐|晚餐 + 店名）；**无**「出发前往下一站」、**无**交通模式芯片、**无**到站/停留。
+- **Fill 细节：** 同 spine；站间为 `{time} 出发前往下一站` + 模式耗时芯片；站上显示到站时间与停留分钟。真源 `fetch` `filled` / 当日切片。
+- **Chrome：** 助手 thread 内 `msg-group--agent` **无白底卡片、无左侧绿条**（透出面板暖底）；`statusLines` 仅散文进度（全日一条 cover + 完成句），不把时间线拆成纯文字堆叠。
+
+**主区完成态（24-P0-ui-C）：** fill `done` 后当日列表 **仅**已填 slot（+ transit）；**无**日底骨架清单、**无**残留 `.plan-slot-preview`。`.slot-thumb` **1:1**；有 `photoUrl` 显示供应商图；点击缩略图或详情打开 `place-sheet`；地图新标签。
+
+主区与助手进度句 **同一 `slot_preview` 字符串**；主区已填 slot 结构仍 §3.5.2 / mock `06-plan-skeleton.html`（主区不改 spine）。
+
+**发送键：** 自首次 agent 等待（discover / make / fill 流）起，`plan-nav-input` + `plan-nav-send` disabled（`aria-disabled`）；placeholder 用 `composer_locked_fill`。失败或完成后恢复。失败：当天停、已填行保留、键恢复、outcome key。
+
+**禁止：** 用 `plan_next_stop` 信封当真源；2play 调 HTTP `patch_trip` 插餐；把打卡串合成一个 UI stop；助手堆叠多条 preview；用户可见句含入选/选择/推荐原因。
 
 **S4 / F91：** 骨架站除 name 外带 `provider` + `native_id`（从池抄）。`plan_next_stop` 的 current/next 带编号；坐标由 agent 读池，2play 也可抄 `location`。单景点日主区两行同名（上午/下午 i18n）。交通行不展示 >45 步行 / >120 公交打车。餐必须落店（无 skip）。
 

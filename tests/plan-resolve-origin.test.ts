@@ -80,12 +80,64 @@ describe("pickOriginCardNearCity (TC-M21-41-21)", () => {
     );
   });
 
-  it("should_return_not_found_when_search_fails (S6A)", async () => {
+  it("should_hit_with_provider_native_id_and_strip_parens_query (ADR-053)", async () => {
+    const searchPlaces = vi.fn(async (input: { query: string }) => {
+      expect(input.query).not.toMatch(/钟楼|回民街/);
+      expect(input.query).toContain("凯悦逸扉酒店");
+      return {
+        ok: true as const,
+        data: [
+          {
+            name: "凯悦逸扉酒店(西安钟楼回民街店)",
+            location: { lat: 34.26, lng: 108.94 },
+            provider: "AMAP",
+            category: "酒店",
+            sources: [{ provider: "AMAP", native_id: "B000A87B" }],
+            photos: ["https://store.is.autonavi.com/photo.jpg"],
+          },
+          {
+            name: "西安钟楼",
+            location: { lat: 34.261, lng: 108.942 },
+            provider: "AMAP",
+            category: "风景名胜",
+            sources: [{ provider: "AMAP", native_id: "B000TOWER" }],
+          },
+        ],
+      };
+    });
     const r = await resolvePlanOrigin(
-      { query: "My Inn", destination: "里斯本", locale: "CN" },
+      { query: "凯悦逸扉酒店(西安钟楼回民街店)", destination: "西安", locale: "CN" },
       {
-        geocode: async () => ({ ok: true, data: LISBON }),
-        searchPlaces: async () => ({ ok: false }),
+        geocode: async () => ({ ok: true, data: { lat: 34.26, lng: 108.94 } }),
+        searchPlaces,
+      },
+    );
+    expect(r.kind).toBe("hit");
+    if (r.kind === "hit") {
+      expect(r.name).toContain("凯悦逸扉");
+      expect(r.provider).toBe("AMAP");
+      expect(r.native_id).toBe("B000A87B");
+      expect(r.photos?.[0]).toMatch(/^https:/);
+      expect(r.name).not.toBe("西安钟楼");
+    }
+  });
+
+  it("should_not_auto_hit_landmark_when_only_bell_tower_near_city (ADR-053)", async () => {
+    const r = await resolvePlanOrigin(
+      { query: "凯悦逸扉酒店(西安钟楼回民街店)", destination: "西安", locale: "CN" },
+      {
+        geocode: async () => ({ ok: true, data: { lat: 34.26, lng: 108.94 } }),
+        searchPlaces: async () => ({
+          ok: true,
+          data: [
+            {
+              name: "西安钟楼",
+              location: { lat: 34.261, lng: 108.942 },
+              category: "风景名胜",
+              sources: [{ provider: "AMAP", native_id: "B000TOWER" }],
+            },
+          ],
+        }),
       },
     );
     expect(r.kind).toBe("not_found");

@@ -53,6 +53,7 @@
       <p class="plan-mock-states" role="navigation" aria-label="Mock generate states">
         <a href="06-plan.html">起飞条</a>
         <a href="06-plan-skeleton.html" class="is-on">骨架填充</a>
+        <a href="06-plan-fill-timeline.html">填充时间线</a>
         <a href="06-plan-qa.html">助手问答</a>
       </p>
 
@@ -188,7 +189,7 @@
           <span class="plan-phase__meta" data-testid="plan-updated">骨架 14:31 · 填充中</span>
           <span class="plan-phase__msg">正在规划第 1/4 天 · 骨架已生成，逐站填充中…</span>
         </p>
-        <p class="plan-slot-preview" data-testid="plan-slot-preview">正在安排交通：Hills Hotel → 热罗尼莫斯修道院（电车约 35 分钟）</p>
+        <p class="plan-slot-preview" data-testid="plan-slot-preview">正在安排下一段行程的交通：公共交通 · 约 8 分钟，或 步行 · 约 8 分钟，或 驾车 · 约 15 分钟，预计耗时：~8 min</p>
 
         <!-- 骨架 → 逐站填充列表 -->
         <section class="panel" aria-labelledby="itin-title">
@@ -316,25 +317,61 @@
               <p class="msg-group__line">已为您生成里斯本 4 天 2 人 情侣出游的行程框架：</p>
             </div>
             <div class="msg-group msg-group--agent" data-testid="plan-thread-skeleton">
-              <div class="skeleton-day">
-                <p class="skeleton-day__theme">D1 · Belém 经典</p>
-                <p class="skeleton-stop"><span class="skeleton-stop__idx">00</span><span class="skeleton-stop__name">Hills Hotel Lisboa</span><span class="skeleton-stop__slot">起点</span></p>
-                <p class="skeleton-stop"><span class="skeleton-stop__idx">01</span><span class="skeleton-stop__name">贝伦塔</span></p>
-                <p class="skeleton-stop"><span class="skeleton-stop__idx">02</span><span class="skeleton-stop__name">热罗尼莫斯修道院</span></p>
-                <p class="skeleton-stop skeleton-stop--meal"><span class="skeleton-stop__idx">03</span><span class="skeleton-stop__name">Pastéis de Belém</span><span class="skeleton-stop__slot">午餐</span></p>
-              </div>
-              <div class="skeleton-day">
-                <p class="skeleton-day__theme">D2 · 老城 Alfama</p>
-                <p class="skeleton-stop"><span class="skeleton-stop__idx">01</span><span class="skeleton-stop__name">圣若热城堡</span></p>
-                <p class="skeleton-stop"><span class="skeleton-stop__idx">02</span><span class="skeleton-stop__name">阿尔法玛街区</span></p>
-              </div>
+              <!-- 24-P0-ui-B: route-spine（仅站点；样式见 mockup.css .fill-route / 06-plan-fill-timeline） -->
+              <section class="fill-route fill-route--skeleton" aria-label="行程骨架">
+                <header class="fill-route__day">
+                  <span class="fill-route__day-idx">D1</span>
+                  <p class="fill-route__day-theme">Belém 经典</p>
+                </header>
+                <ol class="fill-route__list">
+                  <li class="fill-leg fill-leg--origin">
+                    <div class="fill-leg__rail" aria-hidden="true"><span class="fill-leg__bead"></span></div>
+                    <div class="fill-leg__body">
+                      <div class="fill-stop__head"><span class="fill-stop__idx">00</span><span class="fill-stop__kind">起点</span></div>
+                      <p class="fill-stop__name">Hills Hotel Lisboa</p>
+                    </div>
+                  </li>
+                  <li class="fill-leg fill-leg--stop">
+                    <div class="fill-leg__rail" aria-hidden="true"><span class="fill-leg__bead"></span></div>
+                    <div class="fill-leg__body">
+                      <div class="fill-stop__head"><span class="fill-stop__idx">01</span><span class="fill-stop__kind">景点</span></div>
+                      <p class="fill-stop__name">贝伦塔</p>
+                    </div>
+                  </li>
+                  <li class="fill-leg fill-leg--stop">
+                    <div class="fill-leg__rail" aria-hidden="true"><span class="fill-leg__bead"></span></div>
+                    <div class="fill-leg__body">
+                      <div class="fill-stop__head"><span class="fill-stop__idx">02</span><span class="fill-stop__kind">景点</span></div>
+                      <p class="fill-stop__name">热罗尼莫斯修道院</p>
+                    </div>
+                  </li>
+                  <li class="fill-leg fill-leg--meal">
+                    <div class="fill-leg__rail" aria-hidden="true"><span class="fill-leg__bead"></span></div>
+                    <div class="fill-leg__body">
+                      <div class="fill-stop__head"><span class="fill-stop__idx">03</span><span class="fill-stop__kind">午餐</span></div>
+                      <p class="fill-stop__name">Pastéis de Belém</p>
+                    </div>
+                  </li>
+                </ol>
+              </section>
+            </div>
+            <!-- 24-P0-ui-A/B: 全日一条 fill 进度覆盖；composer 锁定 -->
+            <div class="msg-group msg-group--agent" data-testid="plan-thread-fill-progress">
+              <p class="msg-group__line" data-testid="plan-fill-cover-line">正在安排下一段行程的交通：公共交通 · 约 8 分钟，或 步行 · 约 8 分钟，或 驾车 · 约 15 分钟，预计耗时：~8 min</p>
             </div>
           </div>
         </div>
-        <form class="chat-composer" action="06-plan-skeleton.html" method="get">
+        <form class="chat-composer plan-nav__composer" action="06-plan-skeleton.html" method="get" aria-busy="true">
           <label class="sr-only" for="nav-input">Message</label>
-          <input id="nav-input" name="q" placeholder="填充完成后可继续调整…" data-testid="plan-nav-input" />
-          <button class="btn" type="submit" data-testid="plan-nav-send">发送</button>
+          <input
+            id="nav-input"
+            name="q"
+            placeholder="正在填充行程，请稍候…"
+            data-testid="plan-nav-input"
+            disabled
+            aria-disabled="true"
+          />
+          <button class="btn" type="submit" data-testid="plan-nav-send" disabled aria-disabled="true">发送</button>
         </form>
       </div>
     </aside>

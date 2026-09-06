@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatPlanElapsedSeconds, friendlyMakeErrorKey } from "../src/core/format-plan-elapsed";
+import { formatPlanElapsedSeconds, friendlyMakeErrorKey, skeletonMakeErrorKey } from "../src/core/format-plan-elapsed";
 
 describe("formatPlanElapsedSeconds", () => {
   it("should_format_elapsed_to_one_decimal", () => {
@@ -20,5 +20,28 @@ describe("friendlyMakeErrorKey", () => {
     expect(friendlyMakeErrorKey("play.plan.assistant_fetch_failed")).toBe(
       "play.plan.assistant_fetch_failed",
     );
+  });
+});
+
+describe("skeletonMakeErrorKey", () => {
+  it("should_use_make_failed_when_make_fails_with_non_timeout", () => {
+    expect(
+      skeletonMakeErrorKey({
+        makeOutcomeKey: "errors.make_itinerary_failed",
+      }),
+    ).toBe("errors.make_itinerary_failed");
+  });
+
+  it("should_use_phase_make_timeout_only_for_timeout_outcome", () => {
+    expect(
+      skeletonMakeErrorKey({
+        makeOutcomeKey: "play.plan.phase_make_timeout",
+      }),
+    ).toBe("play.plan.phase_make_timeout");
+    expect(
+      skeletonMakeErrorKey({
+        makeOutcomeKey: "errors.make_timeout",
+      }),
+    ).toBe("play.plan.phase_make_timeout");
   });
 });

@@ -16,7 +16,7 @@
 | 文件 | 作用 |
 | --- | --- |
 | `01-home` … `05-set-password` | 公开 / Auth · Travor |
-| `06-plan` / `06-plan-skeleton` / `06-plan-qa` | **MVP-10 定稿**：5 字段起飞条 + Travor 皮肤 + 悬浮助手 + 骨架→逐站（[`2play-design.md §4.7`](./2play-design.md)） |
+| `06-plan` / `06-plan-skeleton` / `06-plan-fill-timeline` / `06-plan-qa` | **MVP-10 定稿**：起飞条 + Travor + 悬浮助手；骨架/fill **route-spine** SoT=`06-plan-fill-timeline`（[`2play-design.md §4.7` / §4.11](./2play-design.md)） |
 | `07-profile` | 个人信息 + 兴趣 |
 | `08-saved` / `09-saved-detail` | 我的行程多卡 / 详情+DB 对话 |
 | `10-travel-advice` | 出行建议 · 签证占位（MVP-11） |

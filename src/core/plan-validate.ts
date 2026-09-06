@@ -93,6 +93,32 @@ export function validatePlanBoundaries(input: unknown): {
       ...(typeof body.originLng === "number" && Number.isFinite(body.originLng)
         ? { originLng: body.originLng }
         : {}),
+      ...(body.originStay &&
+      typeof body.originStay === "object" &&
+      typeof (body.originStay as { name?: unknown }).name === "string" &&
+      typeof (body.originStay as { lat?: unknown }).lat === "number" &&
+      typeof (body.originStay as { lng?: unknown }).lng === "number"
+        ? {
+            originStay: {
+              name: String((body.originStay as { name: string }).name).trim(),
+              lat: (body.originStay as { lat: number }).lat,
+              lng: (body.originStay as { lng: number }).lng,
+              ...((body.originStay as { provider?: string }).provider
+                ? { provider: String((body.originStay as { provider: string }).provider) }
+                : {}),
+              ...((body.originStay as { native_id?: string }).native_id
+                ? { native_id: String((body.originStay as { native_id: string }).native_id) }
+                : {}),
+              ...(Array.isArray((body.originStay as { photos?: unknown }).photos)
+                ? {
+                    photos: ((body.originStay as { photos: unknown[] }).photos)
+                      .filter((p): p is string => typeof p === "string" && p.startsWith("http"))
+                      .slice(0, 1),
+                  }
+                : {}),
+            },
+          }
+        : {}),
       ...(optionalString(body.dailyEnd) ? { dailyEnd: optionalString(body.dailyEnd) } : {}),
       ...(timeFrom ? { timeFrom } : {}),
       ...(timeTo ? { timeTo } : {}),

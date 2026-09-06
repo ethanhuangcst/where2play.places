@@ -239,7 +239,7 @@ function candidateLine(p: ScheduleCandidate): string {
 export async function fetchArrangeHostPrompts(input: {
   locale: string;
   criteria: PlanBoundaries;
-  providers: string[];
+  providers?: string[];
   dayIndex: number;
   date: string;
   candidates: ScheduleCandidatePools;
@@ -415,7 +415,7 @@ export async function completeArrangeDay(input: {
   dayIndex: number;
   date: string;
   criteria: PlanBoundaries;
-  providers: string[];
+  providers?: string[];
   candidates: ScheduleCandidatePools;
   excludeNames?: string[];
   signal?: AbortSignal;
@@ -522,7 +522,7 @@ export async function* streamArrangeDay(input: {
   dayIndex: number;
   date: string;
   criteria: PlanBoundaries;
-  providers: string[];
+  providers?: string[];
   candidates: ScheduleCandidatePools;
   excludeNames?: string[];
   signal?: AbortSignal;

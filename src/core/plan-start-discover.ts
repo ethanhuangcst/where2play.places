@@ -43,7 +43,7 @@ export async function startPlanDiscover(
     city: destination,
     bounds: { start: startDate, end },
     locale: input.locale,
-    providers,
+    ...(providers?.length ? { providers } : {}),
     numDays: days,
     max_number: maxNumber,
     party_size: input.partySize,

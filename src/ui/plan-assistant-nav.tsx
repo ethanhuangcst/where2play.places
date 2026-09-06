@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useT } from "@/src/i18n/use-t";
 import { budgetOptionLabel, normalizeBudgetKey } from "@/src/core/plan-budget";
 import { collapseSkeletonPreviewDays } from "@/src/core/plan-skeleton-preview";
-import { skeletonStopLabel } from "@/src/core/meal-slot-label";
+import { buildSkeletonRouteDays, type FillRouteDay } from "@/src/core/format-fill-timeline";
+import { PlanFillRoute } from "@/src/ui/plan-fill-route";
 import {
   INTAKE_DEFAULT_I18N,
   INTAKE_DEFAULT_VALUES,
@@ -38,7 +39,11 @@ type Props = {
   /** True while plan NDJSON stream is in flight after intake (disable send). */
   fillingLocked?: boolean;
   skeletonDays: SkeletonPreviewDay[];
+  /** Structured fill route-spine (24-P0-ui-B). */
+  fillRouteDays?: FillRouteDay[];
   statusLines: string[];
+  /** Final complete sentence — rendered after fill spine (tmp-ui bug #4). */
+  planCompleteLine?: string | null;
   suggestedMustSee?: string[];
   mustSeeLoading?: boolean;
   makeElapsedSeconds?: string | null;
@@ -66,7 +71,9 @@ export function PlanAssistantNav({
   intakeComplete,
   fillingLocked = false,
   skeletonDays,
+  fillRouteDays = [],
   statusLines,
+  planCompleteLine = null,
   suggestedMustSee,
   mustSeeLoading,
   makeElapsedSeconds,
@@ -82,15 +89,34 @@ export function PlanAssistantNav({
 }: Props) {
   const t = useT();
   const navRef = useRef<HTMLElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const threadEndRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
   const [panelSize, setPanelSize] = useState({ w: MIN_W, h: MIN_H });
   const [draft, setDraft] = useState("");
   const [selectedChip, setSelectedChip] = useState<string | null>(null);
   const [selectedMustSee, setSelectedMustSee] = useState<string[]>([]);
 
+  const skeletonRouteDays = useMemo(
+    () => buildSkeletonRouteDays(collapseSkeletonPreviewDays(skeletonDays), t),
+    [skeletonDays, t],
+  );
+
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Keep latest assistant output visible (tmp-ui bugs §行程助手 #1).
+  useEffect(() => {
+    if (!open) return;
+    const end = threadEndRef.current;
+    const body = bodyRef.current;
+    if (end && typeof end.scrollIntoView === "function") {
+      end.scrollIntoView({ block: "end", behavior: "smooth" });
+    } else if (body) {
+      body.scrollTop = body.scrollHeight;
+    }
+  }, [open, statusLines, planCompleteLine, fillRouteDays, skeletonRouteDays, makeElapsedSeconds, answers, currentStep]);
 
   useEffect(() => {
     if (currentStep && !intakeComplete) {
@@ -142,7 +168,7 @@ export function PlanAssistantNav({
   const [sending, setSending] = useState(false);
 
   async function advanceStep(step: IntakeStepId, value: string) {
-    if (sending) return;
+    if (sending || fillingLocked) return;
     setSending(true);
     try {
       const merged: IntakeAnswers = { ...answers, [step]: value };
@@ -159,7 +185,7 @@ export function PlanAssistantNav({
 
   function submitAnswer(e: React.FormEvent) {
     e.preventDefault();
-    if (!activeStep) return;
+    if (!activeStep || fillingLocked) return;
     if (activeStep === "g" && mustSeeLoading) return;
     if (activeStep === "g") {
       const value =
@@ -172,7 +198,7 @@ export function PlanAssistantNav({
   }
 
   function submitChip(value: string) {
-    if (!activeStep) return;
+    if (!activeStep || fillingLocked) return;
     if (value === ORIGIN_RETRY_CHIP) {
       onRetryOrigin?.();
       return;
@@ -285,7 +311,7 @@ export function PlanAssistantNav({
             </div>
           </header>
 
-          <div className="plan-nav__body">
+          <div className="plan-nav__body" ref={bodyRef} data-testid="plan-nav-body">
             <div className="plan-nav__thread" data-testid="plan-nav-thread">
               <div className="msg-group msg-group--agent">
                 <p className="msg-group__line">{t("play.plan.assistant_greeting")}</p>
@@ -378,32 +404,35 @@ export function PlanAssistantNav({
                 </div>
               ) : null}
 
-              {skeletonDays.length > 0 ? (
-                <div className="plan-nav__skeleton" data-testid="plan-thread-skeleton">
-                  {collapseSkeletonPreviewDays(skeletonDays).map((day) => (
-                    <div key={day.dayIndex} className="skeleton-day">
-                      {day.theme ? <p className="skeleton-day__theme">{day.theme}</p> : null}
-                      {day.stops.map((stop, idx) => (
-                        <p
-                          key={`${day.dayIndex}-${idx}`}
-                          className={`skeleton-stop${stop.filled ? " skeleton-stop--filled" : ""}${stop.pending ? " is-pending" : ""}${stop.mealSlot ? " skeleton-stop--meal" : ""}`}
-                        >
-                          <span className="skeleton-stop__idx">{String(idx).padStart(2, "0")}</span>
-                          <span className="skeleton-stop__name">
-                            {skeletonStopLabel(stop, t)}
-                          </span>
-                          {stop.mealSlot ? (
-                            <span className="skeleton-stop__slot">{skeletonStopLabel(stop, t)}</span>
-                          ) : null}
-                          {stop.pending ? (
-                            <span className="skeleton-stop__slot">{t("play.plan.stop_filling")}</span>
-                          ) : null}
-                        </p>
-                      ))}
-                    </div>
-                  ))}
+              {skeletonRouteDays.length > 0 && fillRouteDays.length === 0 ? (
+                <div className="msg-group msg-group--agent plan-nav__skeleton">
+                  <PlanFillRoute
+                    days={skeletonRouteDays}
+                    variant="skeleton"
+                    data-testid="plan-thread-skeleton"
+                  />
                 </div>
               ) : null}
+
+              {fillRouteDays.length > 0 ? (
+                <div className="msg-group msg-group--agent">
+                  <PlanFillRoute
+                    days={fillRouteDays}
+                    variant="fill"
+                    data-testid="plan-thread-fill-timeline"
+                  />
+                </div>
+              ) : null}
+
+              {planCompleteLine ? (
+                <p
+                  className="msg-group__line plan-nav__complete"
+                  data-testid="plan-thread-complete"
+                >
+                  {planCompleteLine}
+                </p>
+              ) : null}
+              <div ref={threadEndRef} data-testid="plan-nav-thread-end" aria-hidden="true" />
             </div>
 
             {quickChips.length > 0 && activeStep && !(activeStep === "g" && mustSeeLoading) ? (
@@ -413,6 +442,8 @@ export function PlanAssistantNav({
                     key={chip.value}
                     type="button"
                     className={`chip${activeStep === "g" ? (selectedMustSee.includes(chip.value) ? " is-on" : "") : selectedChip === chip.value ? " is-on" : ""}`}
+                    disabled={fillingLocked || sending}
+                    aria-disabled={fillingLocked || sending}
                     data-testid={
                       chip.labelKey === "play.plan.intake_origin_skip"
                         ? "plan-origin-skip"
@@ -441,13 +472,17 @@ export function PlanAssistantNav({
                 data-testid="plan-nav-input"
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                disabled={fillingLocked}
               />
               <button
-                className="btn"
+                className={`btn${fillingLocked || sending ? " is-send-locked" : ""}`}
                 type="submit"
                 data-testid="plan-nav-send"
                 disabled={
+                  fillingLocked ||
+                  sending ||
+                  (activeStep === "g" && Boolean(mustSeeLoading))
+                }
+                aria-disabled={
                   fillingLocked ||
                   sending ||
                   (activeStep === "g" && Boolean(mustSeeLoading))

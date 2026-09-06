@@ -66,14 +66,28 @@ describe("i18n catalogs", () => {
       "play.plan.meal_lunch",
       "play.plan.meal_afternoon_tea",
       "play.plan.meal_dinner",
+      "play.plan.meal_slot_lunch",
+      "play.plan.kind_stay",
+      "play.plan.kind_attraction",
+      "play.plan.composer_locked_fill",
+      "play.plan.timeline_origin",
+      "play.plan.timeline_depart",
+      "play.plan.timeline_depart_next",
+      "play.plan.timeline_arrive",
+      "play.plan.timeline_dwell",
+      "play.plan.timeline_kind_origin",
+      "play.plan.timeline_stop",
     ] as const;
     for (const locale of ["EN", "CN", "HK", "TW"] as const) {
       for (const key of keys) {
         expect(catalogs[locale][key], `${locale} missing ${key}`).toBeTruthy();
       }
     }
-    expect(t("CN", "play.plan.preview_place", { name: "大雁塔", reason: "地标", window: "09:30–11:00" })).toContain(
-      "大雁塔",
+    const cnPlace = t("CN", "play.plan.preview_place", { name: "大雁塔", window: "09:30–11:00" });
+    expect(cnPlace).toContain("大雁塔");
+    expect(cnPlace).not.toMatch(/原因/);
+    expect(t("CN", "play.plan.preview_transit", { label: "步行", duration: "~8 min" })).not.toMatch(
+      /原因/,
     );
   });
 });

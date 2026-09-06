@@ -2,6 +2,7 @@
 
 import { useT } from "@/src/i18n/use-t";
 import { ymdPlusDays } from "@/src/core/plan-agent-body";
+import { iconicPlacesFromTravelTips } from "@/src/core/plan-iconic-parse";
 
 export type TravelTipsData = {
   intro?: string;
@@ -119,6 +120,7 @@ function TravelTipsBody({
   }
 
   const unavailable = t("play.plan.travel_tips_unavailable");
+  const iconicPlaces = iconicPlacesFromTravelTips(data);
 
   return (
     <div className="panel__body plan-travel-tips__body" id="travel-tips-body">
@@ -145,10 +147,10 @@ function TravelTipsBody({
             </p>
           ) : null}
           {data?.intro ? <p className="travel-tips-intro">{data.intro}</p> : null}
-          {data?.iconic_places?.length ? (
+          {iconicPlaces.length ? (
             <ol className="travel-tips-must-see">
-              {data.iconic_places.map((name) => (
-                <li key={name}>{name}</li>
+              {iconicPlaces.map((name, index) => (
+                <li key={`${index}-${name}`}>{name}</li>
               ))}
             </ol>
           ) : null}

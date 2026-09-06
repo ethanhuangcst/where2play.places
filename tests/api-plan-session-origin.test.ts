@@ -355,7 +355,7 @@ describe("PATCH /api/plan/session origin (TC-M21-41-22)", () => {
       bias_radius_m?: number;
     };
     expect(parsed.query?.toLowerCase()).toContain("hyatt");
-    expect(parsed.providers).toEqual(["GOOGLE_MAPS"]);
+    expect(parsed.providers).toBeUndefined();
     expect(parsed.bias_radius_m).toBe(50_000);
   });
 });

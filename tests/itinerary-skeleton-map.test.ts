@@ -109,6 +109,31 @@ describe("itinerary-skeleton-map (TC-M10-46-03)", () => {
     expect(h.label).toBe("Highlights");
     expect(h.title).toBe("Belém");
   });
+
+  it("should_stamp_photo_and_ids_from_pool_when_card_null (24-P0-ui-C-fix)", () => {
+    const slot = mapStopDisplayToPlaceSlot(
+      {
+        stop: { name: "Belém Tower", kind: "attraction", card: null },
+        slot: { start: "10:00", end: "11:00" },
+      },
+      t,
+      {
+        pool: {
+          places: [
+            {
+              name: "Belém Tower",
+              provider: "google",
+              photos: ["https://cdn.example/tower.jpg"],
+              sources: [{ provider: "google", native_id: "ChIJtower" }],
+            },
+          ],
+        },
+      },
+    );
+    expect(slot.photoUrl).toBe("https://cdn.example/tower.jpg");
+    expect(slot.provider).toBe("google");
+    expect(slot.nativeId).toBe("ChIJtower");
+  });
 });
 
 describe("plan-skeleton-fill (TC-M10-46-01)", () => {

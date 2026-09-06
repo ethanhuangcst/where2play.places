@@ -180,13 +180,13 @@ MVP-1 不调 agent，但仍需真实 DB、真实 session、真实邮件路径（
 
 ### MVP-10 — plan-46 轻骨架消费端（2026-09-02 mock/spec 锁定；UI 重做）
 
-**真源：** `[2play-stories.md](./2play-stories.md)` #37 · `[itinerary-design.md §16–17](./itinerary-design.md)` · `[2play-design.md §3.9 / §4.2.1 / §4.7](./2play-design.md)` · mock [`ui-mockup/`](./ui-mockup/) · agent `[0.refactor-plan.md](../../1.places-agent/agent-specs/0.refactor-plan.md)` 批次 11/16。
+**真源：** `[2play-stories.md](./2play-stories.md)` #37 · `[itinerary-design.md §16–17](./itinerary-design.md)` · `[2play-design.md §3.9 / §4.2.1 / §4.7 / §4.11](./2play-design.md)` · mock [`ui-mockup/`](./ui-mockup/)（助手 spine SoT=`06-plan-fill-timeline.html`）· agent `[0.refactor-plan.md](../../1.places-agent/agent-specs/0.refactor-plan.md)` 批次 11/16/24。
 
 | 门禁 | 要求 |
 | --- | --- |
 | 功能 | **37** plan-46：mock **100%** 结构对齐 + 5 字段 + `plan-nav` intake + constraints/travel-tips + 新 BFF（`make_itinerary` → `plan_next_stop` + `fetch_trip_details`）+ place sheet |
 | 依赖 | agent F44 + F63/64 + **F65 Done**（无 `display_current_stop`） |
-| Mock 门 | 实现页 DOM/testid 与 `06-plan.html` / `06-plan-qa.html` / `06-plan-skeleton.html` / `09-saved-detail.html` 一致；**不得**仅用 CSS 壳冒充 |
+| Mock 门 | 实现页 DOM/testid 与 `06-plan.html` / `06-plan-qa.html` / `06-plan-skeleton.html` / `06-plan-fill-timeline.html` / `09-saved-detail.html` 一致；**不得**仅用 CSS 壳冒充 |
 | Live | Lisbon 4D：首 stop < 30s，总 < 90s |
 | Agent parity | 30 城（§5.5） |
 | 用户 | 明确 usable 确认（DoD） |
@@ -221,6 +221,11 @@ MVP-1 不调 agent，但仍需真实 DB、真实 session、真实邮件路径（
 | TC-M10-46-10 | Component | `plan-travel-tips` 四卡 + fold + visa popover | `tests/plan-travel-tips.test.tsx` |
 | TC-M10-46-11 | Component | panel 头三按钮；`plan-phase`；无 bottom sticky | `tests/plan-page.test.tsx` |
 | TC-M10-46-12 | Component | Public/App `data-style="travor"`；register/profile photo grid | `tests/travor-shell.test.tsx` |
+| TC-M24-UIB-01 | Unit | `buildFillRouteDays`：骨架无 transit；fill 含出发+模式+到/停 | `tests/format-fill-timeline.test.ts` |
+| TC-M24-UIB-02 | Unit | 助手 prose `statusLines` 不含时间线句；spine 由 `fillRouteDays` 驱动 | `tests/plan-assistant-narrative.test.ts` |
+| TC-M24-UIC-01 | Unit | idle/done 时 `skeletonStopsForFocusedDay` 为空 | `tests/plan-skeleton-stops.test.ts` |
+| TC-M24-UIC-02 | Component | done 后无日底骨架、无 `plan-slot-preview`；thumb 开 place-sheet | `tests/plan-page.test.tsx` |
+| TC-M25-89-04 | Component | place sheet：CJK `slot.name` 不被 Latin `details.name` 覆盖（AC43 / ADR-052 D9） | `tests/place-sheet.test.tsx` |
 
 #### TC-M10-E2E（Playwright）
 

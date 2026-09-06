@@ -21,7 +21,12 @@ export async function POST(request: NextRequest) {
   const locale = normalizeLocale(parsed.data.locale);
   const providers = providersForPin(lat, lng);
 
-  const geo = await reverseGeocode({ lat, lng, locale, providers });
+  const geo = await reverseGeocode({
+    lat,
+    lng,
+    locale,
+    ...(providers?.length ? { providers } : {}),
+  });
   if (!geo.ok || !geo.data?.label) {
     return authError(geo.outcome?.key ?? "errors.provider_failed", 502);
   }

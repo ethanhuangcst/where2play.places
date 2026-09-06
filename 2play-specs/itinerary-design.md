@@ -56,7 +56,7 @@ L3  Fill         places-agent  循环 plan_next_stop + display_current_stop（�
 ┌─ 行程日提示 ─────────────────────────────────────────┐
 │ 正在安排第 2/3 天…          [ 正在生成第 2/3 天… ]   │
 ├─ 行程细节提示 ───────────────────────────────────────┤
-│ 正在加入行程：大雁塔，入选原因：…，预计游览时间：…     │
+│ 正在加入行程：大雁塔，预计游览时间：…                 │
 ├─ 行程面板 ───────────────────────────────────────────┤
 │ Day tabs · Highlights · [slot][slot][slot]…          │
 │ [ 加载中提示 — skeleton 与 slot 同宽同构 ]             │
@@ -64,6 +64,8 @@ L3  Fill         places-agent  循环 plan_next_stop + display_current_stop（�
 ```
 
 **LLM 等待期（首个 `slot_preview` 前）：** 行程细节提示用 `play.plan.arrange_planning_day`（「正在规划第 d/N 天…」），**不**再显示候选池统计为主文案。
+
+**助手线程（24-P0-ui-A + ui-B）：** fill 期间助手 **全日一条** 进行中文案，与主区 `.plan-slot-preview` **同句**；每条新 `slot_preview` **覆盖** 上一条，禁止堆叠。骨架与 fill 详情用 **route-spine**（`PlanFillRoute` / mock `06-plan-fill-timeline.html`）：骨架仅站点；fill 含出发+交通+到/停。完成后去掉进行中行，仅留 `assistant_plan_complete` + spine。站类型用 `play.plan.kind_*` / `meal_slot_*`（勿裸露 `STAY`/`ATTRACTION`/`MEAL`）。Thread 无白底 agent 卡片。
 
 ---
 
@@ -73,18 +75,30 @@ L3  Fill         places-agent  循环 plan_next_stop + display_current_stop（�
 
 | `slot_preview.kind` | i18n key | 参考（CN） |
 | --- | --- | --- |
-| `place` | `play.plan.preview_place` | 正在加入行程：{name}，入选原因：{reason}，预计游览时间：{window} |
-| `transit` | `play.plan.preview_transit` | 正在安排下一段行程的交通：{label}，选择原因：{reason}，预计耗时：{duration} |
-| `meal` | `play.plan.preview_meal` | 正在安排{meal}，推荐：{name}，推荐原因：{reason}，预计用餐时间：{window} |
+| `place` | `play.plan.preview_place` | 正在加入行程：{name}，预计游览时间：{window} |
+| `transit` | `play.plan.preview_transit` | 正在安排下一段行程的交通：{label}，预计耗时：{duration} |
+| `meal` | `play.plan.preview_meal` | 正在安排{meal}，推荐：{name}，预计用餐时间：{window} |
+
+**禁止**在预览句中出现「入选原因 / 选择原因 / 推荐原因」（及对应 EN reason 短语）。`reason` 字段可仍由 BFF 携带供内部，**不得**插进用户可见句。
+
+**站类型标签（列表 / 后续时间线）：**
+
+| kind / meal_slot | i18n key | 参考（CN） |
+| --- | --- | --- |
+| stay | `play.plan.kind_stay` | 住宿 |
+| attraction | `play.plan.kind_attraction` | 景点 |
+| lunch | `play.plan.meal_slot_lunch` | 午餐 |
+| dinner | `play.plan.meal_slot_dinner` | 晚餐 |
+| afternoon_tea | `play.plan.meal_slot_afternoon_tea` | 下午茶 |
 
 **餐段 `meal` 映射：**
 
 | block.type / 规则 | i18n 餐段 |
 | --- | --- |
-| `lunch` | 午餐 |
-| `dinner` | 晚餐 |
-| `cafe` | 下午茶 |
-| `lunch` 且 start ≥ 15:00 | 下午茶 |
+| `lunch` | `play.plan.meal_slot_lunch` |
+| `dinner` | `play.plan.meal_slot_dinner` |
+| `cafe` / `afternoon_tea` | `play.plan.meal_slot_afternoon_tea` |
+| `lunch` 且 start ≥ 15:00 | `play.plan.meal_slot_afternoon_tea` |
 
 **`slot_preview` payload（BFF → UI）：**
 
@@ -92,7 +106,7 @@ L3  Fill         places-agent  循环 plan_next_stop + display_current_stop（�
 type SlotPreview = {
   kind: "place" | "transit" | "meal";
   name: string;
-  reason: string;
+  reason?: string;          // optional; not shown in UI (24-P0-ui-A)
   window: string;           // "09:30–11:00" 或 "~15 min"
   mealLabel?: "lunch" | "afternoon_tea" | "dinner";
   transportLabel?: string;  // 如「捷运 + 步行」
@@ -378,7 +392,7 @@ sequenceDiagram
 
 ## 17. Stop / Transit 展示契约（MVP-10 UI，mock 定稿）
 
-**真源：** `ui-mockup/06-plan-skeleton.html` · `assets/mockup-travor.css` · [`2play-design.md §4.7`](./2play-design.md)。
+**真源：** 助手 thread spine → `ui-mockup/06-plan-fill-timeline.html`；主区 stop/transit 卡片 → `ui-mockup/06-plan-skeleton.html` · `assets/mockup-travor.css` · [`2play-design.md §4.7` / §4.11](./2play-design.md)。
 
 ### 17.1 起点 stop（Stay）
 
@@ -400,8 +414,10 @@ sequenceDiagram
 ### 17.3 列表顺序（单日）
 
 ```text
-[Stay 起点 stop] → [transit 行] → [stop 1] → [transit] → [stop 2] → … → [pending skeleton 行…]
+[Stay 起点 stop] → [transit 行] → [stop 1] → [transit] → [stop 2] → …
 ```
+
+Fill 进行中可在底部追加 pending skeleton 行；**fill `done` 后禁止**日底骨架清单（24-P0-ui-C）。
 
 ### 17.4 Panel 操作与阶段 meta
 

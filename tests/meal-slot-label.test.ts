@@ -9,17 +9,30 @@ describe("mealSlotLabelKey (TC-M22-85-04)", () => {
     expect(mealSlotLabelKey("bistro")).toBeUndefined();
   });
 
-  it("should_resolve_skeleton_meal_via_key", () => {
+  it("should_prefer_restaurant_name_over_meal_slot_label", () => {
     const t = (key: string) => key;
     expect(
       skeletonStopLabel({ kind: "meal", meal_slot: "lunch", name: "楼外楼" }, t),
-    ).toBe("play.plan.meal_slot_lunch");
-    expect(skeletonStopLabel({ kind: "attraction", name: "贝伦塔" }, t)).toBe("贝伦塔");
+    ).toBe("楼外楼");
+    expect(
+      skeletonStopLabel({ kind: "meal", mealSlot: "dinner", name: "Comidas de Santiago" }, t),
+    ).toBe("Comidas de Santiago");
   });
 
-  it("should_label_stay_as_origin_stop (TC-M23-92)", () => {
+  it("should_fall_back_to_meal_slot_when_name_is_slot_id", () => {
+    const t = (key: string) => key;
+    expect(skeletonStopLabel({ kind: "meal", meal_slot: "lunch", name: "lunch" }, t)).toBe(
+      "play.plan.meal_slot_lunch",
+    );
+    expect(skeletonStopLabel({ kind: "meal", mealSlot: "dinner", name: "dinner" }, t)).toBe(
+      "play.plan.meal_slot_dinner",
+    );
+  });
+
+  it("should_resolve_attraction_and_origin_labels", () => {
     const t = (key: string, vars?: Record<string, string>) =>
       key === "play.plan.origin_stop" ? `Origin · ${vars?.name ?? ""}` : key;
+    expect(skeletonStopLabel({ kind: "attraction", name: "贝伦塔" }, t)).toBe("贝伦塔");
     expect(skeletonStopLabel({ kind: "stay", name: "Hills Hotel" }, t)).toBe(
       "Origin · Hills Hotel",
     );

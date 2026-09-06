@@ -1,4 +1,4 @@
-/** Destination-bounded origin lookup (ADR-048 / S7). No hotel-name-only geocode. */
+/** Destination-bounded origin lookup (ADR-048 / S7 / ADR-053). No hotel-name-only geocode. */
 
 import {
   isBrandOnlyOriginQuery,
@@ -18,11 +18,32 @@ export const ORIGIN_CANDIDATE_LIMIT = 3;
 export type OriginCard = {
   name: string;
   location?: { lat?: number; lng?: number };
+  provider?: string;
+  category?: string;
+  sources?: Array<{ provider?: string; native_id?: string }>;
+  photos?: string[];
+};
+
+export type OriginStayPointer = {
+  name: string;
+  lat: number;
+  lng: number;
+  provider?: string;
+  native_id?: string;
+  photos?: string[];
 };
 
 export type ResolveOriginResult =
   | { kind: "skip"; lat: number; lng: number }
-  | { kind: "hit"; name: string; lat: number; lng: number }
+  | {
+      kind: "hit";
+      name: string;
+      lat: number;
+      lng: number;
+      provider?: string;
+      native_id?: string;
+      photos?: string[];
+    }
   | { kind: "not_found" }
   | { kind: "candidates"; cards: OriginCard[]; city: { lat: number; lng: number } };
 
@@ -38,6 +59,24 @@ function haversineKm(
   const h =
     s1 * s1 + Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * s2 * s2;
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/** ADR-053: reject pure landmarks (e.g. 钟楼) as hotel hits. */
+export function looksLikeLodging(card: {
+  name?: string;
+  category?: string;
+}): boolean {
+  const cat = (card.category ?? "").toLowerCase();
+  if (/lodging|hotel|住宿|酒店|宾馆|旅馆|resort|inn|客栈/.test(cat)) return true;
+  const name = card.name ?? "";
+  if (
+    /酒店|宾馆|旅馆|饭店|客栈|hotel|hyatt|hilton|marriott|sheraton|novotel|ibis|inn|resort|凯悦|希尔顿|万豪|喜来登|洲际|假日/i.test(
+      name,
+    )
+  ) {
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -109,8 +148,8 @@ export type ResolveOriginDeps = {
     locale: string;
     providers?: string[];
   }) => Promise<{ ok: boolean; data?: { lat: number; lng: number } | null }>;
-  /** After city geocode — do not use CJK-text AMAP routing for Lisbon. */
-  providersForPin?: (lat: number, lng: number) => string[];
+  /** After city geocode — omit to let agent auto-select (ADR-052). */
+  providersForPin?: (lat: number, lng: number) => string[] | undefined;
 };
 
 function cardsFromSearch(data: unknown): OriginCard[] {
@@ -121,11 +160,28 @@ function cardsFromSearch(data: unknown): OriginCard[] {
   return [];
 }
 
+function nativeIdOf(card: OriginCard): string | undefined {
+  const id = card.sources?.find((s) => s.native_id?.trim())?.native_id?.trim();
+  return id || undefined;
+}
+
 function hitFromCard(hit: OriginCard): ResolveOriginResult {
   const lat = hit.location?.lat;
   const lng = hit.location?.lng;
   if (typeof lat !== "number" || typeof lng !== "number") return { kind: "not_found" };
-  return { kind: "hit", name: hit.name.trim(), lat, lng };
+  const photos = Array.isArray(hit.photos)
+    ? hit.photos.filter((p): p is string => typeof p === "string" && p.startsWith("http")).slice(0, 1)
+    : undefined;
+  const nid = nativeIdOf(hit);
+  return {
+    kind: "hit",
+    name: hit.name.trim(),
+    lat,
+    lng,
+    ...(hit.provider ? { provider: hit.provider } : {}),
+    ...(nid ? { native_id: nid } : {}),
+    ...(photos?.length ? { photos } : {}),
+  };
 }
 
 async function geocodeCity(
@@ -146,11 +202,11 @@ async function geocodeCity(
 }
 
 /**
- * S7: resolve intake origin.
+ * S7 / ADR-053: resolve intake origin.
  * - empty query → skip with destination coords
- * - pick index → hit from prior candidates (caller supplies pick via resolveOriginPick)
- * - unique exact name match auto → hit
- * - brand-only (凯悦) or remapped / multiple nearby → candidates (≤3)
+ * - pick index → hit from prior candidates
+ * - lodging-only filter; unique token match → hit with pointer fields
+ * - brand-only or multiple → candidates (≤3)
  * - else not_found
  */
 export async function resolvePlanOrigin(
@@ -179,14 +235,13 @@ export async function resolvePlanOrigin(
       address: dest,
       near: city,
       locale: input.locale,
-      providers: pinProviders,
+      ...(pinProviders?.length ? { providers: pinProviders } : {}),
       bias_radius_m: ORIGIN_SEARCH_BIAS_M,
     });
     if (!res.ok) return { kind: "not_found" };
-    const near = filterOriginCardsNearCity(cardsFromSearch(res.data), city).slice(
-      0,
-      ORIGIN_CANDIDATE_LIMIT,
-    );
+    const near = filterOriginCardsNearCity(cardsFromSearch(res.data), city)
+      .filter(looksLikeLodging)
+      .slice(0, ORIGIN_CANDIDATE_LIMIT);
     if (!near.length) return { kind: "not_found" };
 
     if (!isBrandOnlyOriginQuery(q)) {
@@ -206,6 +261,7 @@ export function resolveOriginPick(
 ): ResolveOriginResult {
   const card = cards[index];
   if (!card) return { kind: "not_found" };
+  if (!looksLikeLodging(card)) return { kind: "not_found" };
   return hitFromCard(card);
 }
 

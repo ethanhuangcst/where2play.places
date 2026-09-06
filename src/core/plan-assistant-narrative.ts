@@ -1,4 +1,5 @@
 import type { SlotPreviewPayload } from "./itinerary-map";
+import type { ItineraryDto } from "./itinerary-types";
 import { formatSlotPreviewLine } from "./plan-slot-preview";
 
 export type NarrativeT = (key: string, vars?: Record<string, string | number>) => string;
@@ -11,6 +12,8 @@ export type PlanNarrativeContext = {
   tripType: string;
   skeletonReadyAnnounced: boolean;
   narratedSkeletonDays: Set<number>;
+  /** Current in-progress fill line (slot_preview); covered then stripped on done. */
+  fillCoverLine: string | null;
 };
 
 export function createPlanNarrativeContext(opts: {
@@ -28,6 +31,7 @@ export function createPlanNarrativeContext(opts: {
     tripType: opts.tripType?.trim() || opts.t("play.plan.constraint_none"),
     skeletonReadyAnnounced: false,
     narratedSkeletonDays: new Set(),
+    fillCoverLine: null,
   };
 }
 
@@ -36,6 +40,38 @@ export function appendAssistantLine(lines: string[], line: string): string[] {
   if (!trimmed) return lines;
   if (lines.length > 0 && lines[lines.length - 1] === trimmed) return lines;
   return [...lines, trimmed];
+}
+
+/** Replace the previous fill-progress cover line (全日一条). */
+export function coverFillProgressLine(
+  lines: string[],
+  ctx: PlanNarrativeContext,
+  line: string,
+): { lines: string[]; ctx: PlanNarrativeContext } {
+  const trimmed = line.trim();
+  if (!trimmed) return { lines, ctx };
+  let next = lines;
+  if (ctx.fillCoverLine) {
+    next = next.filter((l) => l !== ctx.fillCoverLine);
+  }
+  if (next.length > 0 && next[next.length - 1] === trimmed) {
+    return { lines: next, ctx: { ...ctx, fillCoverLine: trimmed } };
+  }
+  return {
+    lines: [...next, trimmed],
+    ctx: { ...ctx, fillCoverLine: trimmed },
+  };
+}
+
+export function stripFillCoverLine(
+  lines: string[],
+  ctx: PlanNarrativeContext,
+): { lines: string[]; ctx: PlanNarrativeContext } {
+  if (!ctx.fillCoverLine) return { lines, ctx };
+  return {
+    lines: lines.filter((l) => l !== ctx.fillCoverLine),
+    ctx: { ...ctx, fillCoverLine: null },
+  };
 }
 
 export function narrativeLinesForIntakeComplete(ctx: PlanNarrativeContext): string[] {
@@ -62,6 +98,7 @@ type PlanNarrativeEvent = {
   theme?: string;
   stops?: { name: string; kind?: string; meal_slot?: string }[];
   slot?: { name?: string; kind?: string };
+  itinerary?: ItineraryDto;
   kind?: string;
   name?: string;
   reason?: string;
@@ -70,12 +107,19 @@ type PlanNarrativeEvent = {
   transportLabel?: string;
 };
 
+/**
+ * Prose-only assistant lines. Fill route-spine is rendered from itinerary via
+ * buildFillRouteDays — not stuffed into statusLines (24-P0-ui-B).
+ */
 export function narrativeFromPlanEvent(
   event: PlanNarrativeEvent,
   ctx: PlanNarrativeContext,
   lines: string[],
-): { lines: string[]; ctx: PlanNarrativeContext } {
-  const nextCtx = { ...ctx, narratedSkeletonDays: new Set(ctx.narratedSkeletonDays) };
+): { lines: string[]; ctx: PlanNarrativeContext; completeLine?: string | null } {
+  const nextCtx = {
+    ...ctx,
+    narratedSkeletonDays: new Set(ctx.narratedSkeletonDays),
+  };
 
   if (event.type === "phase" && event.phase === "discovering") {
     const making = nextCtx.t("play.plan.assistant_making");
@@ -113,31 +157,37 @@ export function narrativeFromPlanEvent(
   if (event.type === "slot_preview" && event.kind && event.name) {
     const preview = event as PlanNarrativeEvent & SlotPreviewPayload;
     const line = formatSlotPreviewLine(preview, nextCtx.t);
-    return { lines: appendAssistantLine(lines, line), ctx: nextCtx };
+    return coverFillProgressLine(lines, nextCtx, line);
+  }
+
+  if (event.type === "stop_filled" && event.itinerary) {
+    // Spine updates via fillRouteDays in plan-page; strip cover so prose stays clean.
+    return stripFillCoverLine(lines, nextCtx);
   }
 
   if (event.type === "stop_filled" && event.slot?.name) {
-    return {
-      lines: appendAssistantLine(
-        lines,
-        nextCtx.t("play.plan.assistant_filling_stop", { name: event.slot.name }),
-      ),
-      ctx: nextCtx,
-    };
+    return coverFillProgressLine(
+      lines,
+      nextCtx,
+      nextCtx.t("play.plan.assistant_filling_stop", { name: event.slot.name }),
+    );
+  }
+
+  if (event.type === "day_done" && event.itinerary) {
+    return stripFillCoverLine(lines, nextCtx);
   }
 
   if (event.type === "done") {
+    // Progress prose cleared; complete line renders AFTER fill spine (tmp-ui bug #4).
     return {
-      lines: appendAssistantLine(
-        lines,
-        nextCtx.t("play.plan.assistant_plan_complete", {
-          destination: nextCtx.destination,
-          days: String(nextCtx.days),
-          party: String(nextCtx.partySize),
-          tripType: nextCtx.tripType,
-        }),
-      ),
-      ctx: nextCtx,
+      lines: [],
+      ctx: { ...nextCtx, fillCoverLine: null },
+      completeLine: nextCtx.t("play.plan.assistant_plan_complete", {
+        destination: nextCtx.destination,
+        days: String(nextCtx.days),
+        party: String(nextCtx.partySize),
+        tripType: nextCtx.tripType,
+      }),
     };
   }
 

@@ -122,9 +122,20 @@ export function isBrandOnlyOriginQuery(query: string): boolean {
   return false;
 }
 
-/** Expand CJK brand-only text so Google searchText can match Latin hotel names. */
+/** Expand CJK brand-only text so Google searchText can match Latin hotel names.
+ * ADR-053: strip parenthetical branch labels (钟楼回民街店) before search.
+ */
+export function stripOriginParenthetical(query: string): string {
+  return query
+    .replace(/（[^）]*）/g, "")
+    .replace(/\([^)]*\)/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 export function originSearchQuery(userQuery: string): string {
-  const q = userQuery.trim();
+  const q = stripOriginParenthetical(userQuery);
+  if (!q) return "";
   if (/[A-Za-z]/.test(q)) return q;
   for (const group of BRAND_ALIAS_GROUPS) {
     const latin = group.find((t) => /^[a-z]/i.test(t));

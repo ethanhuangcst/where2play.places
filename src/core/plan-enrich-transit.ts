@@ -33,11 +33,15 @@ export function resetGeocodeCache(): void {
 async function resolvePoint(
   name: string,
   locale: string,
-  providers: string[],
+  providers?: string[],
 ): Promise<AgentEnvelope<GeocodeResult>> {
   if (geocodeCache.has(name)) return geocodeCache.get(name)!;
   const fn = geocodeOverride ?? agentGeocode;
-  const result = await fn({ query: name, locale, providers });
+  const result = await fn({
+    query: name,
+    locale,
+    ...(providers?.length ? { providers } : {}),
+  });
   geocodeCache.set(name, result);
   return result;
 }
@@ -45,7 +49,7 @@ async function resolvePoint(
 export async function enrichArrangedDay(input: {
   arranged: ArrangeDayLlmResult;
   criteria: PlanBoundaries;
-  providers: string[];
+  providers?: string[];
   locale: string;
   candidates: ScheduleCandidatePools;
 }): Promise<ArrangeDayLlmResult> {

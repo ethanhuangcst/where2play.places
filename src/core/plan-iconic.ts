@@ -64,7 +64,7 @@ export async function fetchIconicPlacesForPlan(
     destination,
     bounds: { start: startDate, end },
     locale: input.locale,
-    providers,
+    ...(providers?.length ? { providers } : {}),
     ...(input.tripId ? { trip_id: input.tripId } : {}),
     ...(typeof input.revision === "number" ? { revision: input.revision } : {}),
   });

@@ -166,7 +166,7 @@ function isAbortError(err: unknown): boolean {
  */
 export async function* planItineraryDayByDay(
   criteria: PlanBoundaries,
-  opts: { locale: string; providers: string[]; now?: Date },
+  opts: { locale: string; providers?: string[]; now?: Date },
 ): AsyncGenerator<PlanProgressEvent> {
   const baseNow = opts.now ?? new Date();
   const daysTotal = Math.max(1, criteria.days);

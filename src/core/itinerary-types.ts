@@ -25,6 +25,15 @@ export type PlanBoundaries = {
   /** Story 5: origin resolved in destination (not hotel-only geocode). */
   originLat?: number;
   originLng?: number;
+  /** ADR-053: full stay PlaceCard pointer from intake hit. */
+  originStay?: {
+    name: string;
+    lat: number;
+    lng: number;
+    provider?: string;
+    native_id?: string;
+    photos?: string[];
+  };
 };
 
 /** Progressive discover preview (isomorphic slot fields). */
@@ -54,6 +63,8 @@ export type ItineraryPlaceSlot = {
   nativeId?: string;
   detailsUrl?: string;
   mapUrl?: string;
+  /** lunch | dinner | afternoon_tea when placeKind is meal */
+  mealSlot?: string;
 };
 
 export type ItinerarySlot = ItineraryTransitSlot | ItineraryPlaceSlot;

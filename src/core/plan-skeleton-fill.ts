@@ -11,6 +11,7 @@ import {
 } from "./plan-agent-body";
 import { previewForSkeletonStop, previewForTransitLeg } from "./plan-slot-preview";
 import { sanitizeDailyStartName } from "./plan-resolve-origin";
+import { skeletonMakeErrorKey } from "./format-plan-elapsed";
 import {
   discoverPlaces,
   makeItinerary,
@@ -69,6 +70,8 @@ type SkeletonDay = { day_index: number; day_theme?: string; stops: SkeletonStop[
 type Skeleton = { days: SkeletonDay[] };
 
 type CandidatePools = { places: unknown[]; restaurants: unknown[] };
+
+const MEAL_SLOT_IDS = new Set(["lunch", "dinner", "afternoon_tea"]);
 
 function poolsFromDiscoverData(data: unknown): CandidatePools {
   if (!data || typeof data !== "object") return { places: [], restaurants: [] };
@@ -145,18 +148,41 @@ function enrichStopFromPool(stop: SkeletonStop, pool: CandidatePools): SkeletonS
   };
 }
 
-/** F92: stamp stay stops with origin/city coords so first attraction gets real legs. */
+function placeSlotMapOpts(stop: SkeletonStop, pool: CandidatePools) {
+  const enriched = enrichStopFromPool(stop, pool);
+  const mealSlot =
+    stop.meal_slot === "lunch" ||
+    stop.meal_slot === "dinner" ||
+    stop.meal_slot === "afternoon_tea"
+      ? stop.meal_slot
+      : MEAL_SLOT_IDS.has(stop.name)
+        ? (stop.name as "lunch" | "dinner" | "afternoon_tea")
+        : undefined;
+  return {
+    visit_part: stop.visit_part,
+    provider: enriched.provider,
+    nativeId: enriched.native_id,
+    mealSlot,
+    pool: {
+      places: pool.places as Array<{ name?: string; provider?: string; photos?: string[]; sources?: Array<{ provider?: string; native_id?: string }> }>,
+      restaurants: pool.restaurants as Array<{ name?: string; provider?: string; photos?: string[]; sources?: Array<{ provider?: string; native_id?: string }> }>,
+    },
+  };
+}
+
+/** F92 / ADR-053: stamp stay coords from origin card; do not overwrite existing stay pins. */
 function stampStayCoords(
   skeleton: Skeleton,
-  origin: { lat?: number; lng?: number } | undefined,
+  origin: { lat?: number; lng?: number; native_id?: string } | undefined,
 ): void {
   if (typeof origin?.lat !== "number" || typeof origin?.lng !== "number") return;
   for (const day of skeleton.days) {
     for (const stop of day.stops) {
-      if (stop.kind === "stay") {
-        stop.lat = origin.lat;
-        stop.lng = origin.lng;
-      }
+      if (stop.kind !== "stay") continue;
+      if (typeof stop.lat === "number" && typeof stop.lng === "number") continue;
+      stop.lat = origin.lat;
+      stop.lng = origin.lng;
+      if (origin.native_id && !stop.native_id) stop.native_id = origin.native_id;
     }
   }
 }
@@ -171,6 +197,10 @@ function slimPool(pool: CandidatePools): CandidatePools {
     if (c.user_ratings_total !== undefined) o.user_ratings_total = c.user_ratings_total;
     if (c.must_see !== undefined) o.must_see = c.must_see;
     if (c.user_requested !== undefined) o.user_requested = c.user_requested;
+    // Keep first photo for itinerary thumbs (24-P0-ui-C-fix); no city encyclopedia.
+    if (Array.isArray(c.photos) && typeof c.photos[0] === "string") {
+      o.photos = [c.photos[0]];
+    }
     return o;
   };
   return {
@@ -188,7 +218,7 @@ type PlanNextStopData = StopDisplayPayload & {
 
 export async function* planItinerarySkeletonFill(
   criteria: PlanBoundaries,
-  opts: { locale: string; providers: string[] },
+  opts: { locale: string; providers?: string[] },
 ): AsyncGenerator<SkeletonPlanProgressEvent> {
   const t = tt(opts.locale);
   let itinerary = emptyItinerary(criteria);
@@ -196,19 +226,27 @@ export async function* planItinerarySkeletonFill(
 
   yield { type: "phase", phase: "discovering" };
 
-  // F92: stay = intake origin coords, else city geocode (never hotel-name-only geocode).
-  let origin: { name: string; lat?: number; lng?: number } = {
+  // F92 / ADR-053: stay = originStay pointer, else intake coords, else city geocode.
+  let origin: { name: string; lat?: number; lng?: number; provider?: string; native_id?: string } = {
     name:
       sanitizeDailyStartName(criteria.dailyStart) || criteria.destination.trim(),
   };
-  if (typeof criteria.originLat === "number" && typeof criteria.originLng === "number") {
+  if (criteria.originStay?.name?.trim()) {
+    origin = {
+      name: criteria.originStay.name.trim(),
+      lat: criteria.originStay.lat,
+      lng: criteria.originStay.lng,
+      ...(criteria.originStay.provider ? { provider: criteria.originStay.provider } : {}),
+      ...(criteria.originStay.native_id ? { native_id: criteria.originStay.native_id } : {}),
+    };
+  } else if (typeof criteria.originLat === "number" && typeof criteria.originLng === "number") {
     origin = { ...origin, lat: criteria.originLat, lng: criteria.originLng };
   } else {
     try {
       const geo = await geocode({
         query: criteria.destination.trim(),
         locale: opts.locale,
-        providers: opts.providers,
+        ...(opts.providers?.length ? { providers: opts.providers } : {}),
       });
       if (geo.ok && geo.data && typeof geo.data.lat === "number" && typeof geo.data.lng === "number") {
         origin = { ...origin, lat: geo.data.lat, lng: geo.data.lng };
@@ -314,10 +352,9 @@ export async function* planItinerarySkeletonFill(
     }
   }
   if (!skeleton?.days?.length) {
-    const key =
-      tripId && (!mk.ok || !mk.data)
-        ? "play.plan.phase_make_timeout"
-        : mk.outcome?.key ?? "errors.make_itinerary_failed";
+    const key = skeletonMakeErrorKey({
+      makeOutcomeKey: mk.outcome?.key,
+    });
     yield { type: "error", key };
     return;
   }
@@ -373,7 +410,7 @@ export async function* planItinerarySkeletonFill(
         end: planDayDates(daysTotal, criteria.startDate)[daysTotal - 1] ?? criteria.startDate,
       },
       locale: opts.locale,
-      providers: opts.providers,
+      ...(opts.providers?.length ? { providers: opts.providers } : {}),
       skeleton,
       ...tripLedgerFields(tripId, revision),
     });
@@ -398,7 +435,6 @@ export async function* planItinerarySkeletonFill(
 
   const dates = planDayDates(daysTotal, criteria.startDate);
   const usedRestaurantNames: string[] = [];
-  const MEAL_SLOT_IDS = new Set(["lunch", "dinner", "afternoon_tea"]);
 
   for (const skDay of skeleton.days) {
     const dayIndex = skDay.day_index;
@@ -501,6 +537,7 @@ export async function* planItinerarySkeletonFill(
             legs_to_here: [],
           },
           t,
+          placeSlotMapOpts(stop, pool),
         );
         daySlots = [...daySlots, placeSlot];
         prevStop = stop;
@@ -533,9 +570,7 @@ export async function* planItinerarySkeletonFill(
         }
       }
 
-      const placeSlot = mapStopDisplayToPlaceSlot(fill.display ?? {}, t, {
-        visit_part: stop.visit_part,
-      });
+      const placeSlot = mapStopDisplayToPlaceSlot(fill.display ?? {}, t, placeSlotMapOpts(stop, pool));
       daySlots = [...daySlots, placeSlot];
       prevEndTime = fill.display?.slot?.end
         ? normalizeAgentTime(fill.display.slot.end)
@@ -558,6 +593,25 @@ export async function* planItinerarySkeletonFill(
         !MEAL_SLOT_IDS.has(placeSlot.name)
       ) {
         usedRestaurantNames.push(placeSlot.name);
+        yield {
+          type: "slot_preview",
+          dayIndex,
+          kind: "meal",
+          name: placeSlot.name,
+          reason: t("play.plan.preview_reason_skeleton"),
+          window:
+            placeSlot.start && placeSlot.end
+              ? `${placeSlot.start}–${placeSlot.end}`
+              : "…",
+          mealLabel:
+            stop.meal_slot === "dinner" || stop.meal_slot === "afternoon_tea"
+              ? stop.meal_slot
+              : stop.meal_slot === "lunch"
+                ? "lunch"
+                : MEAL_SLOT_IDS.has(stop.name)
+                  ? (stop.name as "lunch" | "dinner" | "afternoon_tea")
+                  : "lunch",
+        };
       }
 
       itinerary = mergeDay(itinerary, {
@@ -583,7 +637,7 @@ async function fillStop(input: {
   skDay: SkeletonDay;
   pool: CandidatePools;
   criteria: PlanBoundaries;
-  opts: { locale: string; providers: string[] };
+  opts: { locale: string; providers?: string[] };
   prevStop?: SkeletonStop;
   prevEndTime?: string;
   isOriginStay: boolean;
@@ -607,7 +661,7 @@ async function fillStop(input: {
   const nextEnriched = enrichStopFromPool(input.stop, input.pool);
   const body: Record<string, unknown> = {
     locale: input.opts.locale,
-    providers: input.opts.providers,
+    ...(input.opts.providers?.length ? { providers: input.opts.providers } : {}),
     city: input.criteria.destination.trim(),
     candidates: input.pool,
     next_stop: {

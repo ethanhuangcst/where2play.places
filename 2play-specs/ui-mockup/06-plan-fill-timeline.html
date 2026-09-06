@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>行程助手 · 填充时间线 UI — where2play.place</title>
+    <link rel="icon" href="assets/favicon.png" type="image/png" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,500&family=IBM+Plex+Mono:wght@400;500&display=swap" />
+    <link rel="stylesheet" href="assets/mockup.css" />
+    <link rel="stylesheet" href="assets/mockup-travor.css" />
+    <style>
+      /*
+        Design plan (fill timeline in 行程助手) — revised
+        Subject: couples scanning a Lisbon day while the agent fills stops.
+        Job: where next / travel time / dwell — at a glance, no chat-card chrome.
+
+        Color:
+          --ft-ink #1a2b3a | --ft-mute #5f7182
+          --ft-spine #0a7a72 | --ft-meal #6e3d5a | --ft-line #c8d4d1
+          Panel wash stays (#faf7f1); zero white message plates.
+
+        Type: DM Sans (names/theme) + IBM Plex Mono (times).
+
+        Layout: flush thread + route spine. Signature = continuous rail;
+          transit is quieter (dashed + muted) so stop names carry the beat.
+
+        Risk: strip agent “chat bubble” chrome entirely in fill view —
+          thread reads as a field log, not stacked cards.
+      */
+      .plan-mock-states a[href="06-plan-fill-timeline.html"] { color: var(--glaze); }
+
+      /* All agent groups in this mock: no white plate / green edge bar */
+      .plan-nav__thread .msg-group--agent,
+      .plan-nav__thread .bubble--agent {
+        background: transparent !important;
+        border: 0 !important;
+        border-left: 0 !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        max-width: 100%;
+        padding: 0.15rem 0 0.35rem;
+      }
+
+      .plan-nav__thread .msg-group--agent .msg-group__line {
+        color: var(--ink-2);
+      }
+
+      .plan-nav__thread .msg-group--agent .msg-group__line + .msg-group__line {
+        margin-top: 0.4rem;
+        padding-top: 0;
+        border-top: 0;
+      }
+
+      .plan-nav__thread {
+        gap: 1rem;
+      }
+
+      /* Skeleton uses same spine UI; no transit legs */
+      .fill-route--skeleton .fill-leg__body {
+        padding-bottom: 0.7rem;
+      }
+
+      .fill-route {
+        --ft-ink: #1a2b3a;
+        --ft-mute: #5f7182;
+        --ft-spine: #0a7a72;
+        --ft-meal: #6e3d5a;
+        --ft-line: #c8d4d1;
+        margin: 0.15rem 0 0;
+        padding: 0;
+        background: transparent;
+        font-family: "DM Sans", var(--font-ui), system-ui, sans-serif;
+        color: var(--ft-ink);
+      }
+
+      .fill-route + .fill-route {
+        margin-top: 1.1rem;
+        padding-top: 0.95rem;
+        border-top: 1px dashed color-mix(in srgb, var(--ft-spine) 28%, var(--ft-line));
+      }
+
+      .fill-route__day {
+        display: flex;
+        align-items: baseline;
+        gap: 0.5rem;
+        margin: 0 0 0.9rem;
+        padding: 0 0 0.55rem;
+        background: transparent;
+        border: 0;
+        border-bottom: 1px solid color-mix(in srgb, var(--ft-spine) 22%, transparent);
+      }
+
+      .fill-route__day-idx {
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        font-size: 0.7rem;
+        font-weight: 500;
+        letter-spacing: 0.08em;
+        color: var(--ft-spine);
+        text-transform: uppercase;
+        flex-shrink: 0;
+      }
+
+      .fill-route__day-theme {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 650;
+        line-height: 1.3;
+        letter-spacing: -0.015em;
+        color: var(--ft-ink);
+      }
+
+      .fill-route__list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .fill-leg {
+        display: grid;
+        grid-template-columns: 1.35rem 1fr;
+        column-gap: 0.65rem;
+        position: relative;
+      }
+
+      .fill-leg__rail {
+        position: relative;
+        display: flex;
+        justify-content: center;
+      }
+
+      .fill-leg__rail::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 50%;
+        width: 2px;
+        transform: translateX(-50%);
+        background: color-mix(in srgb, var(--ft-spine) 35%, var(--ft-line));
+      }
+
+      .fill-leg:first-child .fill-leg__rail::before {
+        top: 0.5rem;
+      }
+
+      .fill-leg:last-child .fill-leg__rail::before {
+        bottom: calc(100% - 0.85rem);
+      }
+
+      .fill-leg--transit .fill-leg__rail::before {
+        background: repeating-linear-gradient(
+          to bottom,
+          color-mix(in srgb, var(--ft-mute) 35%, transparent) 0 2px,
+          transparent 2px 5px
+        );
+      }
+
+      .fill-leg__bead {
+        position: relative;
+        z-index: 1;
+        width: 0.68rem;
+        height: 0.68rem;
+        margin-top: 0.32rem;
+        border-radius: 999px;
+        background: var(--ft-spine);
+        outline: 3px solid color-mix(in srgb, var(--ft-spine) 14%, transparent);
+      }
+
+      .fill-leg--origin .fill-leg__bead {
+        background: transparent;
+        border: 2px solid var(--ft-spine);
+        outline: none;
+      }
+
+      .fill-leg--meal .fill-leg__bead {
+        background: var(--ft-meal);
+        outline-color: color-mix(in srgb, var(--ft-meal) 14%, transparent);
+      }
+
+      .fill-leg--transit .fill-leg__bead {
+        width: 0.28rem;
+        height: 0.28rem;
+        margin-top: 0.58rem;
+        background: color-mix(in srgb, var(--ft-mute) 55%, #fff);
+        outline: none;
+      }
+
+      .fill-leg__body {
+        min-width: 0;
+        padding: 0.02rem 0 0.95rem;
+      }
+
+      .fill-leg--transit .fill-leg__body {
+        padding: 0.12rem 0 0.75rem;
+        opacity: 0.88;
+      }
+
+      .fill-stop__head {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.3rem 0.4rem;
+        margin: 0 0 0.12rem;
+      }
+
+      .fill-stop__idx {
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        font-size: 0.7rem;
+        font-weight: 500;
+        color: var(--ft-mute);
+      }
+
+      .fill-stop__kind {
+        display: inline-flex;
+        align-items: center;
+        font-size: 0.68rem;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        padding: 0;
+        background: transparent;
+        color: var(--ft-spine);
+      }
+
+      .fill-leg--meal .fill-stop__kind {
+        color: var(--ft-meal);
+      }
+
+      .fill-leg--origin .fill-stop__kind {
+        color: var(--ft-mute);
+      }
+
+      .fill-stop__name {
+        margin: 0;
+        font-size: 0.98rem;
+        font-weight: 650;
+        line-height: 1.3;
+        letter-spacing: -0.012em;
+        color: var(--ft-ink);
+      }
+
+      .fill-stop__meta {
+        margin: 0.22rem 0 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        font-size: 0.7rem;
+        color: var(--ft-mute);
+      }
+
+      .fill-stop__meta span {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.22rem;
+        background: transparent;
+      }
+
+      .fill-stop__meta span + span::before {
+        content: "·";
+        margin-right: 0.28rem;
+        color: color-mix(in srgb, var(--ft-mute) 55%, transparent);
+      }
+
+      .fill-stop__meta strong {
+        font-weight: 500;
+        color: var(--ft-ink);
+      }
+
+      .fill-transit__when {
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        font-size: 0.7rem;
+        font-weight: 500;
+        color: var(--ft-mute);
+        margin: 0 0 0.22rem;
+        letter-spacing: 0.01em;
+      }
+
+      .fill-transit__modes {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.15rem 0.05rem;
+      }
+
+      .fill-mode {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.22rem;
+        padding: 0;
+        background: transparent;
+        border: 0;
+        font-size: 0.74rem;
+        color: color-mix(in srgb, var(--ft-ink) 78%, var(--ft-mute));
+        line-height: 1.25;
+      }
+
+      .fill-mode + .fill-mode::before {
+        content: "·";
+        margin: 0 0.35rem 0 0.2rem;
+        color: color-mix(in srgb, var(--ft-mute) 60%, transparent);
+      }
+
+      .fill-mode__icon {
+        font-size: 0.76rem;
+        line-height: 1;
+        opacity: 0.8;
+      }
+
+      .fill-mode__dur {
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        font-size: 0.7rem;
+        font-weight: 500;
+        color: var(--ft-mute);
+      }
+
+      .fill-mode--rec {
+        color: var(--ft-ink);
+        font-weight: 600;
+      }
+
+      .fill-mode--rec .fill-mode__dur {
+        color: var(--ft-spine);
+        font-weight: 600;
+      }
+
+      .fill-route__note {
+        margin: 0.2rem 0 0;
+        font-size: 0.7rem;
+        color: var(--ft-mute);
+      }
+
+      @media (prefers-reduced-motion: no-preference) {
+        .fill-leg {
+          animation: fill-leg-in 0.45s ease both;
+        }
+        .fill-leg:nth-child(1) { animation-delay: 0.02s; }
+        .fill-leg:nth-child(2) { animation-delay: 0.05s; }
+        .fill-leg:nth-child(3) { animation-delay: 0.08s; }
+        .fill-leg:nth-child(4) { animation-delay: 0.11s; }
+        .fill-leg:nth-child(5) { animation-delay: 0.14s; }
+        .fill-leg:nth-child(6) { animation-delay: 0.17s; }
+        .fill-leg:nth-child(7) { animation-delay: 0.2s; }
+        .fill-leg:nth-child(8) { animation-delay: 0.23s; }
+        .fill-leg:nth-child(9) { animation-delay: 0.26s; }
+      }
+
+      @keyframes fill-leg-in {
+        from {
+          opacity: 0;
+          transform: translateY(0.35rem);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      /* Panel focus for this mock */
+      .plan-nav.is-open .plan-nav__panel {
+        width: min(22.5rem, calc(100vw - 1.25rem));
+        height: min(38rem, calc(100vh - 1.5rem));
+      }
+
+      .mock-design-note {
+        position: fixed;
+        left: 1rem;
+        bottom: 1rem;
+        z-index: 40;
+        max-width: 22rem;
+        padding: 0.85rem 1rem;
+        border-radius: 0.75rem;
+        background: #1a2b3a;
+        color: #f4f7f6;
+        font-size: 0.8rem;
+        line-height: 1.45;
+        box-shadow: 0 10px 30px rgba(26, 43, 58, 0.28);
+      }
+
+      .mock-design-note strong {
+        display: block;
+        margin-bottom: 0.35rem;
+        font-size: 0.78rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #7fd4cb;
+      }
+
+      .mock-design-note ol {
+        margin: 0.35rem 0 0;
+        padding-left: 1.1rem;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .fill-leg {
+          animation: none;
+        }
+        .fill-leg__bead {
+          outline: none;
+        }
+      }
+    </style>
+  </head>
+  <body class="shell-app" data-style="travor">
+    <a class="sr-only" href="#content">Skip to content</a>
+    <header class="app-header">
+      <div class="app-header__inner">
+        <a class="logo" href="06-plan-fill-timeline.html" aria-label="where2play.place">
+          <span class="mark-host mark-host--plane">
+            <img class="mark mark--plane" src="assets/play-logo.png" alt="" width="40" height="40" />
+          </span>
+          <span class="logo-word">where2play.place</span>
+        </a>
+        <nav class="app-nav" aria-label="Primary">
+          <a href="06-plan-fill-timeline.html" class="is-active">行程规划</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="content" class="app-main">
+      <h1 class="page-title">填充时间线 · UI mock</h1>
+      <p class="plan-mock-states" role="navigation" aria-label="Mock generate states">
+        <a href="06-plan.html">起飞条</a>
+        <a href="06-plan-skeleton.html">骨架填充</a>
+        <a href="06-plan-fill-timeline.html" class="is-on">填充时间线</a>
+        <a href="06-plan-qa.html">助手问答</a>
+      </p>
+      <p style="max-width: 36rem; color: var(--mute); font-size: 0.9rem; line-height: 1.5">
+        右侧助手：<strong>骨架</strong>与<strong>填充细节</strong>共用路线脊骨 UI；骨架只显示站点（无出发/交通），细节含出发与交通。
+      </p>
+      <div class="plan-stack" aria-hidden="true" style="opacity: 0.35; pointer-events: none">
+        <section class="panel planner-card">
+          <div class="panel__body">
+            <p>主行程区（背景占位）— 请看右侧「行程助手」。</p>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <aside class="plan-nav is-open" id="plan-nav" data-testid="plan-nav" aria-label="行程助手">
+      <div class="plan-nav__panel">
+        <div class="plan-nav__rail" aria-hidden="true"><span class="plan-nav__rail-fill" style="width: 72%"></span></div>
+        <header class="plan-nav__head">
+          <button type="button" class="plan-nav__resize" aria-label="拖动调整助手尺寸">
+            <svg class="plan-nav__resize-icon" viewBox="0 0 20 20" width="18" height="18" fill="none" aria-hidden="true">
+              <path d="M8 4H4v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M12 16h4v-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <div class="plan-nav__head-copy">
+            <h2 class="plan-nav__title">行程助手</h2>
+            <p class="plan-nav__context">里斯本 · 4 天 · 2 人 · $$ 中等 · 问答 8/8</p>
+          </div>
+          <div class="plan-nav__head-actions">
+            <button type="button" class="panel-fold-btn" aria-label="收起行程助手">
+              <svg class="panel-fold-btn__icon" viewBox="0 0 20 20" width="18" height="18" fill="none" aria-hidden="true">
+                <path d="M5 12l5-5 5 5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+        </header>
+
+        <div class="plan-nav__body">
+          <div class="plan-nav__thread">
+            <div class="msg-group msg-group--agent">
+              <p class="msg-group__line">已为您生成里斯本 4 天 2 人 情侣出游的行程框架。</p>
+              <p class="msg-group__line">正在按站点填充时间与交通…</p>
+            </div>
+
+            <!-- 行程骨架：同填充时间线 UI，仅站点（无出发/交通） -->
+            <div class="msg-group msg-group--agent" data-testid="plan-thread-skeleton">
+              <section class="fill-route fill-route--skeleton" aria-label="Day 1 行程骨架">
+                <header class="fill-route__day">
+                  <span class="fill-route__day-idx">D1</span>
+                  <p class="fill-route__day-theme">西区艺术与观景浪漫日</p>
+                </header>
+                <ol class="fill-route__list">
+                  <li class="fill-leg fill-leg--origin">
+                    <div class="fill-leg__rail" aria-hidden="true"><span class="fill-leg__bead"></span></div>
+                    <div class="fill-leg__body">
+                      <div class="fill-stop__head">
+                        <span class="fill-stop__idx">00</span>
+                        <span class="fill-stop__kind">起点</span>
+                      </div>
+                      <p class="fill-stop__name">Hyatt Regency Lisbon</p>
+                    </div>
+                  </li>
+                  <li class="fill-leg fill-leg--stop">
+                    <div class="fill-leg__rail" aria-hidden="true"><span class="fill-leg__bead"></span></div>
+                    <div class="fill-leg__body">
+                      <div class="fill-stop__head">
+                        <span class="fill-stop__idx">01</span>
+                        <span class="fill-stop__kind">景点</span>
+                      </div>
+                      <p class="fill-stop__name">罗卡角</p>
+                    </div>
+                  </li>
+                  <li class="fill-leg fill-leg--meal">
+                    <div class="fill-leg__rail" aria-hidden="true"><span class="fill-leg__bead"></span></div>
+                    <div class="fill-leg__body">
+                      <div class="fill-stop__head">
+                        <span class="fill-stop__idx">02</span>
+                        <span class="fill-stop__kind">午餐</span>
+                      </div>
+                      <p class="fill-stop__name">Nem que a vaca tussa</p>
+                    </div>
+                  </li>
+                  <li class="fill-leg fill-leg--stop">
+                    <div class="fill-leg__rail" aria-hidden="true"><span class="fill-leg__bead"></span></div>
+                    <div class="fill-leg__body">
+                      <div class="fill-stop__head">
+                        <span class="fill-stop__idx">03</span>
+                        <span class="fill-stop__kind">景点</span>
+                      </div>
+                      <p class="fill-stop__name">罗卡角灯塔</p>
+                    </div>
+                  </li>
+                  <li class="fill-leg fill-leg--meal">
+                    <div class="fill-leg__rail" aria-hidden="true"><span class="fill-leg__bead"></span></div>
+                    <div class="fill-leg__body">
+                      <div class="fill-stop__head">
+                        <span class="fill-stop__idx">04</span>
+                        <span class="fill-stop__kind">晚餐</span>
+                      </div>
+                      <p class="fill-stop__name">Doce do Mastro</p>
+                    </div>
+                  </li>
+                </ol>
+              </section>
+            </div>
+
+            <!-- NEW: 友好填充时间线（替代纯文字） -->
+            <div class="msg-group msg-group--agent" data-testid="plan-thread-fill-timeline">
+              <section class="fill-route" aria-label="Day 1 填充详情">
+                <header class="fill-route__day">
+                  <span class="fill-route__day-idx">Day 1</span>
+                  <p class="fill-route__day-theme">西区艺术与观景浪漫日</p>
+                </header>
+
+                <ol class="fill-route__list">
+                  <li class="fill-leg fill-leg--origin">
+                    <div class="fill-leg__rail" aria-hidden="true"><span class="fill-leg__bead"></span></div>
+                    <div class="fill-leg__body">
+                      <div class="fill-stop__head">
+                        <span class="fill-stop__idx">00</span>
+                        <span class="fill-stop__kind">起点</span>
+                      </div>
+                      <p class="fill-stop__name">Hyatt Regency Lisbon</p>
+                    </div>
+                  </li>
+
+                  <li class="fill-leg fill-leg--transit">
+                    <div class="fill-leg__rail" aria-hidden="true"><span class="fill-leg__bead"></span></div>
+                    <div class="fill-leg__body">
+                      <p class="fill-transit__when">08:56 出发前往下一站</p>
+                      <div class="fill-transit__modes">
+                        <span class="fill-mode fill-mode--rec"><span class="fill-mode__icon" aria-hidden="true">🚌</span>公交 <span class="fill-mode__dur">116′</span></span>
+                        <span class="fill-mode"><span class="fill-mode__icon" aria-hidden="true">🚗</span>驾车 <span class="fill-mode__dur">42′</span></span>
+                      </div>
+                    </div>
+                  </li>
+
+                  <li class="fill-leg fill-leg--stop">
+                    <div class="fill-leg__rail" aria-hidden="true"><span class="fill-leg__bead"></span></div>
+                    <div class="fill-leg__body">
+                      <div class="fill-stop__head">
+                        <span class="fill-stop__idx">01</span>
+                        <span class="fill-stop__kind">景点</span>
+                      </div>
+                      <p class="fill-stop__name">罗卡角</p>
+                      <p class="fill-stop__meta">
+                        <span>到 <strong>08:56</strong></span>
+                        <span>停 <strong>45′</strong></span>
+                      </p>
+                    </div>
+                  </li>
+
+                  <li class="fill-leg fill-leg--transit">
+                    <div class="fill-leg__rail" aria-hidden="true"><span class="fill-leg__bead"></span></div>
+                    <div class="fill-leg__body">
+                      <p class="fill-transit__when">09:41 出发前往下一站</p>
+                      <div class="fill-transit__modes">
+                        <span class="fill-mode fill-mode--rec"><span class="fill-mode__icon" aria-hidden="true">🚌</span>公交 <span class="fill-mode__dur">8′</span></span>
+                        <span class="fill-mode"><span class="fill-mode__icon" aria-hidden="true">🚶</span>步行 <span class="fill-mode__dur">35′</span></span>
+                        <span class="fill-mode"><span class="fill-mode__icon" aria-hidden="true">🚗</span>驾车 <span class="fill-mode__dur">5′</span></span>
+                      </div>
+                    </div>
+                  </li>
+
+                  <li class="fill-leg fill-leg--meal">
+                    <div class="fill-leg__rail" aria-hidden="true"><span class="fill-leg__bead"></span></div>
+                    <div class="fill-leg__body">
+                      <div class="fill-stop__head">
+                        <span class="fill-stop__idx">02</span>
+                        <span class="fill-stop__kind">午餐</span>
+                      </div>
+                      <p class="fill-stop__name">Nem que a vaca tussa</p>
+                      <p class="fill-stop__meta">
+                        <span>到 <strong>11:30</strong></span>
+                        <span>停 <strong>60′</strong></span>
+                      </p>
+                    </div>
+                  </li>
+
+                  <li class="fill-leg fill-leg--transit">
+                    <div class="fill-leg__rail" aria-hidden="true"><span class="fill-leg__bead"></span></div>
+                    <div class="fill-leg__body">
+                      <p class="fill-transit__when">12:30 出发前往下一站</p>
+                      <div class="fill-transit__modes">
+                        <span class="fill-mode fill-mode--rec"><span class="fill-mode__icon" aria-hidden="true">🚌</span>公交 <span class="fill-mode__dur">97′</span></span>
+                        <span class="fill-mode"><span class="fill-mode__icon" aria-hidden="true">🚗</span>驾车 <span class="fill-mode__dur">40′</span></span>
+                      </div>
+                    </div>
+                  </li>
+
+                  <li class="fill-leg fill-leg--stop">
+                    <div class="fill-leg__rail" aria-hidden="true"><span class="fill-leg__bead"></span></div>
+                    <div class="fill-leg__body">
+                      <div class="fill-stop__head">
+                        <span class="fill-stop__idx">03</span>
+                        <span class="fill-stop__kind">景点</span>
+                      </div>
+                      <p class="fill-stop__name">罗卡角灯塔</p>
+                      <p class="fill-stop__meta">
+                        <span>到 <strong>14:07</strong></span>
+                        <span>停 <strong>45′</strong></span>
+                      </p>
+                    </div>
+                  </li>
+
+                  <li class="fill-leg fill-leg--transit">
+                    <div class="fill-leg__rail" aria-hidden="true"><span class="fill-leg__bead"></span></div>
+                    <div class="fill-leg__body">
+                      <p class="fill-transit__when">14:52 出发前往下一站</p>
+                      <div class="fill-transit__modes">
+                        <span class="fill-mode fill-mode--rec"><span class="fill-mode__icon" aria-hidden="true">🚌</span>公交 <span class="fill-mode__dur">4′</span></span>
+                        <span class="fill-mode"><span class="fill-mode__icon" aria-hidden="true">🚶</span>步行 <span class="fill-mode__dur">4′</span></span>
+                        <span class="fill-mode"><span class="fill-mode__icon" aria-hidden="true">🚗</span>驾车 <span class="fill-mode__dur">7′</span></span>
+                      </div>
+                    </div>
+                  </li>
+
+                  <li class="fill-leg fill-leg--meal">
+                    <div class="fill-leg__rail" aria-hidden="true"><span class="fill-leg__bead"></span></div>
+                    <div class="fill-leg__body">
+                      <div class="fill-stop__head">
+                        <span class="fill-stop__idx">04</span>
+                        <span class="fill-stop__kind">晚餐</span>
+                      </div>
+                      <p class="fill-stop__name">Doce do Mastro</p>
+                      <p class="fill-stop__meta">
+                        <span>到 <strong>17:30</strong></span>
+                        <span>停 <strong>90′</strong></span>
+                      </p>
+                      <p class="fill-route__note">17:30 按晚餐展示（截图里误标为午餐）</p>
+                    </div>
+                  </li>
+                </ol>
+              </section>
+            </div>
+          </div>
+        </div>
+
+        <form class="chat-composer plan-nav__composer" action="#" method="get" aria-busy="true">
+          <label class="sr-only" for="nav-input">Message</label>
+          <input id="nav-input" name="q" placeholder="正在填充行程，请稍候…" disabled aria-disabled="true" />
+          <button class="btn" type="submit" disabled aria-disabled="true">发送</button>
+        </form>
+      </div>
+    </aside>
+
+    <aside class="mock-design-note" aria-label="设计说明">
+      <strong>确认点</strong>
+      <ol>
+        <li>骨架与细节共用脊骨 UI；骨架仅站点，无「出发前往下一站」与交通</li>
+        <li>细节保留出发文案 + 模式耗时 + 到站/停留</li>
+        <li>线程无白底绿条；用餐珠梅紫、景点青绿</li>
+        <li>确认后实现到产品</li>
+      </ol>
+      <p style="margin: 0.55rem 0 0">回复「按此实现」或指出要改的点。</p>
+    </aside>
+  </body>
+</html>

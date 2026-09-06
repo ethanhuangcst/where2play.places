@@ -94,6 +94,14 @@ export async function PATCH(request: NextRequest) {
       resolvedValue = resolved.name;
       prev.originLat = resolved.lat;
       prev.originLng = resolved.lng;
+      prev.originStay = {
+        name: resolved.name,
+        lat: resolved.lat,
+        lng: resolved.lng,
+        ...(resolved.provider ? { provider: resolved.provider } : {}),
+        ...(resolved.native_id ? { native_id: resolved.native_id } : {}),
+        ...(resolved.photos?.length ? { photos: resolved.photos } : {}),
+      };
       delete prev.originCandidates;
     }
 
@@ -101,6 +109,7 @@ export async function PATCH(request: NextRequest) {
       resolvedValue = "";
       prev.originLat = resolved.lat;
       prev.originLng = resolved.lng;
+      delete prev.originStay;
       delete prev.originCandidates;
     }
   }
@@ -125,7 +134,11 @@ export async function PATCH(request: NextRequest) {
     locale,
     originLat: prev.originLat,
     originLng: prev.originLng,
+    ...(prev.originStay ? { originStay: prev.originStay } : {}),
   };
+  if (step === "b" && !prev.originStay) {
+    delete criteria.originStay;
+  }
   if (!criteria.destination) {
     criteria.destination = prev.destination ?? "";
   }
@@ -143,7 +156,14 @@ export async function PATCH(request: NextRequest) {
     const written = await patchTrip({
       trip_id: tripId,
       locale,
-      constraints: patch,
+      constraints: {
+        ...patch,
+        ...(step === "b" && prev.originStay
+          ? { originStay: prev.originStay }
+          : step === "b"
+            ? { originStay: null }
+            : {}),
+      },
       ...(typeof raw.revision === "number" ? { revision: raw.revision } : {}),
     });
     if (!written.ok) {

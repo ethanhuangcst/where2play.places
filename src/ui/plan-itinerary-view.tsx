@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useLocale, useT } from "@/src/i18n/use-t";
 import type { ItineraryDto, ItinerarySlot } from "@/src/core/itinerary-types";
-import { skeletonStopLabel } from "@/src/core/meal-slot-label";
+import { mealSlotLabelKey, skeletonStopLabel } from "@/src/core/meal-slot-label";
+import { planStopKindLabel } from "@/src/core/plan-slot-preview";
 
 export type LiveHighlights = {
   label: string;
@@ -84,8 +85,10 @@ export function PlanItineraryView({
 
   const activeFromItinerary = itinerary.days.find((d) => d.dayIndex === day);
   const onArrangeDay = generating && day === (focusDayIndex ?? day);
+  // Day-bottom skeleton + slot_preview only while generating/filling (24-P0-ui-C)
   const showProgressiveOutline =
-    day === (focusDayIndex ?? day) && (generating || skeletonStops.length > 0);
+    generating && day === (focusDayIndex ?? day) && skeletonStops.length > 0;
+  const showSlotPreview = Boolean(generating && slotPreviewText);
   const showingLive = onArrangeDay && (liveSlots.length > 0 || Boolean(liveHighlights) || showPending);
   const slots: ItinerarySlot[] = onArrangeDay && liveSlots.length > 0
     ? liveSlots
@@ -188,7 +191,7 @@ export function PlanItineraryView({
             </p>
           ) : null}
 
-          {slotPreviewText && showProgressiveOutline ? (
+          {showSlotPreview ? (
             <p className="plan-slot-preview" data-testid="plan-slot-preview" role="status">
               {slotPreviewText}
             </p>
@@ -217,22 +220,32 @@ export function PlanItineraryView({
                   {slot.start}–{slot.end}
                 </div>
                 <div className="slot-body">
-                  {slot.photoUrl ? (
-                    <a
+                  {onOpenPlaceSheet ? (
+                    <button
+                      type="button"
                       className="slot-thumb-link"
-                      href={slot.detailsUrl || slot.mapUrl || slot.photoUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      data-testid="stop-thumb-open"
+                      aria-label={t("play.plan.slot_details")}
+                      onClick={() => onOpenPlaceSheet(slot, day)}
                     >
+                      {slot.photoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img className="slot-thumb" src={slot.photoUrl} alt="" />
+                      ) : (
+                        <span className="slot-thumb slot-thumb--empty" aria-hidden="true" />
+                      )}
+                    </button>
+                  ) : slot.photoUrl ? (
+                    <span className="slot-thumb-link">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img className="slot-thumb" src={slot.photoUrl} alt="" />
-                    </a>
+                    </span>
                   ) : (
                     <span className="slot-thumb slot-thumb--empty" aria-hidden="true" />
                   )}
                   <div className="slot-main">
                     <div className="slot-copy">
-                      <span className="slot-kind">{slot.placeKind}</span>
+                      <span className="slot-kind">{planStopKindLabel(slot.placeKind, t, slot.mealSlot)}</span>
                       <h3>{slot.name}</h3>
                       {slot.summary ? <p>{slot.summary}</p> : null}
                     </div>
@@ -294,22 +307,28 @@ export function PlanItineraryView({
 
           {skeletonStops.length > 0 && showProgressiveOutline ? (
             <div className="skeleton-day" data-testid="plan-skeleton-day">
-              {skeletonStops.map((stop, idx) => (
+              {skeletonStops.map((stop, idx) => {
+                const nameLabel = skeletonStopLabel(stop, t);
+                const mealKey = stop.mealSlot ? mealSlotLabelKey(stop.mealSlot) : undefined;
+                const mealBadge = mealKey ? t(mealKey) : null;
+                const showMealBadge = Boolean(mealBadge && mealBadge !== nameLabel);
+                return (
                 <p
                   key={`sk-${idx}`}
                   data-testid="plan-skeleton-stop"
                   className={`skeleton-stop${stop.filled ? " skeleton-stop--filled" : ""}${stop.pending ? " is-pending" : ""}${stop.mealSlot ? " skeleton-stop--meal" : ""}`}
                 >
                   <span className="skeleton-stop__idx">{String(idx).padStart(2, "0")}</span>
-                  <span className="skeleton-stop__name">{skeletonStopLabel(stop, t)}</span>
-                  {stop.mealSlot ? (
-                    <span className="skeleton-stop__slot">{skeletonStopLabel(stop, t)}</span>
+                  <span className="skeleton-stop__name">{nameLabel}</span>
+                  {showMealBadge ? (
+                    <span className="skeleton-stop__slot">{mealBadge}</span>
                   ) : null}
                   {stop.pending ? (
                     <span className="skeleton-stop__slot">{t("play.plan.stop_filling")}</span>
                   ) : null}
                 </p>
-              ))}
+                );
+              })}
             </div>
           ) : null}
 

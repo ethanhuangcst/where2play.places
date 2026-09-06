@@ -26,11 +26,15 @@ import {
 } from "@/src/core/plan-assistant-narrative";
 import { formatPlanElapsedSeconds, friendlyMakeErrorKey } from "@/src/core/format-plan-elapsed";
 import {
+  buildFillRouteDays,
+  type FillRouteDay,
+} from "@/src/core/format-fill-timeline";
+import {
   originNameFromPick,
   parseOriginPickIndex,
   sanitizeDailyStartName,
 } from "@/src/core/plan-resolve-origin";
-import { skeletonStopsForFocusedDay } from "@/src/core/plan-skeleton-stops";
+import { skeletonStopsForFocusedDay, patchSkeletonStopName } from "@/src/core/plan-skeleton-stops";
 import { validatePlanBoundaries } from "@/src/core/plan-validate";
 import { resolveErrorKey } from "@/src/i18n/error-key";
 import { useLocale, useT } from "@/src/i18n/use-t";
@@ -132,7 +136,9 @@ export default function PlanPageClient() {
   const [makeElapsedMs, setMakeElapsedMs] = useState<number | null>(null);
 
   const [skeletonDays, setSkeletonDays] = useState<SkeletonPreviewDay[]>([]);
+  const [fillRouteDays, setFillRouteDays] = useState<FillRouteDay[]>([]);
   const [navStatusLines, setNavStatusLines] = useState<string[]>([]);
+  const [planCompleteLine, setPlanCompleteLine] = useState<string | null>(null);
 
   const [slotPreviewText, setSlotPreviewText] = useState<string | null>(null);
 
@@ -158,10 +164,16 @@ export default function PlanPageClient() {
 
   const mustSeeLoading = intakeStep === "g" && !gCandidatesReady;
 
-  const displaySkeletonStops = useMemo(
-    () => skeletonStopsForFocusedDay(skeletonDays, focusDayIndex, liveSlots, planSubPhase),
-    [skeletonDays, focusDayIndex, liveSlots, planSubPhase],
-  );
+  const displaySkeletonStops = useMemo(() => {
+    const dayIdx = focusDayIndex ?? itinerary?.days[0]?.dayIndex ?? 1;
+    const committedPlaceCount =
+      itinerary?.days
+        .find((d) => d.dayIndex === dayIdx)
+        ?.slots.filter((s) => s.kind === "place").length ?? 0;
+    return skeletonStopsForFocusedDay(skeletonDays, focusDayIndex, liveSlots, planSubPhase, {
+      committedPlaceCount,
+    });
+  }, [skeletonDays, focusDayIndex, liveSlots, planSubPhase, itinerary]);
 
   const constraintItems = useMemo(
     () =>
@@ -229,7 +241,9 @@ export default function PlanPageClient() {
     setFocusDayIndex(null);
     setDayPending(false);
     setSkeletonDays([]);
+    setFillRouteDays([]);
     setNavStatusLines([]);
+    setPlanCompleteLine(null);
     navLinesRef.current = [];
     narrativeCtxRef.current = null;
     setSlotPreviewText(null);
@@ -279,6 +293,8 @@ export default function PlanPageClient() {
       setLiveSlots([]);
       setFocusDayIndex(null);
       setSkeletonDays([]);
+      setFillRouteDays([]);
+      setPlanCompleteLine(null);
       setSlotPreviewText(null);
       setTravelTips(null);
       setTravelTipsError(null);
@@ -298,6 +314,7 @@ export default function PlanPageClient() {
             slot?: ItinerarySlot;
             theme?: string;
             key?: string;
+            stopIndex?: number;
             stops?: { name: string; meal_slot?: string; kind?: string }[];
             data?: TravelTipsData;
           } & Partial<SlotPreviewPayload>
@@ -330,6 +347,9 @@ export default function PlanPageClient() {
               narrativeCtxRef.current = result.ctx;
               navLinesRef.current = result.lines;
               setNavStatusLines(result.lines);
+              if (result.completeLine !== undefined) {
+                setPlanCompleteLine(result.completeLine);
+              }
             };
 
             if (event.type === "tips" && event.data) {
@@ -403,26 +423,49 @@ export default function PlanPageClient() {
               if (event.dayIndex != null) setFocusDayIndex(event.dayIndex);
             } else if (event.type === "stop_filled" && event.slot && event.itinerary) {
               setItinerary(event.itinerary);
+              setFillRouteDays(buildFillRouteDays(event.itinerary, t, { includeTransit: true }));
               setLiveSlots((prev) => [...prev, event.slot!]);
               setDayPending(true);
+              setSlotPreviewText(null);
               if (event.dayIndex != null) setFocusDayIndex(event.dayIndex);
+              const filled = event.slot;
+              if (
+                filled.kind === "place" &&
+                typeof event.stopIndex === "number" &&
+                event.dayIndex != null
+              ) {
+                const placeName = filled.name?.trim();
+                if (placeName) {
+                  setSkeletonDays((prev) =>
+                    patchSkeletonStopName(prev, event.dayIndex!, event.stopIndex!, placeName),
+                  );
+                }
+                // Thumbs come from agent-resolved photos[0] (ADR-051); do not details-backfill.
+              }
               applyNarrative(event);
             } else if (event.type === "day_done" && event.itinerary) {
               setItinerary(event.itinerary);
+              setFillRouteDays(buildFillRouteDays(event.itinerary, t, { includeTransit: true }));
               setLiveSlots([]);
               setDayPending(false);
+              setSlotPreviewText(null);
               if (event.dayIndex != null && event.daysTotal != null) {
                 setGenProgress({ current: event.dayIndex, total: event.daysTotal });
               }
+              applyNarrative(event);
             } else if (event.type === "done" && event.itinerary) {
               sawDone = true;
               setItinerary(event.itinerary);
+              setFillRouteDays(buildFillRouteDays(event.itinerary, t, { includeTransit: true }));
               setPagePhase("done");
               setGenProgress(null);
               setPlanSubPhase(criteria.planMode === "skeleton" ? "skeleton" : "idle");
               setLiveSlots([]);
               setDayPending(false);
               setFocusDayIndex(null);
+              // Clear transit/slot preview residue; keep skeletonDays for assistant spine (ui-B).
+              // Main panel day-bottom outline is gated by idle → [] in skeletonStopsForFocusedDay.
+              setSlotPreviewText(null);
               applyNarrative(event);
             } else if (event.type === "error") {
               sawError = event.key ?? "errors.provider_failed";
@@ -661,7 +704,17 @@ export default function PlanPageClient() {
         if (err instanceof AuthApiError && err.key === "play.plan.intake_origin_not_found") {
           setOriginLookupFailed(true);
           setOriginCandidates([]);
+          return false;
         }
+        // Stale cookie / CSRF used to fail silently here (PATCH 401/403 → "no reaction").
+        if (err instanceof AuthApiError) {
+          setErrorKey(resolveErrorKey(err.key));
+          if (err.key === "errors.session_expired" || err.key === "errors.csrf") {
+            window.location.assign("/login");
+          }
+          return false;
+        }
+        setErrorKey("play.errors.network");
         return false;
       }
       setIntakeAnswers((prev) => ({ ...prev, [step]: value }));
@@ -770,6 +823,7 @@ export default function PlanPageClient() {
       const data = await authJson<{ ok: boolean; data?: Record<string, unknown> }>(
         `/api/places/${encodeURIComponent(slot.provider)}/${encodeURIComponent(slot.nativeId)}?locale=${locale}`,
       );
+      // ADR-051: do not treat details photos as a second thumb truth source.
       setPlaceDetails(data.data ?? null);
     } catch {
       setPlaceDetailsError("play.plan.place_sheet_error");
@@ -777,6 +831,22 @@ export default function PlanPageClient() {
       setPlaceDetailsLoading(false);
     }
   }
+
+  const placeSheetHowToArrive = (() => {
+    if (!placeSheetSlot || placeSheetDay == null || !itinerary) return null;
+    const day = itinerary.days.find((d) => d.dayIndex === placeSheetDay);
+    if (!day) return null;
+    const idx = day.slots.findIndex(
+      (s) =>
+        s.kind === "place" &&
+        s.nativeId === placeSheetSlot.nativeId &&
+        s.provider === placeSheetSlot.provider &&
+        s.name === placeSheetSlot.name,
+    );
+    if (idx <= 0) return null;
+    const prev = day.slots[idx - 1];
+    return prev?.kind === "transit" ? prev.text : null;
+  })();
 
   const phaseTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
@@ -875,21 +945,14 @@ export default function PlanPageClient() {
           open={placeSheetSlot != null}
           slot={placeSheetSlot}
           dayIndex={placeSheetDay ?? undefined}
+          howToArrive={placeSheetHowToArrive}
           onClose={() => {
             setPlaceSheetSlot(null);
             setPlaceSheetDay(null);
             setPlaceDetails(null);
             setPlaceDetailsError(null);
           }}
-          details={
-            placeDetails as {
-              name?: string;
-              address?: string;
-              rating?: number;
-              photos?: string[];
-              summary?: string;
-            } | null
-          }
+          details={placeDetails as import("@/src/ui/place-sheet").PlaceDetails | null}
           loading={placeDetailsLoading}
           errorKey={placeDetailsError}
         />
@@ -903,9 +966,15 @@ export default function PlanPageClient() {
           currentStep={intakeStep}
           answers={intakeAnswers}
           intakeComplete={intakeComplete || pagePhase === "planning" || pagePhase === "done"}
-          fillingLocked={loading && (intakeComplete || pagePhase === "planning")}
+          fillingLocked={
+            loading ||
+            mustSeeLoading ||
+            travelTipsLoading
+          }
           skeletonDays={skeletonDays}
+          fillRouteDays={fillRouteDays}
           statusLines={navStatusLines}
+          planCompleteLine={planCompleteLine}
           suggestedMustSee={suggestedMustSee.length ? suggestedMustSee : undefined}
           mustSeeLoading={mustSeeLoading}
           makeElapsedSeconds={

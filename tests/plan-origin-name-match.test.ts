@@ -41,4 +41,14 @@ describe("originNameTokensCovered (TC-M23-S7-01)", () => {
     expect(originSearchQuery("凯悦").toLowerCase()).toContain("hyatt");
     expect(originSearchQuery("Hills Hotel")).toBe("Hills Hotel");
   });
+
+  it("should_strip_parenthetical_branch_from_search_query (ADR-053)", () => {
+    const q1 = originSearchQuery("凯悦逸扉酒店(西安钟楼回民街店)");
+    expect(q1).not.toMatch(/钟楼|回民街/);
+    expect(q1).toContain("凯悦逸扉酒店");
+    const q2 = originSearchQuery("凯悦逸扉酒店（西安钟楼回民街店）");
+    expect(q2).not.toMatch(/钟楼|回民街/);
+    expect(originSearchQuery("Hyatt Place (Xi'an Bell Tower)").toLowerCase()).toContain("hyatt place");
+    expect(originSearchQuery("Hyatt Place (Xi'an Bell Tower)")).not.toMatch(/bell tower/i);
+  });
 });

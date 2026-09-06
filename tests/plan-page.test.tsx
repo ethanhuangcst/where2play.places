@@ -17,16 +17,21 @@ vi.mock("next/navigation", () => ({
 const authNdjsonEvents = vi.fn();
 const authJson = vi.fn();
 
-vi.mock("@/src/ui/auth-api", () => ({
-  authJson: (...args: unknown[]) => authJson(...args),
-  authNdjsonEvents: (...args: unknown[]) => authNdjsonEvents(...args),
-  AuthApiError: class AuthApiError extends Error {
+const { MockAuthApiError } = vi.hoisted(() => {
+  class MockAuthApiError extends Error {
     key: string;
     constructor(key: string) {
       super(key);
       this.key = key;
     }
-  },
+  }
+  return { MockAuthApiError };
+});
+
+vi.mock("@/src/ui/auth-api", () => ({
+  authJson: (...args: unknown[]) => authJson(...args),
+  authNdjsonEvents: (...args: unknown[]) => authNdjsonEvents(...args),
+  AuthApiError: MockAuthApiError,
 }));
 
 function applyTravorShell() {
@@ -584,10 +589,9 @@ describe("TC-M20-41 Feature 41 Story 2 silent init", () => {
 
     await waitFor(() => {
       const thread = document.body.querySelector('[data-testid="plan-nav-thread"]')?.textContent ?? "";
-      expect(thread).toContain("I understand your request and am drafting the itinerary outline");
-      expect(thread).toMatch(/Day 1/);
-      expect(thread).toContain("Now I'll plan each day's details");
-      expect(thread).toContain("Arranging Tower");
+      // After done: only complete prose; skeleton spine remains when fill spine empty.
+      expect(thread).toContain("Your itinerary is ready.");
+      expect(thread).not.toContain("I understand your request and am drafting the itinerary outline");
       expect(document.body.querySelector('[data-testid="plan-thread-skeleton"]')?.textContent).toContain(
         "Tower",
       );
@@ -707,20 +711,72 @@ describe("TC-M19-40-03 / TC-M23-S1 assistant narrative thread order (fill)", () 
 
     await waitFor(() => expect(authNdjsonEvents).toHaveBeenCalled());
 
+    await waitFor(() => {
+      const fillTimeline =
+        document.body.querySelector('[data-testid="plan-thread-fill-timeline"]')?.textContent ?? "";
+      expect(fillTimeline).toContain("Belém Tower");
+    });
+
     const thread = document.body.querySelector('[data-testid="plan-nav-thread"]') as HTMLElement;
     expect(thread).toBeTruthy();
     const text = thread.textContent ?? "";
-    expect(text).toContain("I understand your request and am drafting the itinerary outline");
-    expect(text).toMatch(/Day 1/);
-    expect(text).toContain("Belém");
-    expect(text).toContain("Now I'll plan each day's details");
-    expect(text).not.toContain("Skeleton preview");
-
-    const skeletonReadyIdx = text.indexOf("Now I'll plan each day's details");
-    const fillIdx = text.indexOf("Arranging Belém Tower");
-    expect(skeletonReadyIdx).toBeGreaterThan(-1);
-    expect(fillIdx).toBeGreaterThan(skeletonReadyIdx);
+    // After done: prose is only the complete line; fill spine remains (24-P0-ui-C-fix).
     expect(text).toContain("Your itinerary is ready.");
+    expect(text).not.toContain("I understand your request and am drafting the itinerary outline");
+    expect(document.body.querySelector('[data-testid="plan-thread-skeleton"]')).toBeNull();
+
+    const fillEl = document.body.querySelector('[data-testid="plan-thread-fill-timeline"]');
+    const completeEl = document.body.querySelector('[data-testid="plan-thread-complete"]');
+    expect(fillEl).toBeTruthy();
+    expect(completeEl).toBeTruthy();
+    expect(completeEl!.textContent).toContain("Your itinerary is ready.");
+    // Complete line must follow fill spine (tmp-ui bug #4).
+    const position = fillEl!.compareDocumentPosition(completeEl!);
+    expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("should_disable_send_while_must_see_candidates_load", async () => {
+    let release: () => void = () => undefined;
+    const hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    authJson.mockImplementation(async (url: string) => {
+      if (url === "/api/plan/current") return { ok: true, criteria: null, itinerary: null };
+      if (url === "/api/plan/discover") {
+        return { ok: true, trip_id: "t1", revision: 1 };
+      }
+      if (url === "/api/plan/candidates") {
+        await hold;
+        return {
+          ok: true,
+          trip_id: "t1",
+          iconic_places: ["Hot Alpha"],
+          pool: [{ name: "Hot Alpha", heat: 9, must_see: true, kind: "place" }],
+        };
+      }
+      return { ok: true };
+    });
+
+    const { getByTestId } = renderWithLocale(<PlanPageClient />);
+    await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
+    await submitTakeoff(getByTestId);
+    for (let i = 0; i < 5; i += 1) {
+      await sendIntakeDefault(getByTestId);
+    }
+
+    await waitFor(() => {
+      const send = getByTestId("plan-nav-send") as HTMLButtonElement;
+      const input = getByTestId("plan-nav-input") as HTMLInputElement;
+      expect(send.disabled).toBe(true);
+      expect(input.disabled).toBe(false);
+      expect(send.className).toContain("is-send-locked");
+    });
+
+    release();
+    await waitFor(() => {
+      const send = getByTestId("plan-nav-send") as HTMLButtonElement;
+      expect(send.disabled).toBe(false);
+    });
   });
 
   it("should_disable_send_while_fill_stream_open_then_enable_after_done", async () => {
@@ -875,6 +931,264 @@ describe("TC-M19-40-04 / TC-M23-S1 filling main list skeleton stops", () => {
     });
 
     releaseDone();
+  });
+});
+
+describe("24-P0-ui-C itinerary detail (AC39–41)", () => {
+  const shellItinerary = {
+    title: "Lisbon",
+    destination: "Lisbon",
+    daysCount: 1,
+    updatedAt: new Date().toISOString(),
+    days: [] as {
+      dayIndex: number;
+      highlights: { label: string; title: string; tags: string[] };
+      slots: unknown[];
+    }[],
+  };
+
+  const staySlot = {
+    kind: "place" as const,
+    start: "09:00",
+    end: "09:30",
+    placeKind: "stay",
+    name: "Hotel Lisboa",
+    summary: "",
+    provider: "google",
+    nativeId: "stay-1",
+    mapUrl: "https://maps.example/stay",
+  };
+
+  const towerSlot = {
+    kind: "place" as const,
+    start: "10:00",
+    end: "12:00",
+    placeKind: "attraction",
+    name: "Belém Tower",
+    summary: "Iconic tower",
+    provider: "google",
+    nativeId: "tower-1",
+    mapUrl: "https://maps.example/tower",
+    // ADR-051: thumbs come from agent-resolved photos, not details backfill.
+    photoUrl: "https://cdn.example/tower.jpg",
+  };
+
+  const filledItinerary = {
+    ...shellItinerary,
+    days: [
+      {
+        dayIndex: 1,
+        highlights: { label: "Highlights", title: "Day 1", tags: [] },
+        slots: [staySlot, towerSlot],
+      },
+    ],
+  };
+
+  beforeEach(() => {
+    applyTravorShell();
+    vi.clearAllMocks();
+    authJson.mockImplementation(async (url: string) => {
+      if (url === "/api/plan/current") {
+        return { ok: true, criteria: null, itinerary: null };
+      }
+      if (url === "/api/plan/discover") {
+        return { ok: true, trip_id: "t1", revision: 1, iconic_places: [] };
+      }
+      if (url.startsWith("/api/places/")) {
+        return {
+          ok: true,
+          data: {
+            name: "Belém Tower",
+            photos: ["https://cdn.example/tower.jpg"],
+          },
+        };
+      }
+      return { ok: true };
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    document.body.className = "";
+    delete document.body.dataset.style;
+  });
+
+  it("should_clear_day_skeleton_and_slot_preview_after_done (TC-M24-UIC-02)", async () => {
+    let releaseDone: () => void = () => undefined;
+    const holdDone = new Promise<void>((resolve) => {
+      releaseDone = resolve;
+    });
+
+    authNdjsonEvents.mockImplementation(async (_url, _init, onEvent) => {
+      onEvent({ type: "phase", phase: "skeleton" });
+      onEvent({
+        type: "skeleton_day",
+        dayIndex: 1,
+        theme: "Belém",
+        itinerary: shellItinerary,
+        stops: [
+          { name: "Hotel Lisboa", kind: "stay" },
+          { name: "Belém Tower", kind: "attraction" },
+        ],
+      });
+      onEvent({ type: "skeleton_done", itinerary: shellItinerary });
+      onEvent({ type: "phase", phase: "filling", dayIndex: 1, daysTotal: 1 });
+      onEvent({
+        type: "slot_preview",
+        dayIndex: 1,
+        kind: "attraction",
+        name: "Belém Tower",
+      });
+      await holdDone;
+      onEvent({ type: "stop_filled", dayIndex: 1, itinerary: shellItinerary, slot: staySlot });
+      onEvent({ type: "done", itinerary: filledItinerary });
+    });
+
+    const { getByTestId } = renderWithLocale(<PlanPageClient />);
+    await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
+    await submitTakeoff(getByTestId);
+    await completeIntake(getByTestId);
+
+    await waitFor(() => {
+      expect(document.body.querySelector('[data-testid="plan-skeleton-day"]')).toBeTruthy();
+      expect(document.body.querySelector('[data-testid="plan-slot-preview"]')).toBeTruthy();
+    });
+
+    releaseDone();
+
+    await waitFor(() => {
+      expect(document.body.querySelector('[data-testid="plan-skeleton-day"]')).toBeNull();
+      expect(document.body.querySelector('[data-testid="plan-slot-preview"]')).toBeNull();
+      expect(document.body.querySelector('[data-testid="stop-filled"]')).toBeTruthy();
+    });
+  });
+
+  it("should_open_place_sheet_from_thumb_with_agent_photo (TC-M24-UIC-03 ADR-051)", async () => {
+    authNdjsonEvents.mockImplementation(async (_url, _init, onEvent) => {
+      onEvent({ type: "phase", phase: "filling", dayIndex: 1, daysTotal: 1 });
+      onEvent({ type: "done", itinerary: filledItinerary });
+    });
+
+    const { getByTestId } = renderWithLocale(<PlanPageClient />);
+    await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
+    await submitTakeoff(getByTestId);
+    await completeIntake(getByTestId);
+
+    await waitFor(() => {
+      const img = document.body.querySelector(
+        '[data-testid="stop-filled"] img.slot-thumb',
+      ) as HTMLImageElement | null;
+      expect(img?.src).toContain("cdn.example/tower.jpg");
+    });
+
+    const thumbs = document.body.querySelectorAll('[data-testid="stop-thumb-open"]');
+    const towerThumb = [...thumbs].find((el) =>
+      el.closest('[data-testid="stop-filled"]')?.textContent?.includes("Belém Tower"),
+    );
+    expect(towerThumb).toBeTruthy();
+    fireEvent.click(towerThumb!);
+
+    await waitFor(() => {
+      expect(document.body.querySelector('[data-testid="place-sheet"]')).toBeTruthy();
+      expect(document.body.querySelector(".place-dialog__bar")).toBeTruthy();
+      expect(document.body.querySelector(".place-split__media")).toBeTruthy();
+      expect(document.body.querySelector(".place-panel--itin")).toBeTruthy();
+      expect(document.body.querySelector(".place-panel--nav")).toBeTruthy();
+    });
+
+    expect(authJson).toHaveBeenCalledWith(
+      expect.stringContaining("/api/places/google/tower-1"),
+    );
+  });
+
+  it("should_use_1x1_slot_thumb_dimensions (TC-M24-UIC-04)", async () => {
+    authNdjsonEvents.mockImplementation(async (_url, _init, onEvent) => {
+      onEvent({
+        type: "done",
+        itinerary: {
+          ...filledItinerary,
+          days: [
+            {
+              ...filledItinerary.days[0]!,
+              slots: [{ ...towerSlot, photoUrl: "https://cdn.example/existing.jpg" }],
+            },
+          ],
+        },
+      });
+    });
+
+    const { getByTestId } = renderWithLocale(<PlanPageClient />);
+    await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
+    await submitTakeoff(getByTestId);
+    await completeIntake(getByTestId);
+
+    await waitFor(() => {
+      expect(document.body.querySelector("img.slot-thumb")).toBeTruthy();
+    });
+
+    const thumb = document.body.querySelector("img.slot-thumb") as HTMLElement;
+    expect(thumb.classList.contains("slot-thumb")).toBe(true);
+    expect(thumb.tagName).toBe("IMG");
+  });
+});
+
+describe("24-P0-ui-C slot-thumb CSS contract (TC-M24-UIC-04b)", () => {
+  it("should_define_equal_square_thumb_in_mockup_css", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { resolve } = await import("node:path");
+    const css = readFileSync(resolve(__dirname, "../app/mockup.css"), "utf8");
+    const block = css.match(/\.slot-thumb\s*\{[^}]+\}/);
+    expect(block?.[0]).toMatch(/width:\s*5\.5rem/);
+    expect(block?.[0]).toMatch(/height:\s*5\.5rem/);
+    expect(block?.[0]).toMatch(/aspect-ratio:\s*1\s*\/\s*1/);
+  });
+});
+
+describe("intake hotel step session errors", () => {
+  const assign = vi.fn();
+
+  beforeEach(() => {
+    applyTravorShell();
+    vi.clearAllMocks();
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...window.location, assign },
+    });
+    authJson.mockImplementation(async (url: string) => {
+      if (url === "/api/plan/current") {
+        return { ok: true, criteria: null, itinerary: null };
+      }
+      if (url === "/api/plan/session") {
+        throw new MockAuthApiError("errors.session_expired");
+      }
+      return { ok: true };
+    });
+    authNdjsonEvents.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    cleanup();
+    document.body.className = "";
+    delete document.body.dataset.style;
+  });
+
+  it("should_show_session_expired_and_redirect_when_hotel_patch_returns_401", async () => {
+    const { getByTestId } = renderWithLocale(<PlanPageClient />);
+    await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
+    await submitTakeoff(getByTestId);
+
+    fireEvent.change(getByTestId("plan-nav-input"), {
+      target: { value: "Hills Hotel Lisboa" },
+    });
+    fireEvent.click(getByTestId("plan-nav-send"));
+
+    await waitFor(() => {
+      const err = getByTestId("plan-error");
+      expect(err.getAttribute("hidden")).toBeNull();
+      expect(err.textContent).toMatch(/session expired|登录已过期|登入已過期/i);
+    });
+    expect(assign).toHaveBeenCalledWith("/login");
+    expect(document.body.querySelectorAll(".bubble--user").length).toBe(0);
   });
 });
 
