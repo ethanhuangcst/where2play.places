@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Gate: app/mockup.css must contain MVP-10 structural rules synced from
-# 2play-specs/ui-mockup/assets/mockup.css (§12 plan-takeoff / plan-nav / constraint-grid).
+# ../specs/2play-specs/ui-mockup/assets/mockup.css (§12 plan-takeoff / plan-nav / constraint-grid).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SPEC_CSS="$ROOT/2play-specs/ui-mockup/assets/mockup.css"
+SPEC_CSS="$ROOT/../specs/2play-specs/ui-mockup/assets/mockup.css"
 APP_CSS="$ROOT/app/mockup.css"
 
 required_selectors=(
@@ -35,7 +35,7 @@ if [ "$app_count" -lt "$spec_count" ]; then
 fi
 
 if [ "$fail" -ne 0 ]; then
-  echo "Re-sync: tail -n +2824 2play-specs/ui-mockup/assets/mockup.css >> app/mockup.css"
+  echo "Re-sync: tail -n +2824 ../specs/2play-specs/ui-mockup/assets/mockup.css >> app/mockup.css"
   exit 1
 fi
 

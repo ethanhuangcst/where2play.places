@@ -9,11 +9,11 @@ from pathlib import Path
 from db_helpers import BASE, delete_user
 from playwright.sync_api import sync_playwright
 
+ROOT = Path(__file__).resolve().parents[1]
+
 EMAIL = "e2e.signoff.lx@where2play.place"
 PASSWORD = "testpass123"
-OUT_DIR = Path(
-    "/Users/ethanhuang/code/places-workspace/1.places-agent/agent-specs/e2e-test-results"
-)
+OUT_DIR = ROOT.parent / "specs" / "agent-specs" / "e2e-test-results"
 SHOT = OUT_DIR / "signoff-lisbon-3d-ui.png"
 UI_JSON = OUT_DIR / "_last-signoff-ui.json"
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env npx tsx
 /**
  * Verify caller key auth + discover_places (batch + NDJSON). No secrets printed.
- * Usage: cd 3.where2play && npx tsx e2e/verify_agent_discover.mts
+ * Usage: cd where2play && npx tsx e2e/verify_agent_discover.mts
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -30,7 +30,7 @@ function loadEnvLocal(dir: string) {
 }
 
 loadEnvLocal(resolve(import.meta.dirname, ".."));
-loadEnvLocal(resolve(import.meta.dirname, "../../1.places-agent"));
+loadEnvLocal(resolve(import.meta.dirname, "../../places-agent"));
 
 const base =
   process.env.PLACES_AGENT_BASE_URL_LOCAL?.trim() ||

@@ -8,11 +8,10 @@ import time
 import urllib.request
 from pathlib import Path
 
-OUT = Path(
-    "/Users/ethanhuang/code/places-workspace/1.places-agent/agent-specs/e2e-test-results"
-)
-ENV = Path("/Users/ethanhuang/code/places-workspace/3.where2play/.env.local")
-AGENT_ENV = Path("/Users/ethanhuang/code/places-workspace/1.places-agent/.env.local")
+ROOT = Path(__file__).resolve().parents[1]
+OUT = ROOT.parent / "specs" / "agent-specs" / "e2e-test-results"
+ENV = ROOT / ".env.local"
+AGENT_ENV = ROOT.parent / "places-agent" / ".env.local"
 
 
 def load_env(path: Path) -> dict[str, str]:

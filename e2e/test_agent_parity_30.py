@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-AGENT_SCRIPT = ROOT.parent / "1.places-agent" / "scripts" / "e2e-places-agent.py"
+AGENT_SCRIPT = ROOT.parent / "places-agent" / "scripts" / "e2e-places-agent.py"
 
 
 def main() -> int:

@@ -34,7 +34,7 @@ for u in "${URLS[@]}"; do
 done
 
 if [[ "$ok" -ne 1 ]]; then
-  echo "Could not connect to Postgres on :${PORT}. Start it first (e.g. cd ../2.what2eat && make up)." >&2
+  echo "Could not connect to Postgres on :${PORT}. Start it first (e.g. cd ../what2eat && make up)." >&2
   exit 1
 fi
 
