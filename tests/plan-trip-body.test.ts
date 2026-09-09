@@ -100,4 +100,25 @@ describe("planTripBffBody", () => {
       revision: 3,
     });
   });
+
+  it("should_forward_origin_startTime_and_other_to_agent", () => {
+    const parsed = planTripBffBody.parse({
+      city: "Lisbon",
+      startDate: "2026-09-20",
+      days: 4,
+      partySize: 2,
+      budget: "mid",
+      tripType: "couple",
+      pace: "medium",
+      transit: "transit_walk",
+      locale: "EN",
+      originName: "Hills Hotel",
+      startTime: "09:30",
+      other: "No early flights",
+    });
+    const body = toAgentPlanTripBody(parsed);
+    expect(body.origin).toEqual({ name: "Hills Hotel" });
+    expect(body.start_time).toBe("09:30");
+    expect(body.other).toBe("No early flights");
+  });
 });

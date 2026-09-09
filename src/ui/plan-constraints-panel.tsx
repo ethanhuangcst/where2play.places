@@ -9,12 +9,27 @@ type Props = {
 
 const TAKEOFF_COUNT = 8;
 
-function ConstraintCell({ item, t }: { item: ConstraintDisplayItem; t: (key: string) => string }) {
+function ConstraintCell({
+  item,
+  t,
+  span2,
+}: {
+  item: ConstraintDisplayItem;
+  t: (key: string) => string;
+  span2?: boolean;
+}) {
   const pendingClass = item.pending ? "constraint-item__pending" : undefined;
-  const testId = item.key === "mustSee" ? "constraint-must-see" : item.key === "tripType" ? "constraint-trip-type" : undefined;
+  const testId =
+    item.key === "mustSee"
+      ? "constraint-must-see"
+      : item.key === "tripType"
+        ? "constraint-trip-type"
+        : item.key === "hotel"
+          ? "constraint-hotel"
+          : undefined;
 
   return (
-    <div className="constraint-item">
+    <div className={`constraint-item${span2 ? " constraint-item--span-2" : ""}`}>
       <dt>{t(item.labelKey)}</dt>
       {item.chips && item.chips.length > 0 ? (
         <dd className="constraint-must-chips" data-testid={testId}>
@@ -53,9 +68,9 @@ export function PlanConstraintsPanel({ items }: Props) {
             <ConstraintCell key={item.key} item={item} t={t} />
           ))}
         </dl>
-        <dl className="constraint-grid constraint-grid--intake">
+        <dl className="constraint-grid constraint-grid--intake" aria-label={t("play.plan.constraints_title")}>
           {intake.map((item) => (
-            <ConstraintCell key={item.key} item={item} t={t} />
+            <ConstraintCell key={item.key} item={item} t={t} span2={item.key === "other"} />
           ))}
         </dl>
       </div>

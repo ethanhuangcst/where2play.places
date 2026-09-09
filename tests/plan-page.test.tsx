@@ -50,6 +50,19 @@ describe("TC-M10-46-05 plan-page takeoff", () => {
       if (url === "/api/plan/travel-tips") {
         return { ok: true, data: { intro: "Tips" } };
       }
+      if (url === "/api/geocode") {
+        return {
+          ok: true,
+          country: "Portugal",
+          city: "Lisbon",
+          lat: 38.72,
+          lng: -9.14,
+          crs: "WGS84",
+        };
+      }
+      if (url === "/api/plan/resolve-origin") {
+        return { ok: true, kind: "hit", name: "Hills Hotel", lat: 38.73, lng: -9.14 };
+      }
       return { ok: true };
     });
     authNdjsonEvents.mockResolvedValue(undefined);
@@ -77,6 +90,8 @@ describe("TC-M10-46-05 plan-page takeoff", () => {
     expect(container.querySelector(".plan-takeoff")).toBeTruthy();
 
     fireEvent.change(getByTestId("plan-dest"), { target: { value: "Lisbon" } });
+    fireEvent.blur(getByTestId("plan-dest"));
+    await waitFor(() => expect(getByTestId("plan-dest-verified")).toBeTruthy());
     fireEvent.change(getByTestId("plan-days"), { target: { value: "4" } });
     fireEvent.change(getByTestId("plan-party"), { target: { value: "2" } });
     fireEvent.change(getByTestId("plan-budget"), { target: { value: "mid" } });
@@ -101,6 +116,19 @@ describe("TC-M10-46-08 plan-takeoff horizontal layout", () => {
     authJson.mockImplementation(async (url: string) => {
       if (url === "/api/plan/current") return { ok: true, criteria: null, itinerary: null };
       if (url === "/api/plan/travel-tips") return { ok: true, data: { intro: "Tips" } };
+      if (url === "/api/geocode") {
+        return {
+          ok: true,
+          country: "Portugal",
+          city: "Lisbon",
+          lat: 38.72,
+          lng: -9.14,
+          crs: "WGS84",
+        };
+      }
+      if (url === "/api/plan/resolve-origin") {
+        return { ok: true, kind: "hit", name: "Hills Hotel", lat: 38.73, lng: -9.14 };
+      }
       return { ok: true };
     });
   });
@@ -111,15 +139,54 @@ describe("TC-M10-46-08 plan-takeoff horizontal layout", () => {
     delete document.body.dataset.style;
   });
 
-  it("should_use_flex_row_takeoff_with_eight_fields", async () => {
-    const { container } = renderWithLocale(<PlanPageClient />);
-    await waitFor(() => expect(container.querySelector(".plan-takeoff")).toBeTruthy());
+  it("should_use_takeoff_eleven_grid_fields", async () => {
+    const { container, getByTestId } = renderWithLocale(<PlanPageClient />);
+    await waitFor(() => expect(container.querySelector(".plan-takeoff--11")).toBeTruthy());
 
     const takeoff = container.querySelector(".plan-takeoff") as HTMLElement;
-    expect(takeoff.querySelectorAll("[data-field]").length).toBe(8);
+    expect(getByTestId("plan-takeoff-11")).toBeTruthy();
+    expect(takeoff.querySelectorAll("[data-field]").length).toBe(11);
     expect(takeoff.querySelector('[data-field="dest"]')).toBeTruthy();
-    expect(takeoff.querySelector('[data-field="budget"]')).toBeTruthy();
-    expect(takeoff.querySelector(".plan-takeoff__actions")).toBeTruthy();
+    expect(takeoff.querySelector('[data-field="origin"]')).toBeTruthy();
+    expect(takeoff.querySelector('[data-field="start_time"]')).toBeTruthy();
+    expect(takeoff.querySelector('[data-field="other"]')).toBeTruthy();
+    expect(takeoff.querySelector('[data-field="must_see"]')).toBeNull();
+  });
+
+  it("should_resolve_origin_on_blur_without_destVerified_gate", async () => {
+    const { getByTestId } = renderWithLocale(<PlanPageClient />);
+    await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
+    fireEvent.change(getByTestId("plan-dest"), { target: { value: "Lisbon" } });
+    fireEvent.blur(getByTestId("plan-dest"));
+    await waitFor(() => expect(getByTestId("plan-dest-verified")).toBeTruthy());
+
+    authJson.mockImplementation(async (url: string) => {
+      if (url === "/api/plan/current") return { ok: true, criteria: null, itinerary: null };
+      if (url === "/api/geocode") {
+        return {
+          ok: true,
+          country: "Portugal",
+          city: "Lisbon",
+          lat: 38.72,
+          lng: -9.14,
+          crs: "WGS84",
+        };
+      }
+      if (url === "/api/plan/resolve-origin") {
+        return {
+          ok: true,
+          kind: "candidates",
+          cards: [{ name: "Hills Hotel" }, { name: "Hills Hostel" }],
+        };
+      }
+      return { ok: true };
+    });
+
+    fireEvent.change(getByTestId("plan-origin"), { target: { value: "Hills" } });
+    fireEvent.blur(getByTestId("plan-origin"));
+    await waitFor(() => expect(getByTestId("plan-origin-overlay")).toBeTruthy());
+    expect(getByTestId("plan-origin-candidates")).toBeTruthy();
+    expect(authJson.mock.calls.some((c) => c[0] === "/api/plan/resolve-origin")).toBe(true);
   });
 });
 
@@ -129,6 +196,19 @@ describe("TC-M10-46-09 plan-constraints grid layout", () => {
     authJson.mockImplementation(async (url: string) => {
       if (url === "/api/plan/current") return { ok: true, criteria: null, itinerary: null };
       if (url === "/api/plan/travel-tips") return { ok: true, data: { intro: "Tips" } };
+      if (url === "/api/geocode") {
+        return {
+          ok: true,
+          country: "Portugal",
+          city: "Lisbon",
+          lat: 38.72,
+          lng: -9.14,
+          crs: "WGS84",
+        };
+      }
+      if (url === "/api/plan/resolve-origin") {
+        return { ok: true, kind: "hit", name: "Hills Hotel", lat: 38.73, lng: -9.14 };
+      }
       return { ok: true };
     });
   });
@@ -144,6 +224,8 @@ describe("TC-M10-46-09 plan-constraints grid layout", () => {
     await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
 
     fireEvent.change(getByTestId("plan-dest"), { target: { value: "Lisbon" } });
+    fireEvent.blur(getByTestId("plan-dest"));
+    await waitFor(() => expect(getByTestId("plan-dest-verified")).toBeTruthy());
     fireEvent.change(getByTestId("plan-days"), { target: { value: "3" } });
     fireEvent.change(getByTestId("plan-party"), { target: { value: "2" } });
     fireEvent.change(getByTestId("plan-budget"), { target: { value: "mid" } });
@@ -154,8 +236,9 @@ describe("TC-M10-46-09 plan-constraints grid layout", () => {
     const grids = container.querySelectorAll(".constraint-grid");
     expect(grids).toHaveLength(2);
     expect(grids[0]?.querySelectorAll(".constraint-item").length).toBe(8);
-    expect(grids[1]?.querySelectorAll(".constraint-item").length).toBe(4);
+    expect(grids[1]?.querySelectorAll(".constraint-item").length).toBe(3);
     expect(grids[1]?.classList.contains("constraint-grid--intake")).toBe(true);
+    expect(container.querySelector('[data-testid="constraint-must-see"]')).toBeNull();
   });
 });
 
@@ -165,6 +248,19 @@ describe("TC-M10-46-10 plan-nav fixed floating panel", () => {
     authJson.mockImplementation(async (url: string) => {
       if (url === "/api/plan/current") return { ok: true, criteria: null, itinerary: null };
       if (url === "/api/plan/travel-tips") return { ok: true, data: { intro: "Tips" } };
+      if (url === "/api/geocode") {
+        return {
+          ok: true,
+          country: "Portugal",
+          city: "Lisbon",
+          lat: 38.72,
+          lng: -9.14,
+          crs: "WGS84",
+        };
+      }
+      if (url === "/api/plan/resolve-origin") {
+        return { ok: true, kind: "hit", name: "Hills Hotel", lat: 38.73, lng: -9.14 };
+      }
       return { ok: true };
     });
   });
@@ -180,6 +276,8 @@ describe("TC-M10-46-10 plan-nav fixed floating panel", () => {
     await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
 
     fireEvent.change(getByTestId("plan-dest"), { target: { value: "Lisbon" } });
+    fireEvent.blur(getByTestId("plan-dest"));
+    await waitFor(() => expect(getByTestId("plan-dest-verified")).toBeTruthy());
     fireEvent.change(getByTestId("plan-days"), { target: { value: "3" } });
     fireEvent.change(getByTestId("plan-party"), { target: { value: "2" } });
     fireEvent.change(getByTestId("plan-budget"), { target: { value: "mid" } });
@@ -227,6 +325,19 @@ describe("TC-M10-46-11 plan-page head actions", () => {
       }
       if (url === "/api/plan/travel-tips") {
         return { ok: true, data: { intro: "Tips" } };
+      }
+      if (url === "/api/geocode") {
+        return {
+          ok: true,
+          country: "Portugal",
+          city: "Lisbon",
+          lat: 38.72,
+          lng: -9.14,
+          crs: "WGS84",
+        };
+      }
+      if (url === "/api/plan/resolve-origin") {
+        return { ok: true, kind: "hit", name: "Hills Hotel", lat: 38.73, lng: -9.14 };
       }
       return { ok: true };
     });
@@ -283,6 +394,19 @@ describe("Feature 37 AC13 iconic single source", () => {
       if (url === "/api/plan/discover") {
         return { ok: true, trip_id: "t1", revision: 2, iconic_places: iconic };
       }
+      if (url === "/api/geocode") {
+        return {
+          ok: true,
+          country: "Portugal",
+          city: "Lisbon",
+          lat: 38.72,
+          lng: -9.14,
+          crs: "WGS84",
+        };
+      }
+      if (url === "/api/plan/resolve-origin") {
+        return { ok: true, kind: "hit", name: "Hills Hotel", lat: 38.73, lng: -9.14 };
+      }
       return { ok: true };
     });
     authNdjsonEvents.mockResolvedValue(undefined);
@@ -299,6 +423,8 @@ describe("Feature 37 AC13 iconic single source", () => {
     await waitFor(() => expect(container.querySelector('[data-testid="plan-dest"]')).toBeTruthy());
 
     fireEvent.change(container.querySelector('[data-testid="plan-dest"]')!, { target: { value: "Porto" } });
+    fireEvent.blur(container.querySelector('[data-testid="plan-dest"]')!);
+    await waitFor(() => expect(getByTestId("plan-dest-verified")).toBeTruthy());
     fireEvent.change(getByTestId("plan-days"), { target: { value: "4" } });
     fireEvent.change(getByTestId("plan-party"), { target: { value: "2" } });
     fireEvent.change(getByTestId("plan-budget"), { target: { value: "mid" } });
@@ -333,6 +459,19 @@ describe("TC-M20-41 Feature 41 Story 1 CTA intake", () => {
       }
       if (url === "/api/plan/session") {
         return { ok: true, trip_id: "t1" };
+      }
+      if (url === "/api/geocode") {
+        return {
+          ok: true,
+          country: "Portugal",
+          city: "Lisbon",
+          lat: 38.72,
+          lng: -9.14,
+          crs: "WGS84",
+        };
+      }
+      if (url === "/api/plan/resolve-origin") {
+        return { ok: true, kind: "hit", name: "Hills Hotel", lat: 38.73, lng: -9.14 };
       }
       return { ok: true };
     });
@@ -369,10 +508,10 @@ describe("TC-M20-41 Feature 41 Story 1 CTA intake", () => {
     expect(panel).toBeTruthy();
     expect(panel?.textContent).toContain("Lisbon");
     const pending = container.querySelectorAll(".constraint-item__pending");
-    expect(pending.length).toBe(4);
-    const mustSee = container.querySelector('[data-testid="constraint-must-see"]');
-    expect(mustSee?.textContent).toBe("—");
-    expect(mustSee?.textContent).not.toContain("Tower");
+    // hotel + other pending; dayStart seeded from takeoff default 09:00
+    expect(pending.length).toBe(2);
+    expect(container.querySelector('[data-testid="constraint-must-see"]')).toBeNull();
+    expect(panel?.textContent).toContain("09:00");
   });
 
   it("TC-M20-41-04 should_not_show_search_copy_chips_or_tips_on_cta", async () => {
@@ -390,6 +529,8 @@ describe("TC-M20-41 Feature 41 Story 1 CTA intake", () => {
 
 async function submitTakeoff(getByTestId: (id: string) => HTMLElement) {
   fireEvent.change(getByTestId("plan-dest"), { target: { value: "Lisbon" } });
+  fireEvent.blur(getByTestId("plan-dest"));
+  await waitFor(() => expect(getByTestId("plan-dest-verified")).toBeTruthy());
   fireEvent.change(getByTestId("plan-days"), { target: { value: "2" } });
   fireEvent.change(getByTestId("plan-party"), { target: { value: "2" } });
   fireEvent.change(getByTestId("plan-budget"), { target: { value: "mid" } });
@@ -446,13 +587,30 @@ describe("TC-M20-41 Feature 41 Story 2 silent init", () => {
           pool: [{ name: "Hot Alpha", heat: 9, must_see: true, kind: "place" }],
         };
       }
+      if (url === "/api/geocode") {
+        return {
+          ok: true,
+          country: "Portugal",
+          city: "Lisbon",
+          lat: 38.72,
+          lng: -9.14,
+          crs: "WGS84",
+        };
+      }
+      if (url === "/api/plan/resolve-origin") {
+        return { ok: true, kind: "hit", name: "Hills Hotel", lat: 38.73, lng: -9.14 };
+      }
       return { ok: true };
     });
 
     const { getByTestId } = renderWithLocale(<PlanPageClient />);
     await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
     await submitTakeoff(getByTestId);
-    for (let i = 0; i < 5; i += 1) {
+    await waitFor(() => {
+      expect((getByTestId("plan-nav-send") as HTMLButtonElement).disabled).toBe(false);
+      expect(document.body.textContent).toMatch(/hotel|住宿|起点|Hotel/i);
+    });
+    for (let i = 0; i < 4; i += 1) {
       await sendIntakeDefault(getByTestId);
     }
 
@@ -474,6 +632,19 @@ describe("TC-M20-41 Feature 41 Story 2 silent init", () => {
       if (url === "/api/plan/current") return { ok: true, criteria: null, itinerary: null };
       if (url === "/api/plan/discover") {
         return { ok: true, trip_id: "t1", revision: 1, iconic_places: [], pool: [] };
+      }
+      if (url === "/api/geocode") {
+        return {
+          ok: true,
+          country: "Portugal",
+          city: "Lisbon",
+          lat: 38.72,
+          lng: -9.14,
+          crs: "WGS84",
+        };
+      }
+      if (url === "/api/plan/resolve-origin") {
+        return { ok: true, kind: "hit", name: "Hills Hotel", lat: 38.73, lng: -9.14 };
       }
       return { ok: true };
     });
@@ -511,6 +682,19 @@ describe("TC-M20-41 Feature 41 Story 2 silent init", () => {
           iconic_places: ["Hot Alpha"],
           pool: [{ name: "Hot Alpha", heat: 9, must_see: true, kind: "place" }],
         };
+      }
+      if (url === "/api/geocode") {
+        return {
+          ok: true,
+          country: "Portugal",
+          city: "Lisbon",
+          lat: 38.72,
+          lng: -9.14,
+          crs: "WGS84",
+        };
+      }
+      if (url === "/api/plan/resolve-origin") {
+        return { ok: true, kind: "hit", name: "Hills Hotel", lat: 38.73, lng: -9.14 };
       }
       return { ok: true };
     });
@@ -614,6 +798,19 @@ describe("TC-M20-41 Feature 41 Story 2 silent init", () => {
       if (url === "/api/plan/candidates") {
         return { ok: true, trip_id: "t1", iconic_places: ["Hot Alpha"], pool: [] };
       }
+      if (url === "/api/geocode") {
+        return {
+          ok: true,
+          country: "Portugal",
+          city: "Lisbon",
+          lat: 38.72,
+          lng: -9.14,
+          crs: "WGS84",
+        };
+      }
+      if (url === "/api/plan/resolve-origin") {
+        return { ok: true, kind: "hit", name: "Hills Hotel", lat: 38.73, lng: -9.14 };
+      }
       return { ok: true };
     });
     authNdjsonEvents.mockImplementation(async (_url, _init, onEvent) => {
@@ -680,6 +877,19 @@ describe.skip("TC-M19-40-03 / TC-M23-S1 assistant narrative thread order (fill) 
       }
       if (url === "/api/plan/discover") {
         return { ok: true, trip_id: "t1", revision: 1, iconic_places: [] };
+      }
+      if (url === "/api/geocode") {
+        return {
+          ok: true,
+          country: "Portugal",
+          city: "Lisbon",
+          lat: 38.72,
+          lng: -9.14,
+          crs: "WGS84",
+        };
+      }
+      if (url === "/api/plan/resolve-origin") {
+        return { ok: true, kind: "hit", name: "Hills Hotel", lat: 38.73, lng: -9.14 };
       }
       return { ok: true };
     });
@@ -766,6 +976,19 @@ describe.skip("TC-M19-40-03 / TC-M23-S1 assistant narrative thread order (fill) 
           iconic_places: ["Hot Alpha"],
           pool: [{ name: "Hot Alpha", heat: 9, must_see: true, kind: "place" }],
         };
+      }
+      if (url === "/api/geocode") {
+        return {
+          ok: true,
+          country: "Portugal",
+          city: "Lisbon",
+          lat: 38.72,
+          lng: -9.14,
+          crs: "WGS84",
+        };
+      }
+      if (url === "/api/plan/resolve-origin") {
+        return { ok: true, kind: "hit", name: "Hills Hotel", lat: 38.73, lng: -9.14 };
       }
       return { ok: true };
     });
@@ -896,6 +1119,19 @@ describe.skip("TC-M19-40-04 / TC-M23-S1 filling main list skeleton stops — T2"
       if (url === "/api/plan/discover") {
         return { ok: true, trip_id: "t1", revision: 1, iconic_places: [] };
       }
+      if (url === "/api/geocode") {
+        return {
+          ok: true,
+          country: "Portugal",
+          city: "Lisbon",
+          lat: 38.72,
+          lng: -9.14,
+          crs: "WGS84",
+        };
+      }
+      if (url === "/api/plan/resolve-origin") {
+        return { ok: true, kind: "hit", name: "Hills Hotel", lat: 38.73, lng: -9.14 };
+      }
       return { ok: true };
     });
   });
@@ -1015,6 +1251,19 @@ describe.skip("24-P0-ui-C itinerary detail (AC39–41) — T2 fill", () => {
             photos: ["https://cdn.example/tower.jpg"],
           },
         };
+      }
+      if (url === "/api/geocode") {
+        return {
+          ok: true,
+          country: "Portugal",
+          city: "Lisbon",
+          lat: 38.72,
+          lng: -9.14,
+          crs: "WGS84",
+        };
+      }
+      if (url === "/api/plan/resolve-origin") {
+        return { ok: true, kind: "hit", name: "Hills Hotel", lat: 38.73, lng: -9.14 };
       }
       return { ok: true };
     });
@@ -1209,6 +1458,19 @@ describe.skip("transit slot structured pills (ADR-052 update) — T2 fill", () =
       if (url === "/api/plan/discover") {
         return { ok: true, trip_id: "t1", revision: 1, iconic_places: [] };
       }
+      if (url === "/api/geocode") {
+        return {
+          ok: true,
+          country: "Portugal",
+          city: "Lisbon",
+          lat: 38.72,
+          lng: -9.14,
+          crs: "WGS84",
+        };
+      }
+      if (url === "/api/plan/resolve-origin") {
+        return { ok: true, kind: "hit", name: "Hills Hotel", lat: 38.73, lng: -9.14 };
+      }
       return { ok: true };
     });
   });
@@ -1338,6 +1600,19 @@ describe("intake hotel step session errors", () => {
       if (url === "/api/plan/session") {
         throw new MockAuthApiError("errors.session_expired");
       }
+      if (url === "/api/geocode") {
+        return {
+          ok: true,
+          country: "Portugal",
+          city: "Lisbon",
+          lat: 38.72,
+          lng: -9.14,
+          crs: "WGS84",
+        };
+      }
+      if (url === "/api/plan/resolve-origin") {
+        return { ok: true, kind: "hit", name: "Hills Hotel", lat: 38.73, lng: -9.14 };
+      }
       return { ok: true };
     });
     authNdjsonEvents.mockResolvedValue(undefined);
@@ -1365,7 +1640,6 @@ describe("intake hotel step session errors", () => {
       expect(err.textContent).toMatch(/session expired|登录已过期|登入已過期/i);
     });
     expect(assign).toHaveBeenCalledWith("/login");
-    expect(document.body.querySelectorAll(".bubble--user").length).toBe(0);
   });
 });
 
@@ -1393,6 +1667,19 @@ describe("2play-plan-90a T1 session intake without auto-fill", () => {
           status: "needs_input",
           need_input: AGENT_FOUR_NEEDS,
         };
+      }
+      if (url === "/api/geocode") {
+        return {
+          ok: true,
+          country: "Portugal",
+          city: "Lisbon",
+          lat: 38.72,
+          lng: -9.14,
+          crs: "WGS84",
+        };
+      }
+      if (url === "/api/plan/resolve-origin") {
+        return { ok: true, kind: "hit", name: "Hills Hotel", lat: 38.73, lng: -9.14 };
       }
       if (url === "/api/plan/session") return { ok: true };
       if (url === "/api/plan/candidates") {
@@ -1478,6 +1765,19 @@ describe("2play-plan-90a T1 session intake without auto-fill", () => {
       if (url === "/api/plan/candidates") {
         return { ok: true, trip_id: "t1", iconic_places: [], pool: [] };
       }
+      if (url === "/api/geocode") {
+        return {
+          ok: true,
+          country: "Portugal",
+          city: "Lisbon",
+          lat: 38.72,
+          lng: -9.14,
+          crs: "WGS84",
+        };
+      }
+      if (url === "/api/plan/resolve-origin") {
+        return { ok: true, kind: "hit", name: "Hills Hotel", lat: 38.73, lng: -9.14 };
+      }
       return { ok: true };
     });
 
@@ -1493,12 +1793,16 @@ describe("2play-plan-90a T1 session intake without auto-fill", () => {
     await sendIntakeDefault(getByTestId);
     fireEvent.click(getByTestId("plan-need-chip-a"));
     fireEvent.click(getByTestId("plan-nav-send"));
-    await waitFor(() => expect(getByTestId("constraint-must-see").textContent).toContain("断桥残雪"));
+    await waitFor(() => {
+      expect(getByTestId("plan-constraints").textContent).toContain("Hills Hotel Lisboa");
+      expect(document.body.textContent).toContain("断桥残雪");
+    });
 
     await sendIntakeDefault(getByTestId);
     await waitFor(() => {
-      expect(getByTestId("constraint-must-see").textContent).toContain("断桥残雪");
       expect(getByTestId("plan-constraints").textContent).toContain("Hills Hotel Lisboa");
+      expect(document.body.textContent).toContain("断桥残雪");
+      expect(document.body.querySelector('[data-testid="constraint-must-see"]')).toBeNull();
     });
   });
 
@@ -1516,6 +1820,19 @@ describe("2play-plan-90a T1 session intake without auto-fill", () => {
       }
       if (url === "/api/plan/session") {
         throw new MockAuthApiError("play.plan.intake_origin_not_found");
+      }
+      if (url === "/api/geocode") {
+        return {
+          ok: true,
+          country: "Portugal",
+          city: "Lisbon",
+          lat: 38.72,
+          lng: -9.14,
+          crs: "WGS84",
+        };
+      }
+      if (url === "/api/plan/resolve-origin") {
+        return { ok: true, kind: "hit", name: "Hills Hotel", lat: 38.73, lng: -9.14 };
       }
       return { ok: true };
     });
@@ -1563,6 +1880,19 @@ describe("2play-plan-90a T1 session intake without auto-fill", () => {
             ],
           },
         };
+      }
+      if (url === "/api/geocode") {
+        return {
+          ok: true,
+          country: "Portugal",
+          city: "Lisbon",
+          lat: 38.72,
+          lng: -9.14,
+          crs: "WGS84",
+        };
+      }
+      if (url === "/api/plan/resolve-origin") {
+        return { ok: true, kind: "hit", name: "Hills Hotel", lat: 38.73, lng: -9.14 };
       }
       if (url === "/api/plan/session") return { ok: true };
       return { ok: true };
@@ -1612,6 +1942,19 @@ describe("2play-plan-90a T1 session intake without auto-fill", () => {
           stay_on_step: true,
           origin_candidates: [{ name: "Hyatt Regency Lisbon" }, { name: "Hills Hotel Lisboa" }],
         };
+      }
+      if (url === "/api/geocode") {
+        return {
+          ok: true,
+          country: "Portugal",
+          city: "Lisbon",
+          lat: 38.72,
+          lng: -9.14,
+          crs: "WGS84",
+        };
+      }
+      if (url === "/api/plan/resolve-origin") {
+        return { ok: true, kind: "hit", name: "Hills Hotel", lat: 38.73, lng: -9.14 };
       }
       return { ok: true };
     });

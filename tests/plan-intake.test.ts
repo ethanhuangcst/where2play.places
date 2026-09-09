@@ -112,7 +112,7 @@ describe("TC-M10-46-08 plan intake", () => {
     expect(mergeIntakeToBoundaries(takeoff, { c: "not-a-time" }, tt, "EN").timeFrom).toBe("09:00");
   });
 
-  it("TC-M20-41-03 should_keep_must_see_constraint_null_when_unanswered_even_if_suggestions", () => {
+  it("TC-M20-41-03 should_omit_must_see_constraint_row_even_if_suggestions", () => {
     const takeoff = {
       destination: "Lisbon",
       startDate: "2026-09-20",
@@ -127,9 +127,8 @@ describe("TC-M10-46-08 plan intake", () => {
       false,
       ["Belém Tower", "Jerónimos Monastery"],
     );
-    const mustSee = items.find((i) => i.key === "mustSee");
-    expect(mustSee?.value).toBeNull();
-    expect(mustSee?.pending).toBe(true);
+    expect(items.find((i) => i.key === "mustSee")).toBeUndefined();
+    expect(items).toHaveLength(11);
   });
 
   it("TC-M19-40-01 should_not_copy_suggested_chips_into_mustInclude_when_step_g_empty", () => {

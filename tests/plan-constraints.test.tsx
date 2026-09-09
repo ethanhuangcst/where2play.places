@@ -75,7 +75,6 @@ describe("TC-M10-46-09 plan-constraints", () => {
       "transport",
       "hotel",
       "dayStart",
-      "mustSee",
       "other",
     ]);
     expect(items.find((i) => i.key === "pace")?.value).toBe(t("EN", "play.plan.pace.medium"));
@@ -86,7 +85,7 @@ describe("TC-M10-46-09 plan-constraints", () => {
     expect(items.find((i) => i.key === "hotel")?.pending).toBe(true);
   });
 
-  it("should_fill_hotel_and_must_see_from_agent_need_answers", () => {
+  it("should_fill_hotel_from_agent_need_answers_without_must_see_row", () => {
     const fromNeeds = intakeAnswersFromAgentNeeds({
       hotel: "SFEEL设计师酒店",
       start_time: "",
@@ -100,28 +99,18 @@ describe("TC-M10-46-09 plan-constraints", () => {
       true,
     );
     expect(items.find((i) => i.key === "hotel")?.value).toBe("SFEEL设计师酒店");
-    expect(items.find((i) => i.key === "mustSee")?.value).toBe("断桥残雪、白堤");
-    expect(items.find((i) => i.key === "mustSee")?.chips).toEqual(["断桥残雪", "白堤"]);
-    expect(items.find((i) => i.key === "mustSee")?.pending).toBe(false);
+    expect(items.find((i) => i.key === "mustSee")).toBeUndefined();
     expect(items.find((i) => i.key === "pace")?.value).toBe(t("CN", "play.plan.pace.medium"));
   });
 
-  it("TC-M20-41-02 should_mark_must_see_pending_without_poi_names", () => {
-    const items = buildConstraintItems(
-      takeoff,
-      {},
-      tt,
-      false,
-      ["Belém Tower"],
-    );
-    const { getByTestId } = renderWithLocale(<PlanConstraintsPanel items={items} />);
-    const mustSee = getByTestId("constraint-must-see");
-    expect(mustSee.classList.contains("constraint-item__pending")).toBe(true);
-    expect(mustSee.textContent).toBe(t("EN", "play.plan.constraint_pending"));
-    expect(mustSee.textContent).not.toContain("Belém");
+  it("TC-M20-41-02 should_not_render_must_see_constraint_row", () => {
+    const items = buildConstraintItems(takeoff, {}, tt, false, ["Belém Tower"]);
+    expect(items.find((i) => i.key === "mustSee")).toBeUndefined();
+    const { container } = renderWithLocale(<PlanConstraintsPanel items={items} />);
+    expect(container.querySelector('[data-testid="constraint-must-see"]')).toBeNull();
   });
 
-  it("should_show_all_twelve_fields_when_complete", () => {
+  it("should_show_eleven_fields_when_complete", () => {
     const items = buildConstraintItems(
       takeoff,
       {
@@ -136,24 +125,44 @@ describe("TC-M10-46-09 plan-constraints", () => {
       tt,
       true,
     );
-    expect(items).toHaveLength(12);
+    expect(items).toHaveLength(11);
     expect(items.every((i) => i.value != null)).toBe(true);
   });
 
-  it("should_render_takeoff_and_intake_as_two_four_column_grids", () => {
+  it("should_render_takeoff_and_intake_grids_without_must_see", () => {
     const items = buildConstraintItems(
       { ...takeoff, tripType: "couple_romance", pace: "medium", transit: "transit_walk" },
-      { b: "Hotel Lisboa", c: "07:00", g: "Belém Tower、Jerónimos" },
+      { b: "Hotel Lisboa", c: "07:00", h: "quiet nights" },
       tt,
       false,
     );
-    const { container, getByTestId } = renderWithLocale(<PlanConstraintsPanel items={items} />);
+    const { container } = renderWithLocale(<PlanConstraintsPanel items={items} />);
     const grids = container.querySelectorAll(".constraint-grid");
     expect(grids).toHaveLength(2);
     expect(grids[1]?.classList.contains("constraint-grid--intake")).toBe(true);
     expect(grids[0]?.querySelectorAll(".constraint-item")).toHaveLength(8);
-    expect(grids[1]?.querySelectorAll(".constraint-item")).toHaveLength(4);
-    const chips = getByTestId("constraint-must-see").querySelectorAll(".chip");
-    expect(chips.length).toBeGreaterThanOrEqual(1);
+    expect(grids[1]?.querySelectorAll(".constraint-item")).toHaveLength(3);
+    expect(grids[1]?.querySelector(".constraint-item--span-2")).toBeTruthy();
+    expect(container.querySelector('[data-testid="constraint-must-see"]')).toBeNull();
+  });
+
+  it("TC-T2-100-09 should_use_cn_constraint_labels_matching_mock", () => {
+    const items = buildConstraintItems(
+      { ...takeoff, tripType: "couple_romance", pace: "medium", transit: "transit_walk" },
+      { b: "Hotel Lisboa", c: "07:00", h: "quiet nights" },
+      (key) => t("CN", key),
+      false,
+    );
+    expect(items.find((i) => i.key === "startDate")?.labelKey).toBe("play.plan.start_date");
+    expect(t("CN", "play.plan.start_date")).toBe("行程开始日期");
+    expect(t("CN", "play.plan.constraint_days")).toBe("行程天数");
+    expect(t("CN", "play.plan.constraint_party")).toBe("出行人数");
+    expect(t("CN", "play.plan.constraint_hotel")).toBe("每日起点");
+    expect(t("CN", "play.plan.constraint_day_start")).toBe("每日出发时间");
+    expect(t("CN", "play.plan.constraint_pace")).toBe("动线节奏");
+    const { container } = renderWithLocale(<PlanConstraintsPanel items={items} />, "CN");
+    expect(container.textContent).toContain("行程开始日期");
+    expect(container.textContent).toContain("每日起点");
+    expect(container.textContent).toContain("每日出发时间");
   });
 });

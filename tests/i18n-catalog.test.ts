@@ -52,19 +52,44 @@ describe("i18n Story 4 skeleton copy (TC-M20-41-20)", () => {
   });
 });
 
-describe("i18n origin lookup (TC-M21-41-23)", () => {
-  it("should_define_origin_not_found_retry_skip_in_all_locales", () => {
+describe("i18n MVP-T2 takeoff 11 (TC-T2-100-07)", () => {
+  it("should_define_takeoff_eleven_field_keys_in_all_locales", () => {
     for (const key of [
-      "play.plan.intake_origin_not_found",
-      "play.plan.intake_origin_candidates",
-      "play.plan.intake_origin_retry",
-      "play.plan.intake_origin_skip",
+      "play.plan.start_time",
+      "play.plan.origin",
+      "play.plan.other",
+      "play.plan.origin_ph",
+      "play.plan.other_ph",
+      "play.plan.dest_geocode_failed",
+      "play.plan.origin_overlay_title",
+      "play.plan.start_day",
+      "play.plan.trip_type_short",
+      "play.plan.trip_days",
+      "play.plan.party_travel",
+      "play.plan.constraint_days",
+      "play.plan.constraint_party",
+      "play.plan.constraint_hotel",
+      "play.plan.constraint_day_start",
     ] as const) {
       expect(EN[key]).toBeTruthy();
       expect(CN[key]).toBeTruthy();
       expect(HK[key]).toBeTruthy();
       expect(TW[key]).toBeTruthy();
     }
+  });
+
+  it("should_align_cn_labels_with_mock_copy", () => {
+    expect(CN["play.plan.start_day"]).toBe("行程开始日期");
+    expect(CN["play.plan.trip_type_short"]).toBe("行程类型");
+    expect(CN["play.plan.trip_days"]).toBe("天数");
+    expect(CN["play.plan.party_travel"]).toBe("人数");
+    expect(CN["play.plan.budget"]).toBe("行程预算");
+    expect(CN["play.plan.pace"]).toBe("动线节奏");
+    expect(CN["play.plan.other"]).toBe("其他要求");
+    expect(CN["play.plan.constraint_hotel"]).toBe("每日起点");
+    expect(CN["play.plan.constraint_day_start"]).toBe("每日出发时间");
+    expect(CN["play.plan.constraint_days"]).toBe("行程天数");
+    expect(CN["play.plan.constraint_party"]).toBe("出行人数");
   });
 });
 

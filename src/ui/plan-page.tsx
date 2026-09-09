@@ -10,6 +10,8 @@ import {
   INTAKE_STEP_ORDER,
   mergeIntakeToBoundaries,
   nextIntakeStep,
+  nextOpenIntakeStep,
+  firstOpenIntakeStep,
   takeoffIsValid,
   takeoffToBoundaries,
   DEFAULT_TAKEOFF_TRIP_TYPE,
@@ -49,7 +51,8 @@ import { authJson, authNdjsonEvents, AuthApiError } from "@/src/ui/auth-api";
 import { PlanAssistantNav, type SkeletonPreviewDay } from "@/src/ui/plan-assistant-nav";
 import { PlanConstraintsPanel } from "@/src/ui/plan-constraints-panel";
 import { PlanItineraryView } from "@/src/ui/plan-itinerary-view";
-import { PlanTakeoffForm, type TakeoffFieldErrors } from "@/src/ui/plan-takeoff-form";
+import { PlanTakeoffForm, type TakeoffFieldErrors, type OriginOverlayState } from "@/src/ui/plan-takeoff-form";
+import { formatDestVerifiedLabel } from "@/src/core/plan-dest-label";
 import { PlanTravelTipsPanel, type TravelTipsData } from "@/src/ui/plan-travel-tips-panel";
 import { PlaceSheet } from "@/src/ui/place-sheet";
 import { ReplanDialog } from "@/src/ui/replan-dialog";
@@ -109,6 +112,20 @@ export default function PlanPageClient() {
   const [tripType, setTripType] = useState(DEFAULT_TAKEOFF_TRIP_TYPE);
   const [pace, setPace] = useState("medium");
   const [transit, setTransit] = useState("transit_walk");
+  const [startTime, setStartTime] = useState("09:00");
+  const [origin, setOrigin] = useState("");
+  const [other, setOther] = useState("");
+  const [destVerified, setDestVerified] = useState<{
+    country: string;
+    city: string;
+    city_en?: string;
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const [destVerifying, setDestVerifying] = useState(false);
+  const [originOverlay, setOriginOverlay] = useState<OriginOverlayState>(null);
+  const [originResolving, setOriginResolving] = useState(false);
+  const [focusOriginToken, setFocusOriginToken] = useState(0);
   const [needQuestions, setNeedQuestions] = useState<
     Array<{ id: string; prompt: string; options?: Array<{ id: string; label: string }>; multi?: boolean }>
   >([]);
@@ -180,6 +197,185 @@ export default function PlanPageClient() {
     () => takeoffFromState(destination, startDate, days, partySize, budget, tripType, pace, transit),
     [destination, startDate, days, partySize, budget, tripType, pace, transit],
   );
+
+  const destVerifiedLabel = useMemo(
+    () =>
+      destVerified
+        ? formatDestVerifiedLabel({
+            country: destVerified.country,
+            city: destVerified.city,
+            city_en: destVerified.city_en,
+          })
+        : null,
+    [destVerified],
+  );
+
+  const takeoffSubmitEnabled = useMemo(() => {
+    if (!destVerified || destVerifying || originResolving || originOverlay) return false;
+    if (!destination.trim() || !startDate.trim() || !budget.trim()) return false;
+    if (!tripType.trim() || !pace.trim() || !transit.trim()) return false;
+    if (!(startTime.trim() || "09:00")) return false;
+    const d = Number(days);
+    const p = Number(partySize);
+    if (!Number.isInteger(d) || d < 1 || d > 14) return false;
+    if (!Number.isInteger(p) || p < 1 || p > 20) return false;
+    return true;
+  }, [
+    destVerified,
+    destVerifying,
+    originResolving,
+    originOverlay,
+    destination,
+    startDate,
+    budget,
+    tripType,
+    pace,
+    transit,
+    startTime,
+    days,
+    partySize,
+  ]);
+
+  const onDestinationChange = useCallback((v: string) => {
+    setDestination(v);
+    setDestVerified(null);
+    setFieldErrors((prev) => {
+      if (!prev.destination) return prev;
+      const next = { ...prev };
+      delete next.destination;
+      return next;
+    });
+  }, []);
+
+  const onDestinationBlur = useCallback(async () => {
+    const q = destination.trim();
+    if (!q) {
+      setDestVerified(null);
+      return;
+    }
+    setDestVerifying(true);
+    try {
+      const res = await authJson<{
+        ok?: boolean;
+        country?: string;
+        city?: string;
+        city_en?: string;
+        lat?: number;
+        lng?: number;
+        error?: { key?: string };
+      }>("/api/geocode", {
+        method: "POST",
+        body: JSON.stringify({ query: q, locale }),
+      });
+      if (!res.ok || !res.country || !res.city || res.lat == null || res.lng == null) {
+        setDestVerified(null);
+        setFieldErrors((prev) => ({
+          ...prev,
+          destination: "play.plan.dest_geocode_failed",
+        }));
+        return;
+      }
+      setDestVerified({
+        country: res.country,
+        city: res.city,
+        ...(res.city_en ? { city_en: res.city_en } : {}),
+        lat: res.lat,
+        lng: res.lng,
+      });
+      setFieldErrors((prev) => {
+        if (!prev.destination) return prev;
+        const next = { ...prev };
+        delete next.destination;
+        return next;
+      });
+    } catch {
+      setDestVerified(null);
+      setFieldErrors((prev) => ({
+        ...prev,
+        destination: "play.plan.dest_geocode_failed",
+      }));
+    } finally {
+      setDestVerifying(false);
+    }
+  }, [destination, locale]);
+
+  const onOriginChange = useCallback((v: string) => {
+    setOrigin(v);
+  }, []);
+
+  const onOriginBlur = useCallback(
+    async (rawValue?: string) => {
+      const q = (rawValue ?? origin).trim();
+      const dest = destination.trim();
+      // Sync controlled state from the live input so submit / next blur see the same text.
+      if (rawValue !== undefined && rawValue !== origin) {
+        setOrigin(rawValue);
+      }
+      if (!q || !dest) {
+        setOriginOverlay(null);
+        return;
+      }
+      setOriginResolving(true);
+      try {
+        const res = await authJson<{
+          ok?: boolean;
+          kind?: string;
+          name?: string;
+          cards?: Array<{ name: string; lat?: number; lng?: number; provider?: string; native_id?: string }>;
+        }>("/api/plan/resolve-origin", {
+          method: "POST",
+          body: JSON.stringify({ query: q, destination: dest, locale }),
+        });
+        if (res.kind === "hit" && res.name) {
+          setOrigin(res.name);
+          setOriginOverlay(null);
+          return;
+        }
+        if (res.kind === "candidates" && res.cards?.length) {
+          setOriginOverlay({
+            kind: "candidates",
+            query: q,
+            destination: dest,
+            cards: res.cards,
+          });
+          return;
+        }
+        if (res.kind === "skip") {
+          setOriginOverlay(null);
+          return;
+        }
+        setOriginOverlay({ kind: "not_found", query: q, destination: dest });
+      } catch {
+        setOriginOverlay({ kind: "not_found", query: q, destination: dest });
+      } finally {
+        setOriginResolving(false);
+      }
+    },
+    [origin, destination, locale],
+  );
+
+  const onOriginPick = useCallback(
+    (index: number) => {
+      if (!originOverlay || originOverlay.kind !== "candidates") return;
+      const card = originOverlay.cards[index];
+      if (!card) return;
+      setOrigin(card.name);
+      setOriginOverlay(null);
+    },
+    [originOverlay],
+  );
+
+  const onOriginRetry = useCallback(() => {
+    setOrigin("");
+    setOriginOverlay(null);
+    setFocusOriginToken((n) => n + 1);
+  }, []);
+
+  const onOriginSkip = useCallback(() => {
+    setOrigin("");
+    setOriginOverlay(null);
+  }, []);
+
 
   const showTakeoff = pagePhase === "idle";
   const showConstraints = pagePhase !== "idle";
@@ -304,6 +500,14 @@ export default function PlanPageClient() {
     setDays("3");
     setPartySize("2");
     setBudget("mid");
+    setTripType(DEFAULT_TAKEOFF_TRIP_TYPE);
+    setPace("medium");
+    setTransit("transit_walk");
+    setStartTime("09:00");
+    setOrigin("");
+    setOther("");
+    setDestVerified(null);
+    setOriginOverlay(null);
     setPagePhase("idle");
     setNavOpen(false);
     void authJson("/api/plan/current", { method: "DELETE" }).catch(() => undefined);
@@ -532,10 +736,71 @@ export default function PlanPageClient() {
     [locale, t, tripId, tripRevision],
   );
 
-  function onTakeoffSubmit(e: React.FormEvent) {
+  async function onTakeoffSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErrorKey(null);
+
+    const errors: TakeoffFieldErrors = {};
+    if (!destination.trim()) errors.destination = "play.plan.error.destination_required";
+    else if (!destVerified) errors.destination = "play.plan.dest_geocode_failed";
+    if (!startDate.trim()) errors.startDate = "play.plan.error.start_date_required";
+    const d = Number(days);
+    if (!Number.isInteger(d) || d < 1 || d > 14) errors.days = "play.plan.error.days_range";
+    const p = Number(partySize);
+    if (!Number.isInteger(p) || p < 1) errors.partySize = "play.plan.error.days_range";
+    if (!budget.trim()) errors.budget = "play.plan.error.budget_required";
+    if (!tripType.trim()) errors.tripType = "play.plan.error.budget_required";
+    if (!pace.trim()) errors.pace = "play.plan.error.budget_required";
+    if (!transit.trim()) errors.transit = "play.plan.error.budget_required";
+    if (!(startTime.trim() || "09:00")) errors.startTime = "play.plan.error.start_date_required";
+
+    if (Object.keys(errors).length) {
+      setFieldErrors(errors);
+      return;
+    }
     setFieldErrors({});
+
+    if (!destVerified) return;
+
+    // Auto-validate origin on submit when present (Fig2 UX).
+    const originQ = origin.trim();
+    const dest = destination.trim();
+    if (originQ && dest) {
+      setOriginResolving(true);
+      try {
+        const res = await authJson<{
+          ok?: boolean;
+          kind?: string;
+          name?: string;
+          cards?: Array<{ name: string; lat?: number; lng?: number; provider?: string; native_id?: string }>;
+        }>("/api/plan/resolve-origin", {
+          method: "POST",
+          body: JSON.stringify({ query: originQ, destination: dest, locale }),
+        });
+        if (res.kind === "hit" && res.name) {
+          setOrigin(res.name);
+          setOriginOverlay(null);
+        } else if (res.kind === "candidates" && res.cards?.length) {
+          setOriginOverlay({
+            kind: "candidates",
+            query: originQ,
+            destination: dest,
+            cards: res.cards,
+          });
+          return;
+        } else if (res.kind === "skip") {
+          setOriginOverlay(null);
+        } else {
+          setOriginOverlay({ kind: "not_found", query: originQ, destination: dest });
+          return;
+        }
+      } catch {
+        setOriginOverlay({ kind: "not_found", query: originQ, destination: dest });
+        return;
+      } finally {
+        setOriginResolving(false);
+      }
+    }
 
     const parsed = validatePlanBoundaries({
       destination,
@@ -546,10 +811,6 @@ export default function PlanPageClient() {
     });
     if (!parsed.ok) {
       setFieldErrors(parsed.errors as TakeoffFieldErrors);
-      return;
-    }
-    if (!budget.trim()) {
-      setFieldErrors({ budget: "play.plan.error.budget_required" });
       return;
     }
 
@@ -569,7 +830,12 @@ export default function PlanPageClient() {
     setNavOpen(true);
     setIntakeStep(null);
     setIntakeComplete(false);
-    setIntakeAnswers({});
+    const seeded: IntakeAnswers = {
+      c: startTime.trim() || "09:00",
+    };
+    if (origin.trim()) seeded.b = origin.trim();
+    if (other.trim()) seeded.h = other.trim();
+    setIntakeAnswers(seeded);
     setNeedQuestions([]);
     setNeedIndex(0);
     setNeedAnswers({});
@@ -607,6 +873,9 @@ export default function PlanPageClient() {
           pace: fields.pace === "tight" || fields.pace === "relaxed" ? fields.pace : "medium",
           transit: fields.transit === "drive_walk" ? "drive_walk" : "transit_walk",
           locale,
+          ...(origin.trim() ? { originName: origin.trim() } : {}),
+          startTime: startTime.trim() || "09:00",
+          ...(other.trim() ? { other: other.trim() } : {}),
         }),
       });
       if (res.trip_id) {
@@ -620,7 +889,11 @@ export default function PlanPageClient() {
       const qs = res.need_input?.questions ?? [];
       setNeedQuestions(qs);
       if (!qs.length) {
-        setIntakeStep("b");
+        // Skip steps already seeded from takeoff (e.g. startTime → c).
+        setIntakeAnswers((prev) => {
+          setIntakeStep(firstOpenIntakeStep(prev));
+          return prev;
+        });
       }
       const chips = qs.find((q) => q.id === "must_see")?.options?.map((o) => o.label) ?? [];
       if (chips.length) setSuggestedMustSee(chips);
@@ -634,7 +907,7 @@ export default function PlanPageClient() {
       setDiscoverLoading(false);
       setDiscoverSettled(true);
     }
-  }, [locale, takeoff, t]);
+  }, [locale, takeoff, t, origin, startTime, other]);
 
   const runSilentDiscover = useCallback(async () => {
     const fields = takeoff;
@@ -843,7 +1116,7 @@ export default function PlanPageClient() {
             (parseOriginPickIndex(value) != null ? "" : value)
           : value;
       setIntakeAnswers((prev) => ({ ...prev, [step]: stored }));
-      const next = nextIntakeStep(step);
+      const next = nextOpenIntakeStep(step, { ...intakeAnswers, [step]: stored });
       setIntakeStep(next);
       return true;
     } catch (err) {
@@ -866,7 +1139,7 @@ export default function PlanPageClient() {
         return false;
       }
       setIntakeAnswers((prev) => ({ ...prev, [step]: value }));
-      setIntakeStep(nextIntakeStep(step));
+      setIntakeStep(nextOpenIntakeStep(step, { ...intakeAnswers, [step]: value }));
       return true;
     }
   }
@@ -1006,9 +1279,19 @@ export default function PlanPageClient() {
             tripType={tripType}
             pace={pace}
             transit={transit}
+            startTime={startTime}
+            origin={origin}
+            other={other}
+            destVerifiedLabel={destVerifiedLabel}
             fieldErrors={fieldErrors}
+            originOverlay={originOverlay}
+            focusOriginToken={focusOriginToken}
+            submitEnabled={takeoffSubmitEnabled}
             disabled={loading}
-            onDestinationChange={setDestination}
+            onDestinationChange={onDestinationChange}
+            onDestinationBlur={() => {
+              void onDestinationBlur();
+            }}
             onStartDateChange={setStartDate}
             onDaysChange={setDays}
             onPartySizeChange={setPartySize}
@@ -1016,7 +1299,18 @@ export default function PlanPageClient() {
             onTripTypeChange={setTripType}
             onPaceChange={setPace}
             onTransitChange={setTransit}
-            onSubmit={onTakeoffSubmit}
+            onStartTimeChange={setStartTime}
+            onOriginChange={onOriginChange}
+            onOriginBlur={(value) => {
+              void onOriginBlur(value);
+            }}
+            onOtherChange={setOther}
+            onOriginPick={onOriginPick}
+            onOriginRetry={onOriginRetry}
+            onOriginSkip={onOriginSkip}
+            onSubmit={(e) => {
+              void onTakeoffSubmit(e);
+            }}
           />
         ) : null}
 

@@ -78,5 +78,7 @@ export function toAgentPlanTripBody(input: PlanTripBffBody): Record<string, unkn
   if (input.revision) body.revision = input.revision;
   if (input.originName) body.origin = { name: input.originName };
   if (input.mustInclude?.length) body.must_include = input.mustInclude;
+  if (input.startTime?.trim()) body.start_time = input.startTime.trim();
+  if (input.other?.trim()) body.other = input.other.trim();
   return body;
 }

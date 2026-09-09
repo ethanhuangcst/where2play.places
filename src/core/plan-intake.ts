@@ -93,6 +93,26 @@ export function nextIntakeStep(current: IntakeStepId | null): IntakeStepId | nul
   return INTAKE_STEP_ORDER[idx + 1] ?? null;
 }
 
+/** First intake step not already present in answers (e.g. takeoff-seeded startTime). */
+export function firstOpenIntakeStep(answers: IntakeAnswers): IntakeStepId | null {
+  for (const step of INTAKE_STEP_ORDER) {
+    if (!Object.prototype.hasOwnProperty.call(answers, step)) return step;
+  }
+  return null;
+}
+
+/** Next unanswered step after `current` (skips keys already in answers). */
+export function nextOpenIntakeStep(
+  current: IntakeStepId | null,
+  answers: IntakeAnswers,
+): IntakeStepId | null {
+  let next = nextIntakeStep(current);
+  while (next && Object.prototype.hasOwnProperty.call(answers, next)) {
+    next = nextIntakeStep(next);
+  }
+  return next;
+}
+
 function resolveDefaultTripType(t: (key: string) => string): string {
   return t("play.plan.trip_type.city");
 }
@@ -299,13 +319,6 @@ export function buildConstraintItems(
       : resolveIntakeAnswer("f", transportAns, t));
   const transport = formatTransitDisplay(transportRaw, t);
 
-  const mustAns = answers.g;
-  const mustResolved = resolveMustInclude(resolveIntakeAnswer("g", mustAns, t));
-  const mustInclude =
-    mustAns === undefined && !intakeComplete
-      ? null
-      : mustResolved?.join("、") ?? t("play.plan.constraint_must_see_default");
-
   const otherAns = answers.h;
   const other =
     otherAns === undefined && !intakeComplete
@@ -315,10 +328,10 @@ export function buildConstraintItems(
   return [
     { key: "destination", labelKey: "play.plan.destination", ...show(null, takeoff.destination, false) },
     { key: "startDate", labelKey: "play.plan.start_date", ...show(null, takeoff.startDate, false) },
-    { key: "days", labelKey: "play.plan.days", ...show(null, String(takeoff.days), false) },
+    { key: "days", labelKey: "play.plan.constraint_days", ...show(null, String(takeoff.days), false) },
     {
       key: "partySize",
-      labelKey: "play.plan.party",
+      labelKey: "play.plan.constraint_party",
       ...show(null, String(takeoff.partySize), false),
     },
     {
@@ -338,12 +351,6 @@ export function buildConstraintItems(
       key: "dayStart",
       labelKey: "play.plan.constraint_day_start",
       ...show("c", dayStart, dayStartAns === undefined),
-    },
-    {
-      key: "mustSee",
-      labelKey: "play.plan.constraint_must_see",
-      ...show("g", mustInclude, mustAns === undefined),
-      ...(mustAns !== undefined && mustResolved?.length ? { chips: mustResolved } : {}),
     },
     {
       key: "other",

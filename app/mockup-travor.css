@@ -796,16 +796,40 @@ body.shell-app[data-style="travor"] {
   font-size: 1.05rem;
 }
 
+[data-style="travor"] .constraint-item {
+  align-items: baseline;
+}
+[data-style="travor"] .constraint-item dt,
+[data-style="travor"] .constraint-item dd {
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
 [data-style="travor"] .constraint-item dt {
   color: var(--teal-deep);
 }
-
 [data-style="travor"] .constraint-item dd {
   color: var(--ink);
 }
-
 [data-style="travor"] .constraint-item__pending {
   color: var(--mute);
+  font-weight: 600;
+}
+[data-style="travor"] .constraint-grid {
+  --constraint-label-w: 7rem;
+}
+[data-style="travor"] .constraint-grid--intake {
+  margin-top: 0.55rem;
+  padding-top: 0.55rem;
+}
+[data-style="travor"] .constraint-grid--intake .constraint-item dt,
+[data-style="travor"] .constraint-grid--intake .constraint-item dd {
+  white-space: nowrap;
+}
+[data-style="travor"] .constraint-grid--intake .constraint-item dd {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* 页签导航状态条 */
@@ -1313,4 +1337,346 @@ body.shell-app[data-style="travor"] {
   [data-style="travor"] .place-split {
     grid-template-columns: 1fr;
   }
+}
+
+/* MVP-T2 takeoff-11 — two hard rows; equal control chrome; balanced columns */
+[data-style="travor"] .plan-takeoff--11 {
+  --takeoff-control-h: 2.75rem;
+  --takeoff-label-h: 1.2rem;
+  --takeoff-label-gap: 0.3rem;
+  /* Shared column tracks so R2 cols 1–3 left-align + same width as R1 dest / date / type */
+  --takeoff-cols:
+    minmax(7.5rem, 1.45fr)   /* 1 dest ↔ origin */
+    minmax(9.25rem, 1.15fr)  /* 2 date ↔ startTime */
+    minmax(6.5rem, 1.1fr)    /* 3 type ↔ transit */
+    4.5rem                   /* 4 days */
+    4.5rem                   /* 5 party */
+    minmax(5.75rem, 1fr)     /* 6 budget */
+    minmax(5.75rem, 1fr);    /* 7 pace / CTA */
+  --takeoff-col-gap: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  align-items: stretch;
+  width: 100%;
+}
+[data-style="travor"] .plan-takeoff--11 .plan-takeoff__grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.45rem;
+  width: 100%;
+  min-width: 0;
+}
+[data-style="travor"] .plan-takeoff--11 .plan-takeoff__row--1,
+[data-style="travor"] .plan-takeoff--11 .plan-takeoff__row--2 {
+  display: grid;
+  grid-template-columns: var(--takeoff-cols);
+  column-gap: var(--takeoff-col-gap);
+  align-items: start;
+  width: 100%;
+}
+/* R2: other spans days+party+budget; CTA occupies pace column */
+[data-style="travor"] .plan-takeoff--11 .plan-takeoff__row--2 .field--other-span {
+  grid-column: 4 / 7;
+}
+[data-style="travor"] .plan-takeoff--11 .plan-takeoff__row--2 .plan-takeoff__actions {
+  grid-column: 7;
+}
+/* Field shell: fixed label row + fixed control row → identical Y across the row */
+[data-style="travor"] .plan-takeoff--11 .field {
+  display: grid;
+  grid-template-rows: var(--takeoff-label-h) var(--takeoff-control-h);
+  row-gap: var(--takeoff-label-gap);
+  align-items: stretch;
+  justify-items: stretch;
+  margin: 0;
+  min-width: 0;
+  width: 100%;
+  position: relative;
+  flex: unset;
+}
+[data-style="travor"] .plan-takeoff--11 .field > label {
+  display: flex;
+  align-items: flex-end;
+  margin: 0;
+  padding: 0;
+  height: var(--takeoff-label-h);
+  font-size: 0.78rem;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: auto;
+  flex: unset;
+}
+[data-style="travor"] .plan-takeoff--11 .field label.is-required::after {
+  content: " *";
+  color: var(--danger, #b6542a);
+  font-weight: 700;
+}
+/* One control surface — same box model for text / number / date / time / select / combo */
+[data-style="travor"] .plan-takeoff--11 .field > input,
+[data-style="travor"] .plan-takeoff--11 .field > select,
+[data-style="travor"] .plan-takeoff--11 .field > .combo {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  height: var(--takeoff-control-h);
+  min-height: var(--takeoff-control-h);
+  max-height: var(--takeoff-control-h);
+  margin: 0;
+  padding: 0 0.65rem;
+  border: 1.5px solid var(--line, #c9ddd4);
+  border-radius: var(--radius-control, 0.85rem);
+  background: var(--plate, #fffdf8);
+  color: var(--ink, #243832);
+  font: inherit;
+  font-size: 0.95rem;
+  line-height: 1;
+  vertical-align: middle;
+}
+[data-style="travor"] .plan-takeoff--11 .field > select {
+  padding-right: 1.75rem;
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink-2, #3a524c) 50%),
+    linear-gradient(135deg, var(--ink-2, #3a524c) 50%, transparent 50%);
+  background-position: calc(100% - 0.85rem) 50%, calc(100% - 0.55rem) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+[data-style="travor"] .plan-takeoff--11 .field > .combo {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: stretch;
+  padding: 0;
+  overflow: hidden;
+}
+[data-style="travor"] .plan-takeoff--11 .field > .combo > input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  max-height: none;
+  margin: 0;
+  padding: 0 0.55rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+[data-style="travor"] .plan-takeoff--11 .field > .combo > .combo__toggle {
+  width: 2rem;
+  height: 100%;
+  margin: 0;
+  border: 0;
+  border-left: 1px solid var(--line, #c9ddd4);
+  border-radius: 0;
+  background: transparent;
+}
+/* Number: same padding/height as siblings; keep native spinner */
+[data-style="travor"] .plan-takeoff--11 .field[data-field="days"] > input[type="number"],
+[data-style="travor"] .plan-takeoff--11 .field[data-field="party"] > input[type="number"] {
+  width: 100%;
+  max-width: none;
+  flex: unset;
+  text-align: center;
+  padding: 0 0.15rem 0 0.35rem;
+  -moz-appearance: auto;
+  appearance: auto;
+}
+[data-style="travor"] .plan-takeoff--11 .field[data-field="days"] > input[type="number"]::-webkit-outer-spin-button,
+[data-style="travor"] .plan-takeoff--11 .field[data-field="days"] > input[type="number"]::-webkit-inner-spin-button,
+[data-style="travor"] .plan-takeoff--11 .field[data-field="party"] > input[type="number"]::-webkit-outer-spin-button,
+[data-style="travor"] .plan-takeoff--11 .field[data-field="party"] > input[type="number"]::-webkit-inner-spin-button {
+  height: 1.35rem;
+  margin: 0;
+  opacity: 1;
+}
+/* Date / time: fill cell; calendar/clock icon inside */
+[data-style="travor"] .plan-takeoff--11 .field[data-field="start_date"] > input[type="date"],
+[data-style="travor"] .plan-takeoff--11 .field[data-field="start_time"] > input[type="time"] {
+  position: relative;
+  width: 100%;
+  max-width: none;
+  padding-right: 1.85rem;
+}
+[data-style="travor"] .plan-takeoff--11 .field[data-field="start_date"] input::-webkit-calendar-picker-indicator,
+[data-style="travor"] .plan-takeoff--11 .field[data-field="start_time"] input::-webkit-calendar-picker-indicator {
+  position: absolute;
+  right: 0.35rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  padding: 0;
+  opacity: 1;
+  cursor: pointer;
+}
+[data-style="travor"] .plan-takeoff--11 .field[data-field="start_date"] input::-webkit-datetime-edit,
+[data-style="travor"] .plan-takeoff--11 .field[data-field="start_date"] input::-webkit-datetime-edit-fields-wrapper,
+[data-style="travor"] .plan-takeoff--11 .field[data-field="start_time"] input::-webkit-datetime-edit,
+[data-style="travor"] .plan-takeoff--11 .field[data-field="start_time"] input::-webkit-datetime-edit-fields-wrapper {
+  padding: 0;
+}
+/* Dest verify overlays below control — does not change grid row height */
+[data-style="travor"] .plan-takeoff--11 .plan-takeoff__verified {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(var(--takeoff-label-h) + var(--takeoff-label-gap) + var(--takeoff-control-h) + 0.15rem);
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  color: var(--teal-deep, #1f5c4f);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  z-index: 2;
+}
+[data-style="travor"] .plan-takeoff--11 .field[data-field="dest"] .field-error {
+  position: absolute;
+  left: 0;
+  top: calc(var(--takeoff-label-h) + var(--takeoff-label-gap) + var(--takeoff-control-h) + 0.15rem);
+  margin: 0;
+  z-index: 2;
+}
+/* Kill legacy takeoff width/flex rules inside --11 */
+[data-style="travor"] .plan-takeoff--11 .field[data-field="dest"],
+[data-style="travor"] .plan-takeoff--11 .field[data-field="start_date"],
+[data-style="travor"] .plan-takeoff--11 .field[data-field="days"],
+[data-style="travor"] .plan-takeoff--11 .field[data-field="party"],
+[data-style="travor"] .plan-takeoff--11 .field[data-field="trip_type"],
+[data-style="travor"] .plan-takeoff--11 .field[data-field="budget"],
+[data-style="travor"] .plan-takeoff--11 .field[data-field="pace"],
+[data-style="travor"] .plan-takeoff--11 .field[data-field="origin"],
+[data-style="travor"] .plan-takeoff--11 .field[data-field="start_time"],
+[data-style="travor"] .plan-takeoff--11 .field[data-field="transit"],
+[data-style="travor"] .plan-takeoff--11 .field[data-field="other"],
+[data-style="travor"] .plan-takeoff--11 .field--grow {
+  flex: unset;
+  width: auto;
+  max-width: none;
+  min-width: 0;
+}
+[data-style="travor"] .plan-takeoff--11 .field[data-field="dest"] > input,
+[data-style="travor"] .plan-takeoff--11 .field[data-field="origin"] > input,
+[data-style="travor"] .plan-takeoff--11 .field[data-field="other"] > input,
+[data-style="travor"] .plan-takeoff--11 .field[data-field="trip_type"] .combo,
+[data-style="travor"] .plan-takeoff--11 .field[data-field="budget"] > select,
+[data-style="travor"] .plan-takeoff--11 .field[data-field="pace"] > select,
+[data-style="travor"] .plan-takeoff--11 .field[data-field="transit"] > select {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+/* CTA sits in the control band (under empty label slot) */
+[data-style="travor"] .plan-takeoff--11 .plan-takeoff__actions {
+  display: grid;
+  grid-template-rows: var(--takeoff-label-h) var(--takeoff-control-h);
+  row-gap: var(--takeoff-label-gap);
+  align-items: stretch;
+  justify-items: stretch;
+  margin: 0;
+  padding: 0;
+  min-width: 8.75rem;
+}
+[data-style="travor"] .plan-takeoff--11 .plan-takeoff__actions::before {
+  content: "";
+  display: block;
+}
+[data-style="travor"] .plan-takeoff--11 .plan-takeoff__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 8.75rem;
+  height: var(--takeoff-control-h);
+  min-height: var(--takeoff-control-h);
+  max-height: var(--takeoff-control-h);
+  margin: 0;
+  padding: 0 1.25rem;
+  aspect-ratio: auto;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  line-height: 1;
+}
+[data-style="travor"] .plan-takeoff--11 .plan-takeoff__cta span {
+  display: inline;
+}
+[data-style="travor"] .plan-takeoff--11 .plan-takeoff__cta[disabled],
+[data-style="travor"] .plan-takeoff--11 .plan-takeoff__cta.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.takeoff-origin-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background: rgba(36, 56, 50, 0.35);
+}
+.takeoff-origin-overlay[hidden] { display: none !important; }
+.takeoff-origin-sheet {
+  width: min(28rem, 100%);
+  max-height: min(70vh, 32rem);
+  overflow: auto;
+  background: var(--plate, #fffdf8);
+  border: 1px solid var(--line, #c9ddd4);
+  border-radius: 1rem;
+  box-shadow: 0 12px 40px rgba(36, 56, 50, 0.18);
+  padding: 1rem 1.1rem 1.15rem;
+}
+.takeoff-origin-sheet h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  color: var(--ink, #243832);
+}
+.takeoff-origin-sheet p {
+  margin: 0 0 0.75rem;
+  font-size: 0.88rem;
+  color: var(--mute, #5c726b);
+  line-height: 1.45;
+}
+.takeoff-origin-sheet__list {
+  list-style: none;
+  margin: 0 0 0.85rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.takeoff-origin-sheet__list button {
+  width: 100%;
+  text-align: left;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--line, #c9ddd4);
+  border-radius: 0.65rem;
+  background: #fff;
+  cursor: pointer;
+  font: inherit;
+  color: var(--ink, #243832);
+}
+.takeoff-origin-sheet__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.takeoff-origin-sheet__actions .btn {
+  background: var(--accent-cta, #ffa26b);
+  color: #fff;
+  border: none;
+}
+.takeoff-origin-sheet__actions .btn:hover {
+  background: var(--accent-cta-hover, #ff621f);
 }

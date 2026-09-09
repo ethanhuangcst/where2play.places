@@ -14,6 +14,9 @@ export type GeocodeResult = {
   lng: number;
   crs: string;
   label?: string;
+  country?: string;
+  city?: string;
+  city_en?: string;
 };
 
 export type FetchFn = typeof fetch;
@@ -82,6 +85,9 @@ type AgentGeocodeData = {
   crs: string;
   address?: string;
   label?: string;
+  country?: string;
+  city?: string;
+  city_en?: string;
 };
 
 export async function reverseGeocode(input: {
@@ -105,6 +111,9 @@ export async function reverseGeocode(input: {
       lng: envelope.data.lng,
       crs: envelope.data.crs,
       label,
+      ...(envelope.data.country ? { country: envelope.data.country } : {}),
+      ...(envelope.data.city ? { city: envelope.data.city } : {}),
+      ...(envelope.data.city_en ? { city_en: envelope.data.city_en } : {}),
     },
   };
 }
@@ -129,6 +138,9 @@ export async function geocode(input: {
       lng: envelope.data.lng,
       crs: envelope.data.crs,
       label,
+      ...(envelope.data.country ? { country: envelope.data.country } : {}),
+      ...(envelope.data.city ? { city: envelope.data.city } : {}),
+      ...(envelope.data.city_en ? { city_en: envelope.data.city_en } : {}),
     },
   };
 }

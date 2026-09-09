@@ -3695,26 +3695,52 @@ html[lang^="zh"] .app-user__tools .btn {
   display: none;
 }
 
-/* —— 出行限制（只读）：4 列、上标下值，起飞 8 + intake 4 —— */
+/* —— 出行限制（只读）：统一 4 列轨道；标签/值均左对齐 —— */
 .constraint-grid {
+  /* Longest label across rows: 每日出发时间： — keeps col1/col2 value edges aligned */
+  --constraint-label-w: 7rem;
+  --constraint-cols: minmax(0, 1.25fr) minmax(0, 1.1fr) minmax(0, 0.85fr) minmax(0, 0.9fr);
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  column-gap: 1.25rem;
-  row-gap: 0.9rem;
+  grid-template-columns: var(--constraint-cols);
+  column-gap: 1.1rem;
+  row-gap: 0.45rem;
   margin: 0;
 }
 
 .constraint-grid--intake {
-  margin-top: 0.95rem;
-  padding-top: 0.95rem;
+  /* Same track widths as takeoff so 起始日/预算 与 每日出发时间 share col2 */
+  grid-template-columns: var(--constraint-cols);
+  margin-top: 0.65rem;
+  padding-top: 0.65rem;
   border-top: 1px solid var(--line);
 }
 
+.constraint-grid--intake .constraint-item dt,
+.constraint-grid--intake .constraint-item dd {
+  white-space: nowrap;
+}
+
+.constraint-grid--intake .constraint-item dd {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
+}
+
+.constraint-grid--intake .constraint-must-chips {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+}
+
+.constraint-item--span-2 {
+  grid-column: span 2;
+}
+
 .constraint-item {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.22rem;
+  display: grid;
+  grid-template-columns: var(--constraint-label-w) minmax(0, 1fr);
+  column-gap: 0.35rem;
+  align-items: baseline;
   min-width: 0;
   margin: 0;
 }
@@ -3722,25 +3748,34 @@ html[lang^="zh"] .app-user__tools .btn {
 .constraint-item dt {
   margin: 0;
   font-family: var(--font-ui);
-  font-size: 0.72rem;
+  font-size: 0.88rem;
   font-weight: 600;
-  letter-spacing: 0.02em;
-  line-height: 1.2;
+  letter-spacing: 0;
+  line-height: 1.4;
   color: var(--mute);
+  white-space: nowrap;
+  text-align: left;
+}
+
+.constraint-item dt::after {
+  content: "：";
 }
 
 .constraint-item dd {
   margin: 0;
+  min-width: 0;
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: 0.88rem;
   font-weight: 600;
-  line-height: 1.35;
+  letter-spacing: 0;
+  line-height: 1.4;
   color: var(--ink);
+  text-align: left;
   overflow-wrap: anywhere;
 }
 
 .constraint-item__pending {
-  font-weight: 500;
+  font-weight: 600;
   color: var(--mute);
 }
 
@@ -3748,6 +3783,7 @@ html[lang^="zh"] .app-user__tools .btn {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
+  justify-content: flex-start;
 }
 
 .plan-constraints .constraint-must-chips .chip {
@@ -3756,7 +3792,15 @@ html[lang^="zh"] .app-user__tools .btn {
 
 @media (max-width: 720px) {
   .constraint-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    --constraint-cols: repeat(2, minmax(0, 1fr));
+    grid-template-columns: var(--constraint-cols);
+  }
+  .constraint-grid--intake {
+    --constraint-cols: 1fr;
+    grid-template-columns: var(--constraint-cols);
+  }
+  .constraint-item--span-2 {
+    grid-column: auto;
   }
 }
 

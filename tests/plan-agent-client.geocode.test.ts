@@ -55,6 +55,31 @@ describe("client.geocode (forward geocode: name → coordinates)", () => {
     expect(envelope.outcome?.key).toBe("errors.provider_failed");
   });
 
+  it("should_passthrough_country_city_city_en", async () => {
+    setPlacesAgentFetchForTests(async () =>
+      jsonResponse({
+        agent: "places-agent",
+        ok: true,
+        data: {
+          lat: 38.72,
+          lng: -9.14,
+          crs: "WGS84",
+          address: "Lisbon",
+          country: "葡萄牙",
+          city: "里斯本",
+          city_en: "Lisbon",
+        },
+      }),
+    );
+    const envelope = await geocode({ query: "里斯本", locale: "CN" });
+    expect(envelope.data).toMatchObject({
+      country: "葡萄牙",
+      city: "里斯本",
+      city_en: "Lisbon",
+      label: "Lisbon",
+    });
+  });
+
   it("should_return_null_data_when_network_throws", async () => {
     setPlacesAgentFetchForTests(async () => {
       throw new Error("network error");
