@@ -151,6 +151,24 @@ export async function searchPlaces(input: {
   });
 }
 
+export async function suggestPlaces(input: {
+  query: string;
+  address?: string;
+  near?: { lat: number; lng: number; crs?: string };
+  locale: string;
+  providers?: string[];
+  bias_radius_m?: number;
+}): Promise<AgentEnvelope<Array<{ name: string; location?: { lat?: number; lng?: number }; address?: string }>>> {
+  return postV1("suggest_places", {
+    query: input.query,
+    address: input.address,
+    near: input.near,
+    locale: input.locale,
+    providers: input.providers,
+    bias_radius_m: input.bias_radius_m,
+  });
+}
+
 export function defaultProviders(): string[] {
   try {
     const raw = process.env.W2P_DEFAULT_PROVIDERS ?? '["GOOGLE_MAPS"]';
@@ -284,6 +302,42 @@ export async function patchTrip(
   body: Record<string, unknown>,
 ): Promise<AgentEnvelope<{ trip_id?: string; revision?: number }>> {
   return postV1("patch_trip", body, injectedFetch ?? fetch, planTimeoutMs());
+}
+
+export type PlanTripData = {
+  trip_id: string;
+  revision: number;
+  status: "needs_input" | "planning" | "ready" | "failed";
+  need_input?: {
+    questions: Array<{
+      id: string;
+      prompt: string;
+      options?: Array<{ id: string; label: string }>;
+      multi?: boolean;
+    }>;
+  };
+};
+
+export async function planTrip(
+  body: Record<string, unknown>,
+): Promise<AgentEnvelope<PlanTripData>> {
+  return postV1<PlanTripData>("plan_trip", body, injectedFetch ?? fetch, planTimeoutMs());
+}
+
+export type ListDestinationPoisData = {
+  count: number;
+  places: Array<{ name: string; kind?: string; must_see?: boolean; provider?: string }>;
+};
+
+export async function listDestinationPois(
+  body: Record<string, unknown>,
+): Promise<AgentEnvelope<ListDestinationPoisData>> {
+  return postV1<ListDestinationPoisData>(
+    "list_destination_pois",
+    body,
+    injectedFetch ?? fetch,
+    timeoutMs(),
+  );
 }
 
 export async function fetchTripDetails(

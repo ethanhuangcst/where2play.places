@@ -5,6 +5,7 @@ import { useLocale, useT } from "@/src/i18n/use-t";
 import type { ItineraryDto, ItinerarySlot } from "@/src/core/itinerary-types";
 import { mealSlotLabelKey, skeletonStopLabel } from "@/src/core/meal-slot-label";
 import { planStopKindLabel } from "@/src/core/plan-slot-preview";
+import { planProviderKey } from "@/src/core/plan-provider-label";
 
 export type LiveHighlights = {
   label: string;
@@ -199,13 +200,52 @@ export function PlanItineraryView({
 
           {slots.map((slot, idx) => {
             if (slot.kind === "transit") {
+              const hasStructured = Array.isArray(slot.legs) && slot.legs.length > 0;
               return (
                 <div
                   key={`t-${idx}`}
                   className={`transit-line slot slot--transit${onArrangeDay && liveSlots.length > 0 ? " is-entering" : ""}`}
                   data-testid="plan-transit-slot"
                 >
-                  <div className="slot-body">{slot.text}</div>
+                  {hasStructured ? (
+                    <p className="transit-line">
+                      {slot.from ? (
+                        <span className="transit-from">
+                          {t("play.plan.transit.from_label")}{" "}
+                          <span className="transit-place">{slot.from}</span>
+                        </span>
+                      ) : null}
+                      {slot.to ? (
+                        <span className="transit-to">
+                          {t("play.plan.transit.to_label")}{" "}
+                          <span className="transit-place">{slot.to}</span>：
+                        </span>
+                      ) : null}
+                      {slot.legs!.map((leg, legIdx) => {
+                        const modeKey = `play.plan.transit.mode.${leg.mode}`;
+                        const modeLabel = t(modeKey);
+                        const durLabel = t("play.plan.transit.line", {
+                          mode: modeLabel,
+                          minutes: String(leg.duration_min),
+                        });
+                        return (
+                          <span
+                            key={`leg-${legIdx}`}
+                            className={`transit-option${leg.recommended ? " transit-option--rec" : ""}`}
+                          >
+                            <span className="transit-bracket">[</span>
+                            <span className="transit-mode">{durLabel}</span>
+                            <span className="transit-bracket">]</span>
+                            {legIdx < slot.legs!.length - 1 ? (
+                              <span className="transit-divider"> / </span>
+                            ) : null}
+                          </span>
+                        );
+                      })}
+                    </p>
+                  ) : (
+                    <div className="slot-body">{slot.text}</div>
+                  )}
                 </div>
               );
             }
@@ -246,7 +286,12 @@ export function PlanItineraryView({
                   <div className="slot-main">
                     <div className="slot-copy">
                       <span className="slot-kind">{planStopKindLabel(slot.placeKind, t, slot.mealSlot)}</span>
-                      <h3>{slot.name}</h3>
+                      <h3>
+                        {slot.name}
+                        <span className="slot-provider" data-testid="stop-provider">
+                          {t(planProviderKey(slot.provider))}
+                        </span>
+                      </h3>
                       {slot.summary ? <p>{slot.summary}</p> : null}
                     </div>
                     <div className="slot-actions">

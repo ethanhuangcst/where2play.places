@@ -2,9 +2,26 @@ import type { PlanBoundaries } from "./itinerary-types";
 import { coerceAgentTime } from "./coerce-agent-time";
 import { budgetOptionLabel, normalizeBudgetKey, type BudgetOptionKey } from "./plan-budget";
 import { ORIGIN_RETRY_CHIP, originPickChipValue, parseOriginPickIndex } from "./plan-resolve-origin";
+import {
+  normalizeTransitKey,
+  transitKeyForAgent,
+  transitOptionLabel,
+  type TransitOptionKey,
+} from "./plan-transit";
+
+export type AgentNeedId = "hotel" | "start_time" | "must_see" | "other";
+
+export type AgentNeedAnswers = Partial<Record<AgentNeedId, string>>;
 
 /** Assistant steps b–h per performance.md §12.11 / 2play-design §4.2.1 */
 export type IntakeStepId = "b" | "c" | "d" | "e" | "f" | "g" | "h";
+
+export const AGENT_NEED_TO_INTAKE_STEP: Record<AgentNeedId, IntakeStepId> = {
+  hotel: "b",
+  start_time: "c",
+  must_see: "g",
+  other: "h",
+};
 
 export const INTAKE_STEP_ORDER: IntakeStepId[] = ["b", "c", "d", "e", "f", "g", "h"];
 
@@ -16,6 +33,9 @@ export type TakeoffFields = {
   days: number;
   partySize: number;
   budget: string;
+  tripType?: string;
+  pace?: string;
+  transit?: string;
 };
 
 /** i18n keys for default option labels (resolved at UI layer). */
@@ -156,6 +176,39 @@ export function tripConstraintsFromIntakeStep(
   }
 }
 
+/** True-agent path: 8 takeoff fields + 4 agent needs_input answers. */
+export function takeoffToBoundaries(
+  takeoff: TakeoffFields,
+  needs: AgentNeedAnswers,
+  t: (key: string) => string,
+  locale?: string,
+): PlanBoundaries {
+  const tripType = takeoff.tripType?.trim() || DEFAULT_TAKEOFF_TRIP_TYPE;
+  const pace = takeoff.pace?.trim() || "medium";
+  const transitKey = (takeoff.transit ?? "transit_walk") as TransitOptionKey | "";
+  const transport = transitKeyForAgent(transitKey) ?? takeoff.transit ?? "";
+  const hotel = needs.hotel?.trim() ?? "";
+  const timeFrom = normalizeTime(needs.start_time?.trim() || "09:00");
+  const mustInclude = resolveMustInclude(needs.must_see);
+  const constraintsRaw = needs.other?.trim() ?? "";
+
+  return {
+    destination: takeoff.destination.trim(),
+    startDate: takeoff.startDate,
+    days: takeoff.days,
+    partySize: takeoff.partySize,
+    budget: takeoff.budget,
+    ...(hotel ? { dailyStart: hotel } : {}),
+    timeFrom,
+    tripType,
+    pace,
+    transport,
+    ...(mustInclude?.length ? { mustInclude } : {}),
+    ...(constraintsRaw ? { constraints: constraintsRaw.slice(0, 500) } : {}),
+    ...(locale ? { locale } : {}),
+  };
+}
+
 export function mergeIntakeToBoundaries(
   takeoff: TakeoffFields,
   answers: IntakeAnswers,
@@ -165,9 +218,11 @@ export function mergeIntakeToBoundaries(
 ): PlanBoundaries {
   const hotel = resolveIntakeAnswer("b", answers.b, t);
   const timeFrom = normalizeTime(resolveIntakeAnswer("c", answers.c, t) || "09:00");
-  const tripType = resolveIntakeAnswer("d", answers.d, t);
-  const pace = resolveIntakeAnswer("e", answers.e, t);
-  const transport = resolveIntakeAnswer("f", answers.f, t);
+  const tripType = takeoff.tripType?.trim() || resolveIntakeAnswer("d", answers.d, t);
+  const pace = takeoff.pace?.trim() || resolveIntakeAnswer("e", answers.e, t);
+  const transport =
+    transitKeyForAgent((takeoff.transit ?? "") as TransitOptionKey | "") ||
+    resolveIntakeAnswer("f", answers.f, t);
   const mustRaw = resolveIntakeAnswer("g", answers.g, t);
   const constraintsRaw = resolveIntakeAnswer("h", answers.h, t);
   const mustInclude = resolveMustInclude(mustRaw);
@@ -194,6 +249,7 @@ export type ConstraintDisplayItem = {
   labelKey: string;
   value: string | null;
   pending: boolean;
+  chips?: string[];
 };
 
 export function buildConstraintItems(
@@ -224,20 +280,24 @@ export function buildConstraintItems(
       : resolveIntakeAnswer("c", dayStartAns, t) || "09:00";
 
   const tripTypeAns = answers.d;
-  const tripType =
-    tripTypeAns === undefined && !intakeComplete
-      ? null
-      : resolveIntakeAnswer("d", tripTypeAns, t);
-
   const paceAns = answers.e;
-  const pace =
-    paceAns === undefined && !intakeComplete ? null : resolveIntakeAnswer("e", paceAns, t);
-
   const transportAns = answers.f;
-  const transport =
-    transportAns === undefined && !intakeComplete
+  const tripTypeRaw =
+    takeoff.tripType?.trim() ||
+    (tripTypeAns === undefined && !intakeComplete ? null : resolveIntakeAnswer("d", tripTypeAns, t));
+  const tripType = formatTripTypeDisplay(tripTypeRaw, t);
+
+  const paceRaw =
+    takeoff.pace?.trim() ||
+    (paceAns === undefined && !intakeComplete ? null : resolveIntakeAnswer("e", paceAns, t));
+  const pace = formatPaceDisplay(paceRaw, t);
+
+  const transportRaw =
+    takeoff.transit?.trim() ||
+    (transportAns === undefined && !intakeComplete
       ? null
-      : resolveIntakeAnswer("f", transportAns, t);
+      : resolveIntakeAnswer("f", transportAns, t));
+  const transport = formatTransitDisplay(transportRaw, t);
 
   const mustAns = answers.g;
   const mustResolved = resolveMustInclude(resolveIntakeAnswer("g", mustAns, t));
@@ -261,7 +321,18 @@ export function buildConstraintItems(
       labelKey: "play.plan.party",
       ...show(null, String(takeoff.partySize), false),
     },
+    {
+      key: "tripType",
+      labelKey: "play.plan.constraint_trip_type",
+      ...show(null, tripType, false),
+    },
     { key: "budget", labelKey: "play.plan.budget", ...show(null, formatBudgetDisplay(takeoff.budget, t), false) },
+    { key: "pace", labelKey: "play.plan.constraint_pace", ...show(null, pace, false) },
+    {
+      key: "transport",
+      labelKey: "play.plan.constraint_transport",
+      ...show(null, transport, false),
+    },
     { key: "hotel", labelKey: "play.plan.constraint_hotel", ...show("b", hotelDisplay, hotelAns === undefined) },
     {
       key: "dayStart",
@@ -269,20 +340,10 @@ export function buildConstraintItems(
       ...show("c", dayStart, dayStartAns === undefined),
     },
     {
-      key: "tripType",
-      labelKey: "play.plan.constraint_trip_type",
-      ...show("d", tripType, tripTypeAns === undefined),
-    },
-    { key: "pace", labelKey: "play.plan.constraint_pace", ...show("e", pace, paceAns === undefined) },
-    {
-      key: "transport",
-      labelKey: "play.plan.constraint_transport",
-      ...show("f", transport, transportAns === undefined),
-    },
-    {
       key: "mustSee",
       labelKey: "play.plan.constraint_must_see",
       ...show("g", mustInclude, mustAns === undefined),
+      ...(mustAns !== undefined && mustResolved?.length ? { chips: mustResolved } : {}),
     },
     {
       key: "other",
@@ -311,7 +372,75 @@ export type IntakeQuickChip = {
   value: string;
 };
 
-const MUST_SEE_CHIP_LIMIT = 5;
+const MUST_SEE_CHIP_LIMIT = 8;
+
+export const DEFAULT_TAKEOFF_TRIP_TYPE = "couple_romance";
+
+const TRIP_TYPE_CATALOG_KEYS = [
+  "couple_romance",
+  "family_kids",
+  "food_checkin",
+  "family_vacation",
+  "city",
+  "couple",
+  "family",
+  "solo",
+  "food",
+  "friends",
+  "business",
+] as const;
+
+const PACE_CATALOG_KEYS = ["tight", "medium", "relaxed"] as const;
+
+/** Map agent four-need answers onto intake steps for the constraints bar. */
+export function intakeAnswersFromAgentNeeds(needs: AgentNeedAnswers): IntakeAnswers {
+  const out: IntakeAnswers = {};
+  if (needs.hotel !== undefined) out.b = needs.hotel;
+  if (needs.start_time !== undefined) out.c = needs.start_time;
+  if (needs.must_see !== undefined) out.g = needs.must_see;
+  if (needs.other !== undefined) out.h = needs.other;
+  return out;
+}
+
+function formatPaceDisplay(raw: string | null | undefined, t: (key: string) => string): string | null {
+  const v = raw?.trim() ?? "";
+  if (!v) return null;
+  if ((PACE_CATALOG_KEYS as readonly string[]).includes(v)) return t(`play.plan.pace.${v}`);
+  return v;
+}
+
+function formatTransitDisplay(raw: string | null | undefined, t: (key: string) => string): string | null {
+  const v = raw?.trim() ?? "";
+  if (!v) return null;
+  const key = normalizeTransitKey(v);
+  if (key) return transitOptionLabel(key, t);
+  return v;
+}
+
+export function formatTripTypeDisplay(raw: string | null | undefined, t: (key: string) => string): string | null {
+  const v = raw?.trim() ?? "";
+  if (!v) return null;
+  const slug = v.toLowerCase().replace(/\s+/g, "_");
+  if ((TRIP_TYPE_CATALOG_KEYS as readonly string[]).includes(slug)) {
+    return t(`play.plan.trip_type.${slug}`);
+  }
+  const asKey = `play.plan.trip_type.${slug}`;
+  const labeled = t(asKey);
+  if (labeled !== asKey) return labeled;
+  return v;
+}
+
+/** Persist takeoff combo as a catalog slug when the typed/picked text matches a locale label. */
+export function tripTypeStorageValue(raw: string, t: (key: string) => string): string {
+  const v = raw.trim();
+  if (!v) return DEFAULT_TAKEOFF_TRIP_TYPE;
+  const slug = v.toLowerCase().replace(/\s+/g, "_");
+  if ((TRIP_TYPE_CATALOG_KEYS as readonly string[]).includes(slug)) return slug;
+  for (const key of TRIP_TYPE_CATALOG_KEYS) {
+    if (t(`play.plan.trip_type.${key}`) === v) return key;
+  }
+  return v;
+}
 
 export function joinMustIncludeSelection(selected: string[], typed: string): string {
   const parts = [...selected];
@@ -407,10 +536,19 @@ export function displayIntakeAnswer(
   return resolveIntakeAnswer(step, raw, t) || t(INTAKE_DEFAULT_I18N[step]);
 }
 
+export const AGENT_NEED_TOTAL = 4;
+
 export function intakeQaProgress(
   activeStep: IntakeStepId | null,
   intakeComplete: boolean,
+  opts?: { useAgentNeeds?: boolean; agentNeedIndex?: number; agentNeedTotal?: number },
 ): { current: number; total: number } {
+  if (opts?.useAgentNeeds) {
+    const total = opts.agentNeedTotal ?? AGENT_NEED_TOTAL;
+    if (intakeComplete) return { current: total, total };
+    const idx = opts.agentNeedIndex ?? 0;
+    return { current: Math.min(total, Math.max(1, idx + 1)), total };
+  }
   const total = 8;
   if (intakeComplete) return { current: total, total };
   if (activeStep) return { current: intakeStepIndex(activeStep) + 1, total };

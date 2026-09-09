@@ -54,7 +54,7 @@ export type SkeletonPlanProgressEvent =
   | { type: "day_done"; dayIndex: number; daysTotal: number; itinerary: ItineraryDto }
   | { type: "done"; itinerary: ItineraryDto }
   | { type: "tips"; data: Record<string, unknown> }
-  | { type: "error"; key: string };
+  | { type: "error"; key: string; detail?: string };
 
 type SkeletonStop = {
   name: string;
@@ -311,10 +311,7 @@ export async function* planItinerarySkeletonFill(
     }
   }
 
-  if (!pool.places.length) {
-    yield { type: "error", key: "errors.empty_results" };
-    return;
-  }
+  // Empty discover/store is OK: make_itinerary merges city stops pool (ADR-056).
 
   if (tripId) {
     yield { type: "ledger", tripId, revision };
@@ -355,7 +352,11 @@ export async function* planItinerarySkeletonFill(
     const key = skeletonMakeErrorKey({
       makeOutcomeKey: mk.outcome?.key,
     });
-    yield { type: "error", key };
+    const detail =
+      typeof mk.data === "object" && mk.data && "detail" in mk.data
+        ? String((mk.data as { detail?: unknown }).detail ?? "")
+        : mk.outcome?.key;
+    yield { type: "error", key, detail: detail || undefined };
     return;
   }
 
@@ -558,7 +559,10 @@ export async function* planItinerarySkeletonFill(
           dayIndex,
           ...previewForTransitLeg(stop.name, fill.legs, t),
         };
-        const transitSlot = mapLegsToTransitSlot(fill.legs, t);
+        const transitSlot = mapLegsToTransitSlot(fill.legs, t, {
+          from: prevStop?.name,
+          to: stop.name,
+        });
         if (transitSlot) {
           daySlots = [...daySlots, transitSlot];
           itinerary = mergeDay(itinerary, {

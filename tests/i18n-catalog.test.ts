@@ -77,6 +77,24 @@ describe("i18n constraint pending", () => {
   });
 });
 
+describe("i18n need nav and provider (2play-plan-97/98)", () => {
+  it("should_define_skip_redo_and_provider_keys", () => {
+    for (const key of [
+      "play.plan.need_skip_this",
+      "play.plan.need_redo_prev",
+      "play.plan.need_skip_hint",
+      "play.plan.provider.google",
+      "play.plan.provider.amap",
+      "play.plan.provider.none",
+    ] as const) {
+      expect(EN[key]).toBeTruthy();
+      expect(CN[key]).toBeTruthy();
+      expect(HK[key]).toBeTruthy();
+      expect(TW[key]).toBeTruthy();
+    }
+  });
+});
+
 describe("i18n narrative keys (TC-M19-40-06)", () => {
   it("should_define_mvp19_narrative_keys_in_all_locales", () => {
     for (const key of NARRATIVE_KEYS) {

@@ -5,13 +5,12 @@ import { iconicPlacesFromTravelTips } from "./plan-iconic-parse";
 import { artifactsTipsFromSlice, tripFetchSlice } from "./plan-fetch-trip";
 import {
   fetchTripDetails,
-  providersForDestinationText,
   travelTips,
 } from "../places-agent/client";
 
 export { iconicPlacesFromTravelTips } from "./plan-iconic-parse";
 
-/** Destination-agnostic heat rank from discover cards (no city table). */
+/** Destination-agnostic heat rank — debug/tests only. Product chips use candidate must_see flags. */
 export function rankIconicFromPool(places: unknown[], limit: number): string[] {
   const cap = Math.max(0, Math.min(limit, 12));
   const scored = (places ?? [])
@@ -59,12 +58,10 @@ export async function fetchIconicPlacesForPlan(
     return [];
   }
   const end = ymdPlusDays(startDate, Math.max(0, days - 1));
-  const providers = input.providers ?? providersForDestinationText(destination);
   const written = await travelTips({
     destination,
     bounds: { start: startDate, end },
     locale: input.locale,
-    ...(providers?.length ? { providers } : {}),
     ...(input.tripId ? { trip_id: input.tripId } : {}),
     ...(typeof input.revision === "number" ? { revision: input.revision } : {}),
   });

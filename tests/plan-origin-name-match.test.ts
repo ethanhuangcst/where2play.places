@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   isBrandOnlyOriginQuery,
+  isFullOriginNameMatch,
   originNameTokensCovered,
   originSearchQuery,
   pickAutoMatchingOrigin,
@@ -19,12 +20,19 @@ describe("originNameTokensCovered (TC-M23-S7-01)", () => {
     expect(originNameTokensCovered("Hills Hotel", "Hills Hotel Lisboa")).toBe(true);
   });
 
-  it("should_pick_first_auto_match_only", () => {
+  it("should_not_auto_pick_brand_or_short_cjk", () => {
     const hit = pickAutoMatchingOrigin("凯悦", [
       { name: "Hyatt Regency Lisbon", location: { lat: 38.7, lng: -9.1 } },
-      { name: "Other Inn", location: { lat: 38.71, lng: -9.12 } },
     ]);
-    expect(hit?.name).toBe("Hyatt Regency Lisbon");
+    expect(hit).toBeNull();
+  });
+
+  it("should_treat_santai_road_fragment_as_partial", () => {
+    expect(
+      isFullOriginNameMatch("三台", "西湖若白雅苑民宿(三台山路8号分店)"),
+    ).toBe(false);
+    expect(isFullOriginNameMatch("三台山庄", "三台山庄")).toBe(true);
+    expect(isFullOriginNameMatch("Hills Hotel Lisbon", "Hills Hotel Lisboa")).toBe(true);
   });
 
   it("should_return_null_when_no_token_coverage", () => {

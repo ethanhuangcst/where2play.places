@@ -67,7 +67,7 @@ type AgentLlmTransport = {
 export type SlotPreviewPayload = {
   kind: "place" | "transit" | "meal";
   name: string;
-  reason: string;
+  reason?: string;
   window: string;
   mealLabel?: "lunch" | "afternoon_tea" | "dinner";
   transportLabel?: string;

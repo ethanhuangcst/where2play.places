@@ -150,4 +150,56 @@ describe("enrichArrangedDay — geocode origin/destination before enrich", () =>
 
     expect(result.to_destination).toEqual({ transport: "taxi", duration_min: 15 });
   });
+
+  it("should_set_drive_preferred_for_drive_walk_transport", async () => {
+    const geocodeFn = makeGeocodeFn({ lat: 38.7304, lng: -9.1405 });
+    setGeocodeForTests(geocodeFn as unknown as typeof import("../src/places-agent/client").geocode);
+
+    let capturedPrefs: Record<string, unknown> | undefined;
+    const enrichFn = vi.fn(async (body: Record<string, unknown>): Promise<ArrangeDayLlmResult> => {
+      capturedPrefs = (body as Record<string, unknown>).preferences as Record<string, unknown>;
+      return { ...baseArranged, transit_outcome: "directions" };
+    });
+    setEnrichArrangeTransitForTests(enrichFn);
+
+    await enrichArrangedDay({
+      arranged: baseArranged,
+      criteria: { ...baseCriteria, transport: "自驾/打车+步行" },
+      providers: ["AMAP"],
+      locale: "CN",
+      candidates: baseCandidates,
+    });
+
+    expect(capturedPrefs).toBeDefined();
+    expect(capturedPrefs!.drive_preferred).toBe(true);
+    // drive_walk should NOT set transit_preferred (it's not public transit)
+    expect(capturedPrefs!.transit_preferred).toBeUndefined();
+  });
+
+  it("should_set_transit_preferred_for_transit_walk_transport", async () => {
+    const geocodeFn = makeGeocodeFn({ lat: 38.7304, lng: -9.1405 });
+    setGeocodeForTests(geocodeFn as unknown as typeof import("../src/places-agent/client").geocode);
+
+    let capturedPrefs: Record<string, unknown> | undefined;
+    let capturedBody: Record<string, unknown> | undefined;
+    const enrichFn = vi.fn(async (body: Record<string, unknown>): Promise<ArrangeDayLlmResult> => {
+      capturedBody = body;
+      capturedPrefs = (body as Record<string, unknown>).preferences as Record<string, unknown>;
+      return { ...baseArranged, transit_outcome: "directions" };
+    });
+    setEnrichArrangeTransitForTests(enrichFn);
+
+    await enrichArrangedDay({
+      arranged: baseArranged,
+      criteria: { ...baseCriteria, transport: "公共交通+步行" },
+      providers: ["AMAP"],
+      locale: "CN",
+      candidates: baseCandidates,
+    });
+
+    expect(capturedBody).toBeDefined();
+    expect(capturedPrefs).toBeDefined();
+    expect(capturedPrefs!.transit_preferred).toBe(true);
+    expect(capturedPrefs!.drive_preferred).toBeUndefined();
+  });
 });

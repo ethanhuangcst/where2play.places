@@ -3,12 +3,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ItineraryDto, ItinerarySlot, PlanBoundaries } from "@/src/core/itinerary-types";
 import {
+  AGENT_NEED_TO_INTAKE_STEP,
   buildConstraintItems,
+  intakeAnswersFromAgentNeeds,
   INTAKE_DEFAULT_VALUES,
   INTAKE_STEP_ORDER,
   mergeIntakeToBoundaries,
   nextIntakeStep,
   takeoffIsValid,
+  takeoffToBoundaries,
+  DEFAULT_TAKEOFF_TRIP_TYPE,
+  type AgentNeedAnswers,
+  type AgentNeedId,
   type IntakeAnswers,
   type IntakeStepId,
   type TakeoffFields,
@@ -34,6 +40,7 @@ import {
   parseOriginPickIndex,
   sanitizeDailyStartName,
 } from "@/src/core/plan-resolve-origin";
+import { redoNeedState } from "@/src/core/plan-need-nav";
 import { skeletonStopsForFocusedDay, patchSkeletonStopName } from "@/src/core/plan-skeleton-stops";
 import { validatePlanBoundaries } from "@/src/core/plan-validate";
 import { resolveErrorKey } from "@/src/i18n/error-key";
@@ -73,6 +80,9 @@ function takeoffFromState(
   days: string,
   partySize: string,
   budget: string,
+  tripType: string,
+  pace: string,
+  transit: string,
 ): TakeoffFields {
   return {
     destination,
@@ -80,6 +90,9 @@ function takeoffFromState(
     days: Number(days) || 1,
     partySize: Number(partySize) || 1,
     budget,
+    tripType,
+    pace,
+    transit,
   };
 }
 
@@ -93,12 +106,21 @@ export default function PlanPageClient() {
   const [days, setDays] = useState("3");
   const [partySize, setPartySize] = useState("2");
   const [budget, setBudget] = useState("mid");
+  const [tripType, setTripType] = useState(DEFAULT_TAKEOFF_TRIP_TYPE);
+  const [pace, setPace] = useState("medium");
+  const [transit, setTransit] = useState("transit_walk");
+  const [needQuestions, setNeedQuestions] = useState<
+    Array<{ id: string; prompt: string; options?: Array<{ id: string; label: string }>; multi?: boolean }>
+  >([]);
+  const [needIndex, setNeedIndex] = useState(0);
+  const [needAnswers, setNeedAnswers] = useState<Record<string, string>>({});
   const [pagePhase, setPagePhase] = useState<PagePhase>("idle");
   const [navOpen, setNavOpen] = useState(false);
   const [intakeStep, setIntakeStep] = useState<IntakeStepId | null>(null);
   const [intakeAnswers, setIntakeAnswers] = useState<IntakeAnswers>({});
   const [originLookupFailed, setOriginLookupFailed] = useState(false);
   const [originCandidates, setOriginCandidates] = useState<Array<{ name: string }>>([]);
+  const [verifyingHotel, setVerifyingHotel] = useState(false);
   const [originQuery, setOriginQuery] = useState("");
   const [originLat, setOriginLat] = useState<number | undefined>();
   const [originLng, setOriginLng] = useState<number | undefined>();
@@ -133,6 +155,7 @@ export default function PlanPageClient() {
   const discoverJobRef = useRef<Promise<void>>(Promise.resolve());
   const tripIdRef = useRef<string | undefined>(undefined);
   const tripRevisionRef = useRef<number | undefined>(undefined);
+  const mustSeeSliceTriedRef = useRef(false);
   const [makeElapsedMs, setMakeElapsedMs] = useState<number | null>(null);
 
   const [skeletonDays, setSkeletonDays] = useState<SkeletonPreviewDay[]>([]);
@@ -154,15 +177,19 @@ export default function PlanPageClient() {
   const abortRef = useRef<AbortController | null>(null);
 
   const takeoff = useMemo(
-    () => takeoffFromState(destination, startDate, days, partySize, budget),
-    [destination, startDate, days, partySize, budget],
+    () => takeoffFromState(destination, startDate, days, partySize, budget, tripType, pace, transit),
+    [destination, startDate, days, partySize, budget, tripType, pace, transit],
   );
 
   const showTakeoff = pagePhase === "idle";
   const showConstraints = pagePhase !== "idle";
   const showItinerary = pagePhase === "planning" || pagePhase === "done" || Boolean(itinerary);
 
-  const mustSeeLoading = intakeStep === "g" && !gCandidatesReady;
+  const agentOnMustSee =
+    needQuestions[needIndex]?.id === "must_see" &&
+    !Object.prototype.hasOwnProperty.call(needAnswers, "must_see");
+  const mustSeeLoading =
+    ((intakeStep === "g" || agentOnMustSee) && !gCandidatesReady);
 
   const displaySkeletonStops = useMemo(() => {
     const dayIdx = focusDayIndex ?? itinerary?.days[0]?.dayIndex ?? 1;
@@ -179,12 +206,12 @@ export default function PlanPageClient() {
     () =>
       buildConstraintItems(
         takeoff,
-        intakeAnswers,
+        { ...intakeAnswersFromAgentNeeds(needAnswers), ...intakeAnswers },
         t,
         intakeComplete || pagePhase === "planning" || pagePhase === "done",
         suggestedMustSee.length ? suggestedMustSee : undefined,
       ),
-    [takeoff, intakeAnswers, t, intakeComplete, pagePhase, suggestedMustSee],
+    [takeoff, intakeAnswers, needAnswers, t, intakeComplete, pagePhase, suggestedMustSee],
   );
 
   useEffect(() => {
@@ -200,6 +227,9 @@ export default function PlanPageClient() {
           if (c.startDate) setStartDate(c.startDate);
           if (c.partySize != null) setPartySize(String(c.partySize));
           if (c.budget) setBudget(normalizeBudgetKey(c.budget) || c.budget);
+          if (c.tripType?.trim()) setTripType(c.tripType.trim());
+          if (c.pace?.trim()) setPace(c.pace.trim());
+          if (c.transport?.trim()) setTransit(c.transport.trim());
           if (typeof c.tripId === "string") {
             setTripId(c.tripId);
             tripIdRef.current = c.tripId;
@@ -469,6 +499,7 @@ export default function PlanPageClient() {
               applyNarrative(event);
             } else if (event.type === "error") {
               sawError = event.key ?? "errors.provider_failed";
+              console.error("plan stream error", event.key, "detail" in event ? event.detail : undefined);
             }
           },
         );
@@ -536,30 +567,94 @@ export default function PlanPageClient() {
     resetPlanningState();
     setPagePhase("intake");
     setNavOpen(true);
-    setIntakeStep(INTAKE_STEP_ORDER[0] ?? "b");
+    setIntakeStep(null);
     setIntakeComplete(false);
     setIntakeAnswers({});
+    setNeedQuestions([]);
+    setNeedIndex(0);
+    setNeedAnswers({});
+    setVerifyingHotel(false);
     setDiscoverLoading(true);
     setDiscoverSettled(false);
-    discoverJobRef.current = runSilentDiscover();
+    discoverJobRef.current = runPlanTripIntake();
   }
 
-  const runSilentDiscover = useCallback(async () => {
+  const runPlanTripIntake = useCallback(async () => {
     const fields = takeoff;
     try {
       const res = await authJson<{
         ok?: boolean;
         trip_id?: string;
         revision?: number;
-      }>("/api/plan/discover", {
+        status?: string;
+        need_input?: {
+          questions: Array<{
+            id: string;
+            prompt: string;
+            options?: Array<{ id: string; label: string }>;
+            multi?: boolean;
+          }>;
+        };
+      }>("/api/plan/trip", {
         method: "POST",
         body: JSON.stringify({
-          destination: fields.destination,
+          city: fields.destination,
           startDate: fields.startDate,
           days: fields.days,
           partySize: fields.partySize,
           budget: fields.budget,
+          tripType: fields.tripType?.trim() || t("play.plan.trip_type.couple_romance"),
+          pace: fields.pace === "tight" || fields.pace === "relaxed" ? fields.pace : "medium",
+          transit: fields.transit === "drive_walk" ? "drive_walk" : "transit_walk",
           locale,
+        }),
+      });
+      if (res.trip_id) {
+        setTripId(res.trip_id);
+        tripIdRef.current = res.trip_id;
+      }
+      if (typeof res.revision === "number") {
+        setTripRevision(res.revision);
+        tripRevisionRef.current = res.revision;
+      }
+      const qs = res.need_input?.questions ?? [];
+      setNeedQuestions(qs);
+      if (!qs.length) {
+        setIntakeStep("b");
+      }
+      const chips = qs.find((q) => q.id === "must_see")?.options?.map((o) => o.label) ?? [];
+      if (chips.length) setSuggestedMustSee(chips);
+    } catch (err) {
+      const key =
+        err instanceof AuthApiError
+          ? resolveErrorKey(err.key)
+          : "play.errors.provider_failed";
+      setErrorKey(key);
+    } finally {
+      setDiscoverLoading(false);
+      setDiscoverSettled(true);
+    }
+  }, [locale, takeoff, t]);
+
+  const runSilentDiscover = useCallback(async () => {
+    const fields = takeoff;
+    const id = tripIdRef.current;
+    if (!id) {
+      setDiscoverLoading(false);
+      setDiscoverSettled(true);
+      return;
+    }
+    try {
+      const res = await authJson<{
+        ok?: boolean;
+        trip_id?: string;
+        revision?: number;
+      }>("/api/plan/candidates", {
+        method: "POST",
+        body: JSON.stringify({
+          trip_id: id,
+          locale,
+          days: fields.days,
           max_number: 5,
         }),
       });
@@ -571,23 +666,15 @@ export default function PlanPageClient() {
         setTripRevision(res.revision);
         tripRevisionRef.current = res.revision;
       }
-    } catch (err) {
-      const body = err instanceof AuthApiError ? err.body : undefined;
-      const tripFromErr =
-        body && typeof body === "object" && "trip_id" in body
-          ? (body as { trip_id?: string }).trip_id
-          : undefined;
-      if (typeof tripFromErr === "string" && tripFromErr) {
-        setTripId(tripFromErr);
-        tripIdRef.current = tripFromErr;
-      }
+    } catch {
+      /* chips remain from plan_trip need_input */
     } finally {
       setDiscoverLoading(false);
       setDiscoverSettled(true);
     }
   }, [locale, takeoff]);
 
-  const loadCandidatesFromTrip = useCallback(async () => {
+  const loadCandidatesFromTrip = useCallback(async (): Promise<string[]> => {
     await discoverJobRef.current;
     if (!tripIdRef.current) {
       await runSilentDiscover();
@@ -596,7 +683,7 @@ export default function PlanPageClient() {
     if (!id) {
       setSuggestedMustSee([]);
       setDiscoverPool([]);
-      return;
+      return [];
     }
     const res = await authJson<{
       iconic_places?: string[];
@@ -608,16 +695,43 @@ export default function PlanPageClient() {
         trip_id: id,
         locale,
         days: takeoff.days,
-        max_number: 5,
+        max_number: 8,
       }),
     });
     if (typeof res.revision === "number") {
       setTripRevision(res.revision);
       tripRevisionRef.current = res.revision;
     }
-    setSuggestedMustSee(Array.isArray(res.iconic_places) ? res.iconic_places.slice(0, 5) : []);
+    const chips = Array.isArray(res.iconic_places) ? res.iconic_places.slice(0, 8) : [];
+    setSuggestedMustSee(chips);
     setDiscoverPool(Array.isArray(res.pool) ? res.pool : []);
+    if (chips.length) {
+      setNeedQuestions((prev) =>
+        prev.map((q) =>
+          q.id === "must_see"
+            ? {
+                ...q,
+                options: chips.map((label, i) => ({ id: `ms_${i}`, label })),
+              }
+            : q,
+        ),
+      );
+    }
+    return chips;
   }, [locale, takeoff.days, runSilentDiscover]);
+
+  const retryMustSee = useCallback(async () => {
+    mustSeeSliceTriedRef.current = true;
+    setGCandidatesReady(false);
+    try {
+      await loadCandidatesFromTrip();
+    } catch {
+      setSuggestedMustSee([]);
+      setDiscoverPool([]);
+    } finally {
+      setGCandidatesReady(true);
+    }
+  }, [loadCandidatesFromTrip]);
 
   useEffect(() => {
     if (intakeStep !== "g") return;
@@ -639,6 +753,40 @@ export default function PlanPageClient() {
       cancelled = true;
     };
   }, [intakeStep, loadCandidatesFromTrip]);
+
+  // Agent Q3: when must_see has no options, try trip slice once (empty → hand-type / refetch).
+  useEffect(() => {
+    const q = needQuestions[needIndex];
+    if (q?.id !== "must_see") {
+      mustSeeSliceTriedRef.current = false;
+      return;
+    }
+    // Takeoff already delivered chips (options or suggestedMustSee): candidates are ready.
+    if ((q.options?.length ?? 0) > 0 || suggestedMustSee.length > 0) {
+      setGCandidatesReady(true);
+      return;
+    }
+    if (mustSeeSliceTriedRef.current) return;
+    if (!tripIdRef.current) return;
+    mustSeeSliceTriedRef.current = true;
+    let cancelled = false;
+    setGCandidatesReady(false);
+    void (async () => {
+      try {
+        await loadCandidatesFromTrip();
+      } catch {
+        if (!cancelled) {
+          setSuggestedMustSee([]);
+          setDiscoverPool([]);
+        }
+      } finally {
+        if (!cancelled) setGCandidatesReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [needIndex, needQuestions, suggestedMustSee.length, loadCandidatesFromTrip]);
 
   async function onIntakeAnswer(step: IntakeStepId, value: string): Promise<boolean> {
     if (step === "b") {
@@ -751,13 +899,6 @@ export default function PlanPageClient() {
       narrativeCtxRef.current = ctx;
       navLinesRef.current = narrativeLinesForIntakeComplete(ctx);
       setNavStatusLines(navLinesRef.current);
-      await runPlan({
-        ...boundaries,
-        tripId: tripIdRef.current,
-        revision: tripRevisionRef.current,
-        originLat,
-        originLng,
-      });
     })();
   }
 
@@ -862,6 +1003,9 @@ export default function PlanPageClient() {
             days={days}
             partySize={partySize}
             budget={budget}
+            tripType={tripType}
+            pace={pace}
+            transit={transit}
             fieldErrors={fieldErrors}
             disabled={loading}
             onDestinationChange={setDestination}
@@ -869,6 +1013,9 @@ export default function PlanPageClient() {
             onDaysChange={setDays}
             onPartySizeChange={setPartySize}
             onBudgetChange={setBudget}
+            onTripTypeChange={setTripType}
+            onPaceChange={setPace}
+            onTransitChange={setTransit}
             onSubmit={onTakeoffSubmit}
           />
         ) : null}
@@ -977,6 +1124,7 @@ export default function PlanPageClient() {
           planCompleteLine={planCompleteLine}
           suggestedMustSee={suggestedMustSee.length ? suggestedMustSee : undefined}
           mustSeeLoading={mustSeeLoading}
+          onRetryMustSee={retryMustSee}
           makeElapsedSeconds={
             makeElapsedMs != null ? formatPlanElapsedSeconds(makeElapsedMs) : null
           }
@@ -992,6 +1140,171 @@ export default function PlanPageClient() {
           }}
           onTerminate={requestTerminateIntake}
           onComplete={onIntakeComplete}
+          agentNeedQuestions={needQuestions.length ? needQuestions : undefined}
+          agentNeedIndex={needIndex}
+          agentNeedAnswers={needAnswers}
+          awaitingAgentNeeds={
+            pagePhase === "intake" &&
+            !intakeComplete &&
+            needQuestions.length === 0 &&
+            discoverLoading
+          }
+          verifyingHotel={verifyingHotel}
+          canRedoNeed={needIndex > 0}
+          onAgentNeedRedo={() => {
+            const next = redoNeedState(
+              needQuestions.map((q) => ({ id: q.id as AgentNeedId })),
+              needIndex,
+              needAnswers,
+            );
+            setNeedIndex(next.index);
+            setNeedAnswers(next.answers);
+          }}
+          canRedoLocal={
+            Boolean(intakeStep && INTAKE_STEP_ORDER.indexOf(intakeStep) > 0)
+          }
+          onLocalNeedSkip={() => {
+            if (!intakeStep) return;
+            void onIntakeAnswer(
+              intakeStep,
+              intakeStep === "b" ? "" : INTAKE_DEFAULT_VALUES[intakeStep],
+            );
+          }}
+          onLocalNeedRedo={() => {
+            if (!intakeStep) return;
+            const idx = INTAKE_STEP_ORDER.indexOf(intakeStep);
+            if (idx <= 0) return;
+            const prev = INTAKE_STEP_ORDER[idx - 1]!;
+            setIntakeAnswers((prevAns) => {
+              const copy = { ...prevAns };
+              delete copy[intakeStep];
+              delete copy[prev];
+              return copy;
+            });
+            setIntakeStep(prev);
+          }}
+          onAgentNeedAnswer={(id, value) => {
+            void (async () => {
+              const needId = id as AgentNeedId;
+              const step = AGENT_NEED_TO_INTAKE_STEP[needId];
+              let stored = value;
+              if (needId === "hotel") {
+                setOriginQuery(value.trim());
+              }
+              if (step) {
+                const skipHotelVerify = needId === "hotel" && !value.trim();
+                const shouldVerifyHotel = needId === "hotel" && Boolean(value.trim());
+                const isPick = parseOriginPickIndex(value.trim()) != null;
+                if (needId === "hotel" && shouldVerifyHotel && !isPick) {
+                  setOriginCandidates([]);
+                  setOriginLookupFailed(false);
+                  setErrorKey(null);
+                  setNeedQuestions((prev) =>
+                    prev.map((q) => (q.id === "hotel" ? { ...q, options: undefined } : q)),
+                  );
+                  setVerifyingHotel(true);
+                }
+                try {
+                  const res = await authJson<{
+                    originLat?: number;
+                    originLng?: number;
+                    origin_name?: string;
+                    origin_candidates?: Array<{ name: string }>;
+                    stay_on_step?: boolean;
+                  }>("/api/plan/session", {
+                    method: "PATCH",
+                    body: JSON.stringify({
+                      step,
+                      value: skipHotelVerify ? "" : value,
+                      locale,
+                      destination: takeoff.destination,
+                      trip_id: tripIdRef.current,
+                      revision: tripRevision,
+                    }),
+                  });
+                  if (needId === "hotel" && res.stay_on_step && res.origin_candidates?.length) {
+                    setOriginCandidates(res.origin_candidates.map((c) => ({ name: c.name })));
+                    setNeedQuestions((prev) =>
+                      prev.map((q) =>
+                        q.id === "hotel"
+                          ? {
+                              ...q,
+                              options: res.origin_candidates!.map((c, i) => ({
+                                id: `cand_${i}`,
+                                label: c.name,
+                              })),
+                            }
+                          : q,
+                      ),
+                    );
+                    return;
+                  }
+                  if (needId === "hotel") {
+                    setOriginCandidates([]);
+                    setOriginLookupFailed(false);
+                    if (typeof res.originLat === "number") setOriginLat(res.originLat);
+                    if (typeof res.originLng === "number") setOriginLng(res.originLng);
+                    const isPick = parseOriginPickIndex(value.trim()) != null;
+                    if (typeof res.origin_name === "string") {
+                      stored = res.origin_name;
+                    } else if (isPick) {
+                      stored = originNameFromPick(value, originCandidates) || value;
+                    }
+                  }
+                } catch (err) {
+                  if (needId === "hotel" && value.trim()) {
+                    if (err instanceof AuthApiError && err.key === "play.plan.intake_origin_not_found") {
+                      setOriginLookupFailed(true);
+                      setOriginCandidates([]);
+                      setNeedQuestions((prev) =>
+                        prev.map((q) => (q.id === "hotel" ? { ...q, options: undefined } : q)),
+                      );
+                      return;
+                    }
+                    if (err instanceof AuthApiError) {
+                      setErrorKey(resolveErrorKey(err.key));
+                      if (err.key === "errors.session_expired" || err.key === "errors.csrf") {
+                        window.location.assign("/login");
+                      }
+                      return;
+                    }
+                    setErrorKey("play.errors.network");
+                    return;
+                  }
+                } finally {
+                  setVerifyingHotel(false);
+                }
+              }
+              const nextAnswers: AgentNeedAnswers = { ...needAnswers, [needId]: stored };
+              setNeedAnswers(nextAnswers);
+              if (needIndex + 1 < needQuestions.length) {
+                setNeedIndex(needIndex + 1);
+                return;
+              }
+              setIntakeComplete(true);
+              const chips = nextAnswers.must_see;
+              if (chips) {
+                setSuggestedMustSee(chips.split(/[,，、]/).map((s) => s.trim()).filter(Boolean));
+              }
+              try {
+                await loadCandidatesFromTrip();
+              } catch {
+                setSuggestedMustSee((prev) => prev);
+                setDiscoverPool([]);
+              }
+              const boundaries = takeoffToBoundaries(takeoff, nextAnswers, t, locale);
+              const ctx = createPlanNarrativeContext({
+                t,
+                destination: takeoff.destination,
+                days: takeoff.days,
+                partySize: takeoff.partySize,
+                tripType: boundaries.tripType,
+              });
+              narrativeCtxRef.current = ctx;
+              navLinesRef.current = narrativeLinesForIntakeComplete(ctx);
+              setNavStatusLines(navLinesRef.current);
+            })();
+          }}
         />
       ) : null}
 

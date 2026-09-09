@@ -46,7 +46,7 @@ describe("plan-assistant-narrative (TC-M19-40-03)", () => {
       tripType: "Couple",
     });
     const lines = narrativeLinesForIntakeComplete(ctx);
-    expect(lines).toEqual(["play.plan.assistant_planning_skeleton"]);
+    expect(lines).toEqual(["play.plan.assistant_know_enough"]);
   });
 
   it("should_skip_discovering_after_making_has_started", () => {

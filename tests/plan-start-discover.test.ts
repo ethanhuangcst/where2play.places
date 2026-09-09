@@ -7,16 +7,17 @@ describe("startPlanDiscover", () => {
     vi.restoreAllMocks();
   });
 
-  it("should_return_must_see_names_from_fetch_candidates_not_discover_envelope", async () => {
-    vi.spyOn(client, "discoverPlaces").mockResolvedValue({
+  it("should_call_plan_trip_not_discover_places_and_omit_providers", async () => {
+    const tripSpy = vi.spyOn(client, "planTrip").mockResolvedValue({
       agent: "places-agent",
       ok: true,
       data: {
         trip_id: "t1",
         revision: 1,
-        candidates: { places: [{ name: "IGNORE_HTTP", must_see: true }] },
+        status: "needs_input",
       },
     });
+    vi.spyOn(client, "discoverPlaces");
     vi.spyOn(client, "fetchTripDetails").mockResolvedValue({
       agent: "places-agent",
       ok: true,
@@ -39,12 +40,13 @@ describe("startPlanDiscover", () => {
       startDate: "2026-10-10",
       days: 4,
       locale: "EN",
-      providers: ["GOOGLE_MAPS"],
     });
 
-    expect(client.discoverPlaces).toHaveBeenCalledWith(
-      expect.objectContaining({ max_number: 5 }),
+    expect(client.discoverPlaces).not.toHaveBeenCalled();
+    expect(tripSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ city: "Lisbon", numDays: 4 }),
     );
+    expect(tripSpy.mock.calls[0]?.[0]).not.toHaveProperty("providers");
     expect(result).toEqual({
       ok: true,
       trip_id: "t1",
@@ -58,10 +60,10 @@ describe("startPlanDiscover", () => {
   });
 
   it("should_fail_when_fetch_pool_is_empty", async () => {
-    vi.spyOn(client, "discoverPlaces").mockResolvedValue({
+    vi.spyOn(client, "planTrip").mockResolvedValue({
       agent: "places-agent",
       ok: true,
-      data: { trip_id: "t1", revision: 1 },
+      data: { trip_id: "t1", revision: 1, status: "needs_input" },
     });
     vi.spyOn(client, "fetchTripDetails").mockResolvedValue({
       agent: "places-agent",

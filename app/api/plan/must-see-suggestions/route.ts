@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/src/auth/user";
 import { fetchIconicPlacesForPlan } from "@/src/core/plan-iconic";
 import { normalizeLocale } from "@/src/core/locales";
-import { providersForDestinationText } from "@/src/places-agent/client";
 
 export async function POST(request: NextRequest) {
   const gate = await requireUser(request);
@@ -32,9 +31,6 @@ export async function POST(request: NextRequest) {
     startDate,
     days,
     locale,
-    ...(providersForDestinationText(destination)?.length
-      ? { providers: providersForDestinationText(destination) }
-      : {}),
   });
 
   return NextResponse.json({ ok: true, suggestions });

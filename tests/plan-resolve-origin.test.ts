@@ -252,4 +252,247 @@ describe("pickOriginCardNearCity (TC-M21-41-21)", () => {
     );
     expect(r.kind).toBe("not_found");
   });
+
+  it("should_list_candidates_when_partial_unique", async () => {
+    const r = await resolvePlanOrigin(
+      { query: "三台", destination: "杭州", locale: "CN" },
+      {
+        geocode: async () => ({ ok: true, data: HANGZHOU }),
+        searchPlaces: async () => ({
+          ok: true,
+          data: [
+            {
+              name: "西湖若白雅苑民宿(三台山路8号分店)",
+              location: { lat: 30.24, lng: 120.14 },
+              category: "民宿",
+              sources: [{ provider: "AMAP", native_id: "B000ROAD" }],
+            },
+          ],
+        }),
+      },
+    );
+    expect(r.kind).toBe("candidates");
+    if (r.kind === "candidates") {
+      expect(r.cards[0]?.name).toContain("三台山路");
+    }
+  });
+
+  it("should_auto_hit_when_full_name_unique", async () => {
+    const r = await resolvePlanOrigin(
+      { query: "Hills Hotel Lisbon", destination: "里斯本", locale: "EN" },
+      {
+        geocode: async () => ({ ok: true, data: LISBON }),
+        searchPlaces: async () => ({
+          ok: true,
+          data: [{ name: "Hills Hotel Lisboa", location: { lat: 38.73, lng: -9.14 } }],
+        }),
+      },
+    );
+    expect(r.kind).toBe("hit");
+    if (r.kind === "hit") {
+      expect(r.name).toBe("Hills Hotel Lisboa");
+    }
+  });
+
+  it("should_list_candidates_when_partial_unique_shanzhuang", async () => {
+    // 三台山 token-covers only 三台山庄 (not 三台阁, since 台山 is not in 三台阁)
+    const r = await resolvePlanOrigin(
+      { query: "三台山", destination: "杭州", locale: "CN" },
+      {
+        geocode: async () => ({ ok: true, data: HANGZHOU }),
+        searchPlaces: async () => ({
+          ok: true,
+          data: [
+            {
+              name: "三台山庄",
+              location: { lat: 30.24, lng: 120.14 },
+              category: "风景名胜",
+              sources: [{ provider: "AMAP", native_id: "B000SANTAIZHUANG" }],
+            },
+            {
+              name: "西湖国宾馆",
+              location: { lat: 30.23, lng: 120.13 },
+              category: "酒店",
+              sources: [{ provider: "AMAP", native_id: "B000GUO" }],
+            },
+          ],
+        }),
+      },
+    );
+    expect(r.kind).toBe("candidates");
+    if (r.kind === "candidates") {
+      expect(r.cards.some((c) => c.name === "三台山庄")).toBe(true);
+    }
+  });
+
+  it("should_include_shanzhuang_in_candidates_via_expanded_lodging_keywords", async () => {
+    // 三台山庄 now passes looksLikeLodging via 山庄 keyword
+    const r = await resolvePlanOrigin(
+      { query: "山庄", destination: "杭州", locale: "CN" },
+      {
+        geocode: async () => ({ ok: true, data: HANGZHOU }),
+        searchPlaces: async () => ({
+          ok: true,
+          data: [
+            {
+              name: "三台山庄",
+              location: { lat: 30.24, lng: 120.14 },
+              category: "山庄",
+              sources: [{ provider: "AMAP", native_id: "B000SANTAIZHUANG" }],
+            },
+          ],
+        }),
+      },
+    );
+    expect(r.kind).toBe("candidates");
+    if (r.kind === "candidates") {
+      expect(r.cards[0]?.name).toBe("三台山庄");
+    }
+  });
+
+  it("should_return_candidates_when_two_lodging_token_matches (三台)", async () => {
+    // Both 三台山庄 and 三台山庄(分店) pass lodging filter and token-cover "三台"
+    const r = await resolvePlanOrigin(
+      { query: "三台", destination: "杭州", locale: "CN" },
+      {
+        geocode: async () => ({ ok: true, data: HANGZHOU }),
+        searchPlaces: async () => ({
+          ok: true,
+          data: [
+            {
+              name: "三台山庄",
+              location: { lat: 30.24, lng: 120.14 },
+              category: "山庄",
+              sources: [{ provider: "AMAP", native_id: "B000A" }],
+            },
+            {
+              name: "三台山庄(满觉陇店)",
+              location: { lat: 30.25, lng: 120.15 },
+              category: "山庄",
+              sources: [{ provider: "AMAP", native_id: "B000B" }],
+            },
+          ],
+        }),
+      },
+    );
+    expect(r.kind).toBe("candidates");
+    if (r.kind === "candidates") {
+      expect(r.cards.length).toBe(2);
+    }
+  });
+
+  it("should_use_suggest_tips_before_search_for_SFEE_prefix", async () => {
+    const suggestPlaces = vi.fn(async () => ({
+      ok: true as const,
+      data: [
+        {
+          name: "SFEEL设计师酒店(杭州西湖武林广场店)",
+          location: { lat: 30.27, lng: 120.16 },
+          category: "酒店",
+          sources: [{ provider: "AMAP", native_id: "B0SFEEL" }],
+        },
+      ],
+    }));
+    const searchPlaces = vi.fn(async () => ({ ok: true as const, data: [] }));
+    const r = await resolvePlanOrigin(
+      { query: "SFEE", destination: "杭州", locale: "CN" },
+      {
+        geocode: async () => ({ ok: true, data: HANGZHOU }),
+        suggestPlaces,
+        searchPlaces,
+      },
+    );
+    expect(suggestPlaces).toHaveBeenCalledWith(
+      expect.objectContaining({ query: "SFEE", address: "杭州", near: HANGZHOU }),
+    );
+    expect(searchPlaces).not.toHaveBeenCalled();
+    expect(r.kind).toBe("hit");
+    if (r.kind === "hit") {
+      expect(r.name).toContain("SFEEL");
+      expect(r.native_id).toBe("B0SFEEL");
+    }
+  });
+
+  it("should_fallback_to_search_when_suggest_empty", async () => {
+    const suggestPlaces = vi.fn(async () => ({ ok: true as const, data: [] }));
+    const searchPlaces = vi.fn(async () => ({
+      ok: true as const,
+      data: [{ name: "Hills Hotel Lisboa", location: { lat: 38.73, lng: -9.14 } }],
+    }));
+    const r = await resolvePlanOrigin(
+      { query: "Hills Hotel Lisboa", destination: "里斯本", locale: "CN" },
+      {
+        geocode: async () => ({ ok: true, data: LISBON }),
+        suggestPlaces,
+        searchPlaces,
+      },
+    );
+    expect(suggestPlaces).toHaveBeenCalled();
+    expect(searchPlaces).toHaveBeenCalled();
+    expect(r.kind).toBe("hit");
+  });
+
+  it("should_drop_out_of_city_suggest_tips_by_dest_token", async () => {
+    const suggestPlaces = vi.fn(async () => ({
+      ok: true as const,
+      data: [
+        {
+          name: "SFEEL Design Hotel Hangzhou Xihu",
+          address: "Hangzhou, Zhejiang, China",
+          location: { lat: Number.NaN, lng: Number.NaN },
+          category: "hotel",
+        },
+        {
+          name: "SFEEL Designer Hotel Shanghai",
+          address: "Shanghai, China",
+          location: { lat: Number.NaN, lng: Number.NaN },
+          category: "hotel",
+        },
+      ],
+    }));
+    const searchPlaces = vi.fn(async (input: { query: string }) => {
+      expect(input.query).toMatch(/Hangzhou/i);
+      return {
+        ok: true as const,
+        data: [
+          {
+            name: "SFEEL Design Hotel Hangzhou Xihu",
+            location: { lat: 30.27, lng: 120.16 },
+            category: "hotel",
+            sources: [{ provider: "GOOGLE_MAPS", native_id: "ChIJhz" }],
+          },
+        ],
+      };
+    });
+    const r = await resolvePlanOrigin(
+      { query: "SFEE", destination: "Hangzhou", locale: "EN" },
+      {
+        geocode: async () => ({ ok: true, data: HANGZHOU }),
+        suggestPlaces,
+        searchPlaces,
+      },
+    );
+    expect(r.kind).toBe("hit");
+    if (r.kind === "hit") {
+      expect(r.name).toMatch(/Hangzhou/i);
+      expect(r.name).not.toMatch(/Shanghai/i);
+    }
+    expect(searchPlaces).toHaveBeenCalledTimes(1);
+  });
+
+  it("should_not_call_suggest_when_query_empty", async () => {
+    const suggestPlaces = vi.fn(async () => ({ ok: true as const, data: [] }));
+    const searchPlaces = vi.fn(async () => ({ ok: true as const, data: [] }));
+    const r = await resolvePlanOrigin(
+      { query: "", destination: "杭州", locale: "CN" },
+      {
+        geocode: async () => ({ ok: true, data: HANGZHOU }),
+        suggestPlaces,
+        searchPlaces,
+      },
+    );
+    expect(r.kind).toBe("skip");
+    expect(suggestPlaces).not.toHaveBeenCalled();
+    expect(searchPlaces).not.toHaveBeenCalled();
+  });
 });

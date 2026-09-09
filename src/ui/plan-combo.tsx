@@ -10,6 +10,9 @@ type Props = {
   onChange: (value: string) => void;
   placeholder?: string;
   toggleLabel: string;
+  disabled?: boolean;
+  required?: boolean;
+  testId?: string;
 };
 
 export function PlanCombo({
@@ -20,6 +23,9 @@ export function PlanCombo({
   onChange,
   placeholder,
   toggleLabel,
+  disabled,
+  required,
+  testId,
 }: Props) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -42,8 +48,11 @@ export function PlanCombo({
         value={value}
         placeholder={placeholder}
         autoComplete="off"
+        required={required}
+        disabled={disabled}
+        data-testid={testId}
         onChange={(e) => onChange(e.target.value)}
-        onFocus={() => setOpen(true)}
+        onFocus={() => !disabled && setOpen(true)}
       />
       <button
         type="button"
@@ -51,7 +60,8 @@ export function PlanCombo({
         aria-label={toggleLabel}
         aria-expanded={open}
         aria-controls={listId}
-        onClick={() => setOpen((v) => !v)}
+        disabled={disabled}
+        onClick={() => !disabled && setOpen((v) => !v)}
       />
       <ul id={listId} className="combo__list" role="listbox" hidden={!open}>
         {options.map((opt) => (

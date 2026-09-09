@@ -3,14 +3,13 @@ import "server-only";
 import { ymdPlusDays } from "./plan-agent-body";
 import { type DiscoverPoolRow } from "./plan-discover-pool";
 import { fetchTripCandidates } from "./plan-fetch-candidates";
-import { discoverPlaces, providersForDestinationText } from "../places-agent/client";
+import { planTrip } from "../places-agent/client";
 
 export type StartPlanDiscoverInput = {
   destination: string;
   startDate: string;
   days: number;
   locale: string;
-  providers?: string[];
   partySize?: number;
   budget?: string;
   max_number?: number;
@@ -27,6 +26,7 @@ export type StartPlanDiscoverResult = {
   key: string;
 };
 
+/** Chips/pool via plan_trip + fetch_trip_details (G6/G7). Omit providers[]. */
 export async function startPlanDiscover(
   input: StartPlanDiscoverInput,
 ): Promise<StartPlanDiscoverResult> {
@@ -36,21 +36,18 @@ export async function startPlanDiscover(
   if (!destination || !startDate || !Number.isInteger(days) || days < 1 || days > 14) {
     return { ok: false, key: "errors.validation" };
   }
-  const providers = input.providers ?? providersForDestinationText(destination);
   const end = ymdPlusDays(startDate, Math.max(0, days - 1));
   const maxNumber = input.max_number ?? 5;
-  const written = await discoverPlaces({
+  const written = await planTrip({
     city: destination,
     bounds: { start: startDate, end },
     locale: input.locale,
-    ...(providers?.length ? { providers } : {}),
     numDays: days,
-    max_number: maxNumber,
-    party_size: input.partySize,
-    budget: input.budget,
+    ...(input.partySize != null ? { party_size: input.partySize } : {}),
+    ...(input.budget ? { budget: input.budget } : {}),
   });
   if (!written.ok || !written.data) {
-    console.error("startPlanDiscover: discover_places not ok", written.outcome?.key);
+    console.error("startPlanDiscover: plan_trip not ok", written.outcome?.key);
     return { ok: false, key: written.outcome?.key ?? "errors.discover_places_failed" };
   }
   const tripId =

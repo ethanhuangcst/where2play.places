@@ -1067,11 +1067,17 @@ html[lang^="zh"] .app-user__tools .btn {
 
 .chat-composer {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   flex-shrink: 0;
   padding: 0.75rem 1rem;
   border-top: 1px solid var(--line);
   background: var(--plate);
+}
+
+.plan-nav__composer .msg-group__hint {
+  flex: 1 0 100%;
+  margin: 0;
 }
 
 .chat-composer input {
@@ -2930,69 +2936,168 @@ html[lang^="zh"] .app-user__tools .btn {
    （06-plan*.html 系列专用；品牌 token 沿用 :root）
    ============================================================ */
 
-/* —— 1. 起飞条：单行五格 —— */
+/* —— 1. 起飞条：两行（核心 + 偏好） —— */
 .plan-takeoff {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--plan-gap);
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto;
+  width: 100%;
+  gap: 0.7rem 1.75rem;
+  align-items: stretch;
 }
 
-.plan-takeoff .field {
-  flex: 1 1 8rem;
+.plan-takeoff__col--core {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.7rem;
+  align-items: center;
   min-width: 0;
 }
 
-.plan-takeoff .field[data-field="dest"] {
-  flex: 1 1 12rem;
+.plan-takeoff__col--prefs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.7rem 1.25rem;
+  align-items: center;
+  min-width: 0;
 }
 
-.plan-takeoff .field[data-field="start_date"] {
-  flex: 0 0 12rem;
-  max-width: 12rem;
+.plan-takeoff .field {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
 }
 
-.plan-takeoff .field[data-field="start_date"] input {
-  padding-right: 2.25rem;
-  font-size: 0.9rem;
+.plan-takeoff .field > label {
+  flex: 0 0 3em;
+  width: 3em;
+  margin: 0;
+  text-align: left;
+  font-weight: 700;
+  font-size: 0.84rem;
+  line-height: 1.2;
 }
 
-.plan-takeoff .field[data-field="start_date"] input::-webkit-calendar-picker-indicator {
-  margin-left: 0.4rem;
+.plan-takeoff__col--prefs .field > label {
+  flex: 0 0 2em;
+  width: 2em;
+}
+
+.plan-takeoff .field > input,
+.plan-takeoff .field > select,
+.plan-takeoff .field > .combo,
+.plan-takeoff .field > .plan-takeoff__cluster {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+}
+
+.plan-takeoff__cluster {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+  min-width: 0;
+  flex: 1 1 auto;
+  width: auto;
+}
+
+.plan-takeoff__cluster > input[type="date"] {
+  position: relative;
+  box-sizing: border-box;
+  flex: 0 0 9.15rem;
+  width: 9.15rem;
+  max-width: 9.15rem;
+  min-width: 9.15rem;
+  padding: 0 1.35rem 0 0.5rem;
+  font-size: 0.95rem;
 }
 
 .plan-takeoff .field[data-field="days"],
 .plan-takeoff .field[data-field="party"] {
-  flex: 0 0 3.3rem;
-  max-width: 3.3rem;
+  flex: 0 0 auto;
+  gap: 0.4rem;
 }
 
-.plan-takeoff .field[data-field="budget"] {
-  flex: 0 0 7.5rem;
-  max-width: 7.5rem;
+.plan-takeoff .field[data-field="days"] > label,
+.plan-takeoff .field[data-field="party"] > label {
+  flex: 0 0 auto;
+  width: auto;
+  white-space: nowrap;
 }
 
-.plan-takeoff .field[data-field="budget"] select {
+.plan-takeoff .field[data-field="days"] input,
+.plan-takeoff .field[data-field="party"] input {
+  width: 3.25rem;
+  flex: 0 0 3.25rem;
+}
+
+.plan-takeoff .field[data-field="start_date"] input::-webkit-calendar-picker-indicator {
+  position: absolute;
+  right: 0.28rem;
+  top: 50%;
+  transform: translateY(-50%);
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.plan-takeoff .field[data-field="start_date"] input::-webkit-datetime-edit,
+.plan-takeoff .field[data-field="start_date"] input::-webkit-datetime-edit-fields-wrapper {
+  padding: 0;
+}
+
+.plan-takeoff .field[data-field="start_date"] input::-webkit-clear-button {
+  display: none;
+}
+
+.plan-takeoff .field[data-field="budget"] select,
+.plan-takeoff .field[data-field="pace"] select,
+.plan-takeoff .field[data-field="transit"] select,
+.plan-takeoff .field[data-field="trip_type"] .combo {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 6.5em;
+}
+
+.plan-takeoff__col--core .field[data-field="dest"],
+.plan-takeoff__col--core .field[data-field="start_date"] {
   width: 100%;
+}
+
+.plan-takeoff .field[data-field="dest"] > input {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 8.25rem;
 }
 
 .plan-takeoff .plan-takeoff__actions {
   display: flex;
-  align-items: flex-end;
-  flex: 0 0 auto;
+  align-items: stretch;
+  justify-self: end;
+  margin-left: 0;
 }
 
-@media (max-width: 640px) {
-  .plan-takeoff .field {
-    flex: 1 1 calc(50% - var(--plan-gap));
-  }
-  .plan-takeoff .field[data-field="start_date"],
-  .plan-takeoff .field[data-field="days"],
-  .plan-takeoff .field[data-field="party"],
-  .plan-takeoff .field[data-field="budget"] {
-    flex: 1 1 calc(50% - var(--plan-gap));
-    max-width: none;
-  }
+.plan-takeoff__cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  width: auto;
+  height: 100%;
+  aspect-ratio: 1;
+  min-height: 100%;
+  padding: 0.45rem 0.5rem;
+  line-height: 1.2;
+  font-size: 1.22rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.plan-takeoff__cta span {
+  display: block;
 }
 
 /* §12：状态条不撑高（覆盖 .plan-phase 的 flex:1） */
@@ -3529,6 +3634,18 @@ html[lang^="zh"] .app-user__tools .btn {
   }
 }
 
+.plan-nav__thread .bubble {
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.plan-nav__thread .msg-group__line {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+
 .plan-nav__thread .bubble--user {
   align-self: flex-end;
   max-width: 85%;
@@ -3578,32 +3695,63 @@ html[lang^="zh"] .app-user__tools .btn {
   display: none;
 }
 
-/* —— 出行限制（只读） —— */
+/* —— 出行限制（只读）：4 列、上标下值，起飞 8 + intake 4 —— */
 .constraint-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.75rem 1rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: 1.25rem;
+  row-gap: 0.9rem;
+  margin: 0;
+}
+
+.constraint-grid--intake {
+  margin-top: 0.95rem;
+  padding-top: 0.95rem;
+  border-top: 1px solid var(--line);
 }
 
 .constraint-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.22rem;
+  min-width: 0;
   margin: 0;
 }
 
 .constraint-item dt {
-  margin: 0 0 0.2rem;
+  margin: 0;
   font-family: var(--font-ui);
   font-size: 0.72rem;
   font-weight: 600;
-  color: var(--mute);
   letter-spacing: 0.02em;
+  line-height: 1.2;
+  color: var(--mute);
 }
 
 .constraint-item dd {
   margin: 0;
   font-family: var(--font-ui);
-  font-size: 0.92rem;
+  font-size: 0.95rem;
   font-weight: 600;
+  line-height: 1.35;
   color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.constraint-item__pending {
+  font-weight: 500;
+  color: var(--mute);
+}
+
+.constraint-must-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.plan-constraints .constraint-must-chips .chip {
+  cursor: default;
 }
 
 @media (max-width: 720px) {
@@ -3824,16 +3972,70 @@ html[lang^="zh"] .app-user__tools .btn {
   transition: height 0.5s ease-out;
 }
 
-/* —— 5. 问答快答条 —— */
+/* —— 5. 问答快答条 + 底部 dock（芯片 / 跳过重答 / 输入） —— */
+.plan-nav__dock {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.35rem 1rem 0.85rem;
+  border-top: 1px solid var(--line);
+  background: var(--plate);
+}
+
 .plan-nav__quick {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.4rem;
-  margin: 0.3rem 0 0.8rem;
+  margin: 0;
+  max-height: 11rem;
+  overflow-y: auto;
+}
+
+.plan-nav__thread .plan-nav__quick {
+  margin: 0.35rem 0 0.55rem;
+  max-height: none;
+}
+
+.plan-nav__quick--stack {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+}
+
+.plan-nav__quick--stack .chip {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .plan-nav__quick .chip {
   font-size: 0.78rem;
   padding: 0.18rem 0.7rem;
+}
+
+.plan-nav__need-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 0.4rem;
+  margin: 0;
+}
+
+.plan-nav__need-actions .chip--ghost,
+.plan-nav__quick .chip--ghost {
+  background: transparent;
+  border: 1px solid var(--line);
+}
+
+.slot-provider {
+  margin-left: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--muted, #666);
 }
 
 .plan-make-progress {

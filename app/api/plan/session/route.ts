@@ -7,7 +7,7 @@ import {
   emptyPlanItinerary,
   upsertPlanSessionCache,
 } from "@/src/core/plan-session-cache";
-import { geocode, patchTrip, searchPlaces, providersForPin } from "@/src/places-agent/client";
+import { geocode, patchTrip, searchPlaces, suggestPlaces } from "@/src/places-agent/client";
 import {
   INTAKE_STEP_ORDER,
   tripConstraintsFromIntakeStep,
@@ -61,7 +61,7 @@ export async function PATCH(request: NextRequest) {
               destination: dest,
               locale,
             },
-            { searchPlaces, geocode, providersForPin },
+            { searchPlaces, suggestPlaces, geocode },
           );
 
     if (resolved.kind === "not_found") {

@@ -22,7 +22,8 @@ import {
   type IntakeStepId,
   type TakeoffFields,
 } from "@/src/core/plan-intake";
-import { ORIGIN_RETRY_CHIP } from "@/src/core/plan-resolve-origin";
+import { ORIGIN_RETRY_CHIP, originPickChipValue } from "@/src/core/plan-resolve-origin";
+import { PLAN_NAV_MIN_H, PLAN_NAV_MIN_W, nextPanelSizeRem } from "@/src/core/plan-nav-resize";
 
 export type SkeletonPreviewDay = {
   dayIndex: number;
@@ -46,6 +47,7 @@ type Props = {
   planCompleteLine?: string | null;
   suggestedMustSee?: string[];
   mustSeeLoading?: boolean;
+  onRetryMustSee?: () => void | Promise<void>;
   makeElapsedSeconds?: string | null;
   onOpen: () => void;
   onClose: () => void;
@@ -56,12 +58,43 @@ type Props = {
   onAnswer: (step: IntakeStepId, value: string) => void | Promise<boolean | void>;
   onTerminate: () => void;
   onComplete: (answers: IntakeAnswers) => void;
+  agentNeedQuestions?: Array<{
+    id: string;
+    prompt: string;
+    options?: Array<{ id: string; label: string }>;
+    multi?: boolean;
+  }>;
+  agentNeedIndex?: number;
+  agentNeedAnswers?: Record<string, string>;
+  /** First plan_trip in flight — show wait line + composer (send disabled). */
+  awaitingAgentNeeds?: boolean;
+  /** Hotel candidate click — PATCH /api/plan/session in flight. */
+  verifyingHotel?: boolean;
+  onAgentNeedAnswer?: (questionId: string, value: string) => void;
+  onAgentNeedRedo?: () => void;
+  canRedoNeed?: boolean;
+  onLocalNeedSkip?: () => void;
+  onLocalNeedRedo?: () => void;
+  canRedoLocal?: boolean;
 };
 
-const MIN_W = 27;
-const MIN_H = 45;
-const MAX_W = 40;
-const MAX_H = 64;
+function catalogNeedPrompt(
+  id: string,
+  fallback: string,
+  t: (key: string) => string,
+): string {
+  const keys: Record<string, string> = {
+    hotel: "play.plan.need_prompt.hotel",
+    start_time: "play.plan.need_prompt.start_time",
+    must_see: "play.plan.need_prompt.must_see",
+    other: "play.plan.need_prompt.other",
+  };
+  const key = keys[id];
+  return key ? t(key) : fallback;
+}
+
+const MIN_W = PLAN_NAV_MIN_W;
+const MIN_H = PLAN_NAV_MIN_H;
 
 export function PlanAssistantNav({
   open,
@@ -76,6 +109,7 @@ export function PlanAssistantNav({
   planCompleteLine = null,
   suggestedMustSee,
   mustSeeLoading,
+  onRetryMustSee,
   makeElapsedSeconds,
   originNotFound,
   originCandidates,
@@ -86,6 +120,17 @@ export function PlanAssistantNav({
   onAnswer,
   onTerminate,
   onComplete,
+  agentNeedQuestions,
+  agentNeedIndex = 0,
+  agentNeedAnswers = {},
+  awaitingAgentNeeds = false,
+  verifyingHotel = false,
+  onAgentNeedAnswer,
+  onAgentNeedRedo,
+  canRedoNeed = false,
+  onLocalNeedSkip,
+  onLocalNeedRedo,
+  canRedoLocal = false,
 }: Props) {
   const t = useT();
   const navRef = useRef<HTMLElement>(null);
@@ -116,7 +161,7 @@ export function PlanAssistantNav({
     } else if (body) {
       body.scrollTop = body.scrollHeight;
     }
-  }, [open, statusLines, planCompleteLine, fillRouteDays, skeletonRouteDays, makeElapsedSeconds, answers, currentStep]);
+  }, [open, statusLines, planCompleteLine, fillRouteDays, skeletonRouteDays, makeElapsedSeconds, answers, currentStep, agentNeedAnswers, agentNeedIndex, awaitingAgentNeeds]);
 
   useEffect(() => {
     if (currentStep && !intakeComplete) {
@@ -130,8 +175,14 @@ export function PlanAssistantNav({
     }
   }, [currentStep, intakeComplete, answers]);
 
-  const activeStep = intakeComplete ? null : currentStep;
-  const qa = intakeQaProgress(activeStep, intakeComplete);
+  const agentQ = agentNeedQuestions?.[agentNeedIndex];
+  const useAgentNeeds = Boolean(agentNeedQuestions?.length) || awaitingAgentNeeds;
+  const activeStep = intakeComplete || useAgentNeeds ? null : currentStep;
+  const qa = intakeQaProgress(activeStep, intakeComplete, {
+    useAgentNeeds,
+    agentNeedIndex,
+    agentNeedTotal: agentNeedQuestions?.length || 4,
+  });
   const budgetKey = normalizeBudgetKey(takeoff.budget);
   const budgetLabel = budgetKey ? budgetOptionLabel(budgetKey, t) : takeoff.budget;
   const contextSummary = `${takeoff.destination} · ${takeoff.days} ${t("play.plan.days_short")} · ${takeoff.partySize} ${t("play.plan.people_short")} · ${budgetLabel} · ${t("play.plan.nav_qa_progress", { current: qa.current, total: qa.total })}`;
@@ -146,12 +197,17 @@ export function PlanAssistantNav({
 
       function onMove(ev: PointerEvent) {
         const root = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-        const dw = (ev.clientX - startX) / root;
-        const dh = (ev.clientY - startY) / root;
-        setPanelSize({
-          w: Math.min(MAX_W, Math.max(MIN_W, startW + dw)),
-          h: Math.min(MAX_H, Math.max(MIN_H, startH + dh)),
-        });
+        setPanelSize(
+          nextPanelSizeRem({
+            startW,
+            startH,
+            startX,
+            startY,
+            clientX: ev.clientX,
+            clientY: ev.clientY,
+            rootPx: root,
+          }),
+        );
       }
 
       function onUp() {
@@ -185,7 +241,18 @@ export function PlanAssistantNav({
 
   function submitAnswer(e: React.FormEvent) {
     e.preventDefault();
-    if (!activeStep || fillingLocked) return;
+    if (fillingLocked) return;
+    if (useAgentNeeds && agentQ) {
+      const qid = agentQ.id;
+      const value =
+        qid === "must_see"
+          ? joinMustIncludeSelection(selectedMustSee, draft.trim())
+          : draft.trim();
+      setDraft("");
+      onAgentNeedAnswer?.(qid, value);
+      return;
+    }
+    if (!activeStep) return;
     if (activeStep === "g" && mustSeeLoading) return;
     if (activeStep === "g") {
       const value =
@@ -225,6 +292,27 @@ export function PlanAssistantNav({
         originCandidates,
       })
     : [];
+  const agentChipOptions =
+    useAgentNeeds && agentQ
+      ? agentQ.options?.length
+        ? agentQ.options
+        : agentQ.id === "hotel" && originCandidates?.length
+          ? originCandidates.map((c, i) => ({ id: `cand_${i}`, label: c.name }))
+          : agentQ.id === "must_see" && suggestedMustSee?.length
+            ? suggestedMustSee.map((label, i) => ({ id: `ms_${i}`, label }))
+            : []
+      : [];
+  const mustSeeChipsEmpty =
+    (useAgentNeeds && agentQ?.id === "must_see" && agentChipOptions.length === 0) ||
+    (!useAgentNeeds && activeStep === "g" && !(suggestedMustSee?.length));
+  const showMustSeeEmpty =
+    mustSeeChipsEmpty && !mustSeeLoading && !(awaitingAgentNeeds && !agentQ);
+  const showLocalChips =
+    !useAgentNeeds &&
+    quickChips.length > 0 &&
+    Boolean(activeStep) &&
+    !(activeStep === "g" && mustSeeLoading);
+  const stackProcessChips = true;
 
   const railPct = intakeComplete
     ? 100
@@ -314,8 +402,15 @@ export function PlanAssistantNav({
           <div className="plan-nav__body" ref={bodyRef} data-testid="plan-nav-body">
             <div className="plan-nav__thread" data-testid="plan-nav-thread">
               <div className="msg-group msg-group--agent">
-                <p className="msg-group__line">{t("play.plan.assistant_greeting")}</p>
-                {activeStep === "b" && !("b" in answers) ? (
+                {useAgentNeeds ? (
+                  <p className="msg-group__line" data-testid="plan-nav-searching">
+                    {t("play.plan.assistant_searching")}
+                  </p>
+                ) : null}
+                {!awaitingAgentNeeds ? (
+                  <p className="msg-group__line">{t("play.plan.assistant_greeting")}</p>
+                ) : null}
+                {activeStep === "b" && !("b" in answers) && !originNotFound && !originCandidates?.length ? (
                   <p className="msg-group__line">
                     {t(intakeQuestionKey("b"))}
                     {defaultHint ? (
@@ -326,20 +421,17 @@ export function PlanAssistantNav({
                     ) : null}
                   </p>
                 ) : null}
-                {originCandidates?.length ? (
-                  <p className="msg-group__line" data-testid="plan-origin-candidates">
-                    {t("play.plan.intake_origin_candidates", {
+                {!useAgentNeeds && originNotFound ? (
+                  <p className="msg-group__line" data-testid="plan-origin-not-found">
+                    {t("play.plan.intake_origin_not_found", {
                       destination: takeoff.destination.trim() || "—",
-                      list: originCandidates
-                        .slice(0, 3)
-                        .map((c, i) => `${String.fromCharCode(65 + i)} - ${c.name}`)
-                        .join(", "),
+                      query: (originQuery ?? "").trim() || "—",
                     })}
                   </p>
                 ) : null}
-                {originNotFound ? (
-                  <p className="msg-group__line" data-testid="plan-origin-not-found">
-                    {t("play.plan.intake_origin_not_found", {
+                {!useAgentNeeds && (originCandidates?.length ?? 0) > 0 ? (
+                  <p className="msg-group__line" data-testid="plan-origin-candidates">
+                    {t("play.plan.intake_origin_candidates", {
                       destination: takeoff.destination.trim() || "—",
                       query: (originQuery ?? "").trim() || "—",
                     })}
@@ -356,13 +448,136 @@ export function PlanAssistantNav({
                 );
               })}
 
-              {activeStep && (activeStep !== "b" || "b" in answers) ? (
+              {useAgentNeeds
+                ? (agentNeedQuestions ?? []).map((q, i) => {
+                    const answered = Object.prototype.hasOwnProperty.call(agentNeedAnswers, q.id);
+                    if (i > agentNeedIndex && !answered) return null;
+                    return (
+                      <div key={q.id}>
+                        {i < agentNeedIndex || answered ? (
+                          <>
+                            <div className="bubble bubble--agent">{catalogNeedPrompt(q.id, q.prompt, t)}</div>
+                            <div className="bubble bubble--user" data-testid={`plan-nav-need-answer-${q.id}`}>
+                              {(agentNeedAnswers[q.id] ?? "").trim() || t("play.plan.need_skipped")}
+                            </div>
+                          </>
+                        ) : i === agentNeedIndex ? (
+                          <>
+                            {q.id === "hotel" && (originNotFound || (originCandidates?.length ?? 0) > 0) ? (
+                              <div
+                                className="bubble bubble--agent"
+                                data-testid={originNotFound ? "plan-origin-not-found" : "plan-origin-candidates"}
+                              >
+                                {originNotFound
+                                  ? t("play.plan.intake_origin_not_found", {
+                                      destination: takeoff.destination.trim() || "—",
+                                      query: (originQuery ?? "").trim() || "—",
+                                    })
+                                  : t("play.plan.intake_origin_candidates", {
+                                      destination: takeoff.destination.trim() || "—",
+                                      query: (originQuery ?? "").trim() || "—",
+                                    })}
+                              </div>
+                            ) : (
+                              <div className="bubble bubble--agent" data-testid="plan-nav-need-prompt">
+                                {catalogNeedPrompt(q.id, q.prompt, t)}
+                              </div>
+                            )}
+                            {q.id === "hotel" && verifyingHotel ? (
+                              <p className="msg-group__line" data-testid="plan-nav-verifying-hotel">
+                                {t("play.plan.verifying_hotel")}
+                              </p>
+                            ) : null}
+                            {q.id === "must_see" && showMustSeeEmpty ? (
+                              <p className="msg-group__line" data-testid="plan-must-see-empty">
+                                {t("play.plan.must_see_empty")}
+                              </p>
+                            ) : null}
+                            {q.id === "must_see" && showMustSeeEmpty && onRetryMustSee ? (
+                              <div
+                                className="plan-nav__quick"
+                                role="group"
+                                aria-label={t("play.plan.nav_quick_aria")}
+                              >
+                                <button
+                                  type="button"
+                                  className="chip chip--ghost"
+                                  data-testid="plan-must-see-refetch"
+                                  disabled={Boolean(mustSeeLoading)}
+                                  aria-disabled={Boolean(mustSeeLoading)}
+                                  onClick={() => {
+                                    void onRetryMustSee();
+                                  }}
+                                >
+                                  {t("play.plan.must_see_refetch")}
+                                </button>
+                              </div>
+                            ) : null}
+                            {q.id === "hotel" && originNotFound ? null : agentChipOptions.length > 0 ? (
+                              <div
+                                className={`plan-nav__quick${stackProcessChips ? " plan-nav__quick--stack" : ""}`}
+                                role="group"
+                                aria-label={t("play.plan.nav_quick_aria")}
+                                data-testid="plan-nav-thread-chips"
+                              >
+                                {agentChipOptions.map((opt, chipIndex) => (
+                                  <button
+                                    key={opt.id}
+                                    type="button"
+                                    className={`chip${q.multi && selectedMustSee.includes(opt.label) ? " is-on" : ""}`}
+                                    data-testid={`plan-need-chip-${opt.id}`}
+                                    disabled={verifyingHotel && q.id === "hotel"}
+                                    aria-disabled={verifyingHotel && q.id === "hotel"}
+                                    onClick={() => {
+                                      if (verifyingHotel && q.id === "hotel") return;
+                                      if (q.multi) {
+                                        setSelectedMustSee((prev) =>
+                                          prev.includes(opt.label)
+                                            ? prev.filter((v) => v !== opt.label)
+                                            : [...prev, opt.label],
+                                        );
+                                        return;
+                                      }
+                                      if (q.id === "hotel") {
+                                        const fromId = /^cand_(\d+)$/.exec(opt.id);
+                                        const idx = fromId ? Number(fromId[1]) : chipIndex;
+                                        onAgentNeedAnswer?.(q.id, originPickChipValue(idx));
+                                        return;
+                                      }
+                                      onAgentNeedAnswer?.(q.id, opt.label);
+                                    }}
+                                  >
+                                    {opt.label}
+                                  </button>
+                                ))}
+                              </div>
+                            ) : null}
+                          </>
+                        ) : null}
+                      </div>
+                    );
+                  })
+                : null}
+
+              {awaitingAgentNeeds && !agentQ ? (
+                <p className="msg-group__line sr-only" data-testid="plan-nav-waiting">
+                  {t("play.plan.assistant_searching")}
+                </p>
+              ) : null}
+
+              {!useAgentNeeds && activeStep && (activeStep !== "b" || "b" in answers) ? (
                 <div className="bubble bubble--agent">
                   {activeStep === "g" && mustSeeLoading && !suggestedMustSee?.length ? (
                     <span>{t("play.plan.must_see_loading")}</span>
                   ) : (
                     intakeQuestionText(activeStep, t, suggestedMustSee)
                   )}
+                  {activeStep === "g" && showMustSeeEmpty ? (
+                    <span className="msg-group__hint" data-testid="plan-must-see-empty">
+                      {" "}
+                      {t("play.plan.must_see_empty")}
+                    </span>
+                  ) : null}
                   {activeStep === "g" && !mustSeeLoading ? (
                     <span className="msg-group__hint">
                       {" "}
@@ -377,6 +592,56 @@ export function PlanAssistantNav({
                       {t("play.plan.assistant_defaults_hint", { value: defaultHint })}
                     </span>
                   ) : null}
+                </div>
+              ) : null}
+
+              {!useAgentNeeds && activeStep === "g" && showMustSeeEmpty && onRetryMustSee ? (
+                <div
+                  className="plan-nav__quick"
+                  role="group"
+                  aria-label={t("play.plan.nav_quick_aria")}
+                >
+                  <button
+                    type="button"
+                    className="chip chip--ghost"
+                    data-testid="plan-must-see-refetch"
+                    disabled={Boolean(mustSeeLoading) || fillingLocked}
+                    aria-disabled={Boolean(mustSeeLoading) || fillingLocked}
+                    onClick={() => {
+                      void onRetryMustSee();
+                    }}
+                  >
+                    {t("play.plan.must_see_refetch")}
+                  </button>
+                </div>
+              ) : null}
+
+              {!useAgentNeeds && showLocalChips ? (
+                <div
+                  className={`plan-nav__quick${stackProcessChips ? " plan-nav__quick--stack" : ""}`}
+                  role="group"
+                  aria-label={t("play.plan.nav_quick_aria")}
+                  data-testid="plan-nav-thread-chips"
+                >
+                  {quickChips.map((chip) => (
+                    <button
+                      key={chip.value}
+                      type="button"
+                      className={`chip${activeStep === "g" ? (selectedMustSee.includes(chip.value) ? " is-on" : "") : selectedChip === chip.value ? " is-on" : ""}`}
+                      disabled={fillingLocked || sending}
+                      aria-disabled={fillingLocked || sending}
+                      data-testid={
+                        chip.labelKey === "play.plan.intake_origin_skip"
+                          ? "plan-origin-skip"
+                          : chip.labelKey === "play.plan.intake_origin_retry"
+                            ? "plan-origin-retry"
+                            : undefined
+                      }
+                      onClick={() => submitChip(chip.value)}
+                    >
+                      {chip.labelKey ? t(chip.labelKey) : chip.label}
+                    </button>
+                  ))}
                 </div>
               ) : null}
 
@@ -434,64 +699,112 @@ export function PlanAssistantNav({
               ) : null}
               <div ref={threadEndRef} data-testid="plan-nav-thread-end" aria-hidden="true" />
             </div>
-
-            {quickChips.length > 0 && activeStep && !(activeStep === "g" && mustSeeLoading) ? (
-              <div className="plan-nav__quick" role="group" aria-label={t("play.plan.nav_quick_aria")}>
-                {quickChips.map((chip) => (
-                  <button
-                    key={chip.value}
-                    type="button"
-                    className={`chip${activeStep === "g" ? (selectedMustSee.includes(chip.value) ? " is-on" : "") : selectedChip === chip.value ? " is-on" : ""}`}
-                    disabled={fillingLocked || sending}
-                    aria-disabled={fillingLocked || sending}
-                    data-testid={
-                      chip.labelKey === "play.plan.intake_origin_skip"
-                        ? "plan-origin-skip"
-                        : chip.labelKey === "play.plan.intake_origin_retry"
-                          ? "plan-origin-retry"
-                          : undefined
-                    }
-                    onClick={() => submitChip(chip.value)}
-                  >
-                    {chip.labelKey ? t(chip.labelKey) : chip.label}
-                  </button>
-                ))}
-              </div>
-            ) : null}
           </div>
 
-          {(!intakeComplete && activeStep) || intakeComplete ? (
-            <form className="chat-composer plan-nav__composer" onSubmit={submitAnswer}>
-              <label className="sr-only" htmlFor="nav-input">
-                {t("play.chat.input_label")}
-              </label>
-              <input
-                id="nav-input"
-                name="q"
-                placeholder={t("play.plan.nav_input_ph")}
-                data-testid="plan-nav-input"
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-              />
-              <button
-                className={`btn${fillingLocked || sending ? " is-send-locked" : ""}`}
-                type="submit"
-                data-testid="plan-nav-send"
-                disabled={
-                  fillingLocked ||
-                  sending ||
-                  (activeStep === "g" && Boolean(mustSeeLoading))
-                }
-                aria-disabled={
-                  fillingLocked ||
-                  sending ||
-                  (activeStep === "g" && Boolean(mustSeeLoading))
-                }
-              >
-                {t("play.chat.send")}
-              </button>
-            </form>
-          ) : null}
+          {(() => {
+            const showComposer =
+              (!intakeComplete && (activeStep || useAgentNeeds || awaitingAgentNeeds)) ||
+              intakeComplete;
+            const showNeedActions =
+              showComposer &&
+              (Boolean(agentQ) ||
+                Boolean(activeStep) ||
+                (useAgentNeeds && canRedoNeed) ||
+                (!useAgentNeeds && canRedoLocal) ||
+                intakeComplete);
+
+            return (
+              <div className="plan-nav__dock" data-testid="plan-nav-dock">
+                {showNeedActions ? (
+                  <div
+                    className="plan-nav__need-actions"
+                    role="group"
+                    aria-label={t("play.plan.nav_quick_aria")}
+                    data-testid="plan-nav-need-actions"
+                  >
+                    <button
+                      type="button"
+                      className="chip chip--ghost"
+                      data-testid="plan-nav-skip-need"
+                      disabled={
+                        useAgentNeeds
+                          ? !agentQ || verifyingHotel
+                          : !activeStep || fillingLocked || sending
+                      }
+                      aria-disabled={
+                        useAgentNeeds
+                          ? !agentQ || verifyingHotel
+                          : !activeStep || fillingLocked || sending
+                      }
+                      onClick={() => {
+                        if (useAgentNeeds) {
+                          if (agentQ) onAgentNeedAnswer?.(agentQ.id, "");
+                          return;
+                        }
+                        onLocalNeedSkip?.();
+                      }}
+                    >
+                      {t("play.plan.need_skip_this")}
+                    </button>
+                    <button
+                      type="button"
+                      className="chip chip--ghost"
+                      data-testid="plan-nav-redo-need"
+                      disabled={useAgentNeeds ? !canRedoNeed : !canRedoLocal}
+                      aria-disabled={useAgentNeeds ? !canRedoNeed : !canRedoLocal}
+                      onClick={() => {
+                        if (useAgentNeeds) {
+                          if (canRedoNeed) onAgentNeedRedo?.();
+                          return;
+                        }
+                        if (canRedoLocal) onLocalNeedRedo?.();
+                      }}
+                    >
+                      {t("play.plan.need_redo_prev")}
+                    </button>
+                  </div>
+                ) : null}
+
+                {showComposer ? (
+                  <form className="chat-composer plan-nav__composer" onSubmit={submitAnswer}>
+                    <label className="sr-only" htmlFor="nav-input">
+                      {t("play.chat.input_label")}
+                    </label>
+                    <input
+                      id="nav-input"
+                      name="q"
+                      placeholder={t("play.plan.nav_input_ph")}
+                      data-testid="plan-nav-input"
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      disabled={awaitingAgentNeeds && !agentQ}
+                    />
+                    <button
+                      className={`btn${fillingLocked || sending || (awaitingAgentNeeds && !agentQ) ? " is-send-locked" : ""}`}
+                      type="submit"
+                      data-testid="plan-nav-send"
+                      disabled={
+                        fillingLocked ||
+                        sending ||
+                        verifyingHotel ||
+                        (awaitingAgentNeeds && !agentQ) ||
+                        (activeStep === "g" && Boolean(mustSeeLoading))
+                      }
+                      aria-disabled={
+                        fillingLocked ||
+                        sending ||
+                        verifyingHotel ||
+                        (awaitingAgentNeeds && !agentQ) ||
+                        (activeStep === "g" && Boolean(mustSeeLoading))
+                      }
+                    >
+                      {t("play.chat.send")}
+                    </button>
+                  </form>
+                ) : null}
+              </div>
+            );
+          })()}
         </div>
       </aside>
     </>

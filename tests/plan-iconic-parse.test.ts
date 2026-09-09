@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { mustSeeNamesFromCandidates } from "@/src/core/plan-iconic-parse";
 
-describe("TC-M19-79-01 mustSeeNamesFromCandidates heat order", () => {
-  it("should_return_must_see_names_sorted_by_user_ratings_total", () => {
+describe("TC-M19-79-01 mustSeeNamesFromCandidates nomination order", () => {
+  it("should_return_must_see_names_in_candidate_order_not_heat", () => {
     const slice = {
       candidates: {
         places: [
@@ -13,6 +13,6 @@ describe("TC-M19-79-01 mustSeeNamesFromCandidates heat order", () => {
         ],
       },
     };
-    expect(mustSeeNamesFromCandidates(slice, 4)).toEqual(["Hot Alpha", "Hot Beta", "Low Signal"]);
+    expect(mustSeeNamesFromCandidates(slice, 4)).toEqual(["Low Signal", "Hot Alpha", "Hot Beta"]);
   });
 });

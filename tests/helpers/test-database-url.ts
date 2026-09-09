@@ -7,7 +7,9 @@ export const DEFAULT_TEST_DATABASE_URL =
  * Prefer `TEST_DATABASE_URL`; ignore app `DATABASE_URL` so `.env.local` cannot point
  * wipe helpers at the real `where2play` database.
  */
-export function resolveVitestDatabaseUrl(env: NodeJS.ProcessEnv = process.env): string {
+export function resolveVitestDatabaseUrl(
+  env: Partial<NodeJS.ProcessEnv> & Record<string, string | undefined> = process.env,
+): string {
   const explicit = env.TEST_DATABASE_URL?.trim();
   if (explicit) return explicit;
   return DEFAULT_TEST_DATABASE_URL;

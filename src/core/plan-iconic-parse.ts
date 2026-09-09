@@ -40,20 +40,7 @@ export function mustSeeNamesFromCandidates(
     if (!item || typeof item !== "object") return false;
     const c = item as { name?: unknown; must_see?: unknown };
     return c.must_see === true && typeof c.name === "string" && c.name.trim().length > 0;
-  }) as Array<{ name: string; user_ratings_total?: number; rating?: number }>;
-
-  mustSee.sort((a, b) => {
-    const heat = (c: { user_ratings_total?: number; rating?: number }) => {
-      if (typeof c.user_ratings_total === "number" && c.user_ratings_total > 0) {
-        return c.user_ratings_total;
-      }
-      if (typeof c.rating === "number" && c.rating > 0) return c.rating * 1000;
-      return 0;
-    };
-    const diff = heat(b) - heat(a);
-    if (diff !== 0) return diff;
-    return a.name.localeCompare(b.name);
-  });
+  }) as Array<{ name: string }>;
 
   const seen = new Set<string>();
   const out: string[] = [];

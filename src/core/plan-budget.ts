@@ -1,11 +1,11 @@
 /** Stable takeoff budget values — not locale strings. */
-export const BUDGET_OPTION_KEYS = ["economy", "mid", "comfort"] as const;
+export const BUDGET_OPTION_KEYS = ["economy", "mid", "luxury"] as const;
 export type BudgetOptionKey = (typeof BUDGET_OPTION_KEYS)[number];
 
 const BUDGET_OPTION_I18N: Record<BudgetOptionKey, string> = {
   economy: "play.plan.budget.option_economy",
   mid: "play.plan.budget.option_mid",
-  comfort: "play.plan.budget.option_comfort",
+  luxury: "play.plan.budget.option_luxury",
 };
 
 export function budgetOptionLabel(key: BudgetOptionKey, t: (k: string) => string): string {
@@ -17,15 +17,16 @@ export function normalizeBudgetKey(raw: string | undefined): BudgetOptionKey | "
   const v = raw?.trim() ?? "";
   if (!v) return "";
   if (BUDGET_OPTION_KEYS.includes(v as BudgetOptionKey)) return v as BudgetOptionKey;
+  if (v === "comfort") return "luxury";
   const lower = v.toLowerCase();
-  if (/经济|economy|\$ budget|budget/.test(lower)) return "economy";
-  if (/舒适|comfort|\$\$\$/.test(lower)) return "comfort";
-  if (/中等|mid|\$\$/.test(lower)) return "mid";
+  if (/经济|economy|\$ budget|^\$[^$]|budget/.test(lower) && !/\$\$/.test(v)) return "economy";
+  if (/豪华|luxury|comfort|\$\$\$/.test(lower)) return "luxury";
+  if (/适中|中等|mid|moderate|\$\$/.test(lower)) return "mid";
   return "";
 }
 
+/** Stable takeoff keys for agent L3 — do not collapse mid/luxury to `premium`. */
 export function budgetKeyForAgent(key: BudgetOptionKey | ""): string | undefined {
-  if (key === "economy") return "economy";
-  if (key === "comfort") return "comfort";
-  return undefined;
+  if (!key) return undefined;
+  return key;
 }

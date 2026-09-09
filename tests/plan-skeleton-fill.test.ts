@@ -378,13 +378,17 @@ describe("plan-skeleton-fill orchestrator (TC-M10-46-01/02)", () => {
     expect(events).not.toContain("error");
   });
 
-  it("should_error_when_discover_and_store_candidates_are_empty", async () => {
+  it("should_call_make_itinerary_when_discover_and_store_candidates_are_empty", async () => {
     vi.spyOn(client, "discoverPlaces").mockResolvedValue({
       agent: "places-agent",
       ok: true,
       data: { candidates: { places: [], restaurants: [] }, trip_id: "t1", revision: 1 },
     });
-    const makeSpy = vi.spyOn(client, "makeItinerary");
+    const makeSpy = vi.spyOn(client, "makeItinerary").mockResolvedValue({
+      agent: "places-agent",
+      ok: false,
+      outcome: { key: "errors.make_itinerary_failed" },
+    });
     vi.spyOn(client, "fetchTripDetails").mockResolvedValue({
       agent: "places-agent",
       ok: true,
@@ -399,8 +403,11 @@ describe("plan-skeleton-fill orchestrator (TC-M10-46-01/02)", () => {
       events.push(ev);
     }
 
-    expect(makeSpy).not.toHaveBeenCalled();
-    expect(events).toEqual([{ type: "phase", phase: "discovering" }, { type: "error", key: "errors.empty_results" }]);
+    expect(makeSpy).toHaveBeenCalled();
+    expect(events.some((e) => e.type === "error" && e.key === "errors.empty_results")).toBe(false);
+    expect(events.some((e) => e.type === "error" && e.key === "errors.make_itinerary_failed")).toBe(
+      true,
+    );
   });
 
   it("should_keep_envelope_skeleton_when_store_has_fewer_stops", async () => {
@@ -624,7 +631,7 @@ describe("make failure fetch recovery (TC-M19-78-02)", () => {
     }
 
     const err = events.find((e) => e.type === "error");
-    expect(err).toEqual({ type: "error", key: "errors.make_itinerary_failed" });
+    expect(err).toMatchObject({ type: "error", key: "errors.make_itinerary_failed" });
     expect(events.some((e) => e.type === "skeleton_done")).toBe(false);
   });
 
@@ -655,7 +662,7 @@ describe("make failure fetch recovery (TC-M19-78-02)", () => {
     }
 
     const err = events.find((e) => e.type === "error");
-    expect(err).toEqual({ type: "error", key: "play.plan.phase_make_timeout" });
+    expect(err).toMatchObject({ type: "error", key: "play.plan.phase_make_timeout" });
   });
 
   it("should_pass_used_restaurant_names_after_first_meal (TC-M23-89)", async () => {

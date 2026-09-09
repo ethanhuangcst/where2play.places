@@ -1,3 +1,4 @@
+/** Paused as-built path (MVP-T1): prefer POST /api/plan/trip. Do not delete. */
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser, authError } from "@/src/auth/user";
 import { prisma } from "@/src/db/client";
@@ -12,7 +13,6 @@ import {
 } from "@/src/core/plan-skeleton-fill";
 import { planItinerarySkeletonOnly } from "@/src/core/plan-skeleton-only";
 import type { ItineraryDto, PlanBoundaries } from "@/src/core/itinerary-types";
-import { providersForDestinationText } from "@/src/places-agent/client";
 import {
   emptyPlanItinerary,
   extractPlanLedgerFromEvent,
@@ -39,15 +39,14 @@ function encodeNdjson(event: PlanProgressEvent | SkeletonPlanProgressEvent): Uin
 function planStream(
   criteria: PlanBoundaries,
   locale: string,
-  providers?: string[],
 ): AsyncGenerator<PlanProgressEvent | SkeletonPlanProgressEvent> {
   if (criteria.planMode === "skeleton") {
-    return planItinerarySkeletonOnly(criteria, { locale, providers });
+    return planItinerarySkeletonOnly(criteria, { locale });
   }
   if (planPipelineMode() === "legacy") {
-    return planItineraryDayByDay(criteria, { locale, providers });
+    return planItineraryDayByDay(criteria, { locale });
   }
-  return planItinerarySkeletonFill(criteria, { locale, providers });
+  return planItinerarySkeletonFill(criteria, { locale });
 }
 
 function applyLedger(ledger: PlanLedger, patch: PlanLedger | null): PlanLedger {
@@ -96,7 +95,6 @@ export async function POST(request: NextRequest) {
     originLng:
       typeof parsed.value.originLng === "number" ? parsed.value.originLng : prev.originLng,
   };
-  const providers = providersForDestinationText(criteria.destination) ?? undefined;
   const stream = request.headers.get("accept")?.includes("application/x-ndjson");
 
   let ledger: PlanLedger = {
@@ -108,7 +106,7 @@ export async function POST(request: NextRequest) {
   if (!stream) {
     let last: ItineraryDto | null = null;
     let errorKey: string | null = null;
-    for await (const event of planStream(criteria, locale, providers)) {
+    for await (const event of planStream(criteria, locale)) {
       const ledgerPatch = extractPlanLedgerFromEvent(event);
       if (ledgerPatch) {
         ledger = applyLedger(ledger, ledgerPatch);
@@ -137,7 +135,7 @@ export async function POST(request: NextRequest) {
   const body = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        for await (const event of planStream(criteria, locale, providers)) {
+        for await (const event of planStream(criteria, locale)) {
           const ledgerPatch = extractPlanLedgerFromEvent(event);
           if (ledgerPatch) {
             ledger = applyLedger(ledger, ledgerPatch);

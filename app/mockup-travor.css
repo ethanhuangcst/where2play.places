@@ -115,75 +115,168 @@ body.shell-app[data-style="travor"] {
    起飞条：白卡 + 青标签 + 橙胶囊 CTA
    ============================================================ */
 [data-style="travor"] .plan-takeoff {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--plan-gap);
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto;
+  width: 100%;
+  gap: 0.7rem 1.75rem;
+  align-items: stretch;
 }
 
-[data-style="travor"] .plan-takeoff .field {
-  flex: 1 1 8rem;
+[data-style="travor"] .plan-takeoff__col--core {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.7rem;
+  align-items: center;
   min-width: 0;
 }
 
-[data-style="travor"] .plan-takeoff .field-label-row,
+[data-style="travor"] .plan-takeoff__col--prefs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.7rem 1.25rem;
+  align-items: center;
+  min-width: 0;
+}
+
+[data-style="travor"] .plan-takeoff .field {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
 [data-style="travor"] .plan-takeoff .field > label {
+  flex: 0 0 3em;
+  width: 3em;
+  margin: 0;
+  text-align: left;
   font-family: var(--font-ui);
   font-weight: 700;
-  font-size: 0.78rem;
+  font-size: 0.84rem;
   color: var(--teal-deep);
+  line-height: 1.2;
+}
+
+[data-style="travor"] .plan-takeoff__col--prefs .field > label {
+  flex: 0 0 2em;
+  width: 2em;
+}
+
+[data-style="travor"] .plan-takeoff .field > input,
+[data-style="travor"] .plan-takeoff .field > select,
+[data-style="travor"] .plan-takeoff .field > .combo,
+[data-style="travor"] .plan-takeoff .field > .plan-takeoff__cluster {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+}
+
+[data-style="travor"] .plan-takeoff__cluster {
   display: flex;
-  gap: 0.3rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+  min-width: 0;
+  flex: 1 1 auto;
+  width: auto;
 }
 
-[data-style="travor"] .plan-takeoff .req {
-  color: #ffa26b;
-}
-
-[data-style="travor"] .plan-takeoff .field[data-field="dest"] {
-  flex: 1 1 14rem;
-}
-
-[data-style="travor"] .plan-takeoff .field[data-field="start_date"] {
-  flex: 0 0 12rem;
-  max-width: 12rem;
-}
-
-[data-style="travor"] .plan-takeoff .field[data-field="start_date"] input {
-  padding-right: 2.25rem;
+[data-style="travor"] .plan-takeoff__cluster > input[type="date"] {
+  position: relative;
+  box-sizing: border-box;
+  flex: 0 0 9.15rem;
+  width: 9.15rem;
+  max-width: 9.15rem;
+  min-width: 9.15rem;
+  padding: 0 1.35rem 0 0.5rem;
 }
 
 [data-style="travor"] .plan-takeoff .field[data-field="days"],
 [data-style="travor"] .plan-takeoff .field[data-field="party"] {
-  flex: 0 0 4.5rem;
-  max-width: 4.5rem;
+  flex: 0 0 auto;
+  gap: 0.4rem;
 }
 
-[data-style="travor"] .plan-takeoff .field[data-field="budget"] {
-  flex: 0 0 8.5rem;
-  max-width: 8.5rem;
+[data-style="travor"] .plan-takeoff .field[data-field="days"] > label,
+[data-style="travor"] .plan-takeoff .field[data-field="party"] > label {
+  flex: 0 0 auto;
+  width: auto;
+  white-space: nowrap;
 }
 
-[data-style="travor"] .plan-takeoff .field[data-field="budget"] select {
+[data-style="travor"] .plan-takeoff .field[data-field="days"] input,
+[data-style="travor"] .plan-takeoff .field[data-field="party"] input {
+  width: 3.25rem;
+  flex: 0 0 3.25rem;
+}
+
+[data-style="travor"] .plan-takeoff .field[data-field="budget"] select,
+[data-style="travor"] .plan-takeoff .field[data-field="trip_type"] select,
+[data-style="travor"] .plan-takeoff .field[data-field="pace"] select,
+[data-style="travor"] .plan-takeoff .field[data-field="transit"] select,
+[data-style="travor"] .plan-takeoff .field[data-field="trip_type"] .combo {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 6.5em;
+}
+
+[data-style="travor"] .plan-takeoff__col--core .field[data-field="dest"],
+[data-style="travor"] .plan-takeoff__col--core .field[data-field="start_date"] {
   width: 100%;
+}
+
+[data-style="travor"] .plan-takeoff .field[data-field="dest"] > input {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 8.25rem;
+}
+
+[data-style="travor"] .plan-takeoff .field[data-field="start_date"] input::-webkit-calendar-picker-indicator {
+  position: absolute;
+  right: 0.28rem;
+  top: 50%;
+  transform: translateY(-50%);
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+[data-style="travor"] .plan-takeoff .field[data-field="start_date"] input::-webkit-datetime-edit,
+[data-style="travor"] .plan-takeoff .field[data-field="start_date"] input::-webkit-datetime-edit-fields-wrapper {
+  padding: 0;
+}
+
+[data-style="travor"] .plan-takeoff .field[data-field="start_date"] input::-webkit-clear-button {
+  display: none;
 }
 
 [data-style="travor"] .plan-takeoff__actions {
   display: flex;
-  align-items: flex-end;
-  flex: 0 0 auto;
+  align-items: stretch;
+  justify-self: end;
+  margin-left: 0;
 }
 
-@media (max-width: 640px) {
-  [data-style="travor"] .plan-takeoff .field {
-    flex: 1 1 calc(50% - var(--plan-gap));
-  }
-  [data-style="travor"] .plan-takeoff .field[data-field="start_date"],
-  [data-style="travor"] .plan-takeoff .field[data-field="days"],
-  [data-style="travor"] .plan-takeoff .field[data-field="party"],
-  [data-style="travor"] .plan-takeoff .field[data-field="budget"] {
-    max-width: none;
-  }
+[data-style="travor"] .plan-takeoff__cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  width: auto;
+  height: 100%;
+  aspect-ratio: 1;
+  min-height: 100%;
+  padding: 0.45rem 0.5rem;
+  line-height: 1.2;
+  font-size: 1.22rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+[data-style="travor"] .plan-takeoff__cta span {
+  display: block;
 }
 
 /* 状态条：meta 左、进度右 */
@@ -704,11 +797,15 @@ body.shell-app[data-style="travor"] {
 }
 
 [data-style="travor"] .constraint-item dt {
-  color: var(--mute);
+  color: var(--teal-deep);
 }
 
 [data-style="travor"] .constraint-item dd {
   color: var(--ink);
+}
+
+[data-style="travor"] .constraint-item__pending {
+  color: var(--mute);
 }
 
 /* 页签导航状态条 */

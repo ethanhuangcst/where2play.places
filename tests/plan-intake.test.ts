@@ -12,6 +12,7 @@ import {
   mergeIntakeToBoundaries,
   nextIntakeStep,
   resolveIntakeAnswer,
+  takeoffToBoundaries,
   tripConstraintsFromIntakeStep,
 } from "@/src/core/plan-intake";
 
@@ -33,6 +34,30 @@ describe("TC-M10-46-08 plan intake", () => {
     expect(resolveIntakeAnswer("d", INTAKE_DEFAULT_VALUES.d, tt)).toBe(tt("play.plan.trip_type.city"));
     expect(resolveIntakeAnswer("e", INTAKE_DEFAULT_VALUES.e, tt)).toBe(tt("play.plan.pace.medium"));
     expect(resolveIntakeAnswer("f", INTAKE_DEFAULT_VALUES.f, tt)).toBe(tt("play.plan.transport.metro_walk"));
+  });
+
+  it("should_map_takeoff_and_agent_needs_without_intake_def", () => {
+    const takeoff = {
+      destination: "Lisbon",
+      startDate: "2026-09-20",
+      days: 4,
+      partySize: 2,
+      budget: "luxury",
+      tripType: "情侣浪漫",
+      pace: "medium",
+      transit: "transit_walk" as const,
+    };
+    const boundaries = takeoffToBoundaries(
+      takeoff,
+      { hotel: "Hyatt Regency Lisbon", start_time: "09:00", must_see: "", other: "" },
+      tt,
+      "CN",
+    );
+    expect(boundaries.tripType).toBe("情侣浪漫");
+    expect(boundaries.pace).toBe("medium");
+    expect(boundaries.transport).toBe("公共交通+步行");
+    expect(boundaries.dailyStart).toBe("Hyatt Regency Lisbon");
+    expect(boundaries.timeFrom).toBe("09:00");
   });
 
   it("should_map_intake_to_plan_boundaries", () => {
@@ -173,6 +198,11 @@ describe("TC-M10-46-08 plan intake", () => {
     expect(intakeQaProgress("b", false)).toEqual({ current: 1, total: 8 });
     expect(intakeQaProgress("e", false)).toEqual({ current: 4, total: 8 });
     expect(intakeQaProgress(null, true)).toEqual({ current: 8, total: 8 });
+    expect(intakeQaProgress(null, false, { useAgentNeeds: true, agentNeedIndex: 0 })).toEqual({
+      current: 1,
+      total: 4,
+    });
+    expect(intakeQaProgress(null, true, { useAgentNeeds: true })).toEqual({ current: 4, total: 4 });
   });
 
   it("should_format_display_answers_for_bubbles", () => {

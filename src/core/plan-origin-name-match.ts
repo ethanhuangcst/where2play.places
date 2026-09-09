@@ -104,11 +104,60 @@ export function originNameTokensCovered(userQuery: string, placeName: string): b
   });
 }
 
+function cjkLen(s: string): number {
+  return [...s].filter((ch) => /[\u4e00-\u9fff]/.test(ch)).length;
+}
+
+function primaryVenueTitle(placeName: string): string {
+  return placeName
+    .replace(/[（(][^）)]*[）)]/g, "")
+    .replace(/[\u4e00-\u9fff]*[路街巷][\u4e00-\u9fff0-9号分店]*/g, "")
+    .trim();
+}
+
+/** Query appears only inside a road / street / number fragment (or its parentheses). */
+function queryOnlyInRoadFragment(queryNorm: string, placeName: string): boolean {
+  const stripped = placeName
+    .replace(/[（(][^）)]*[）)]/g, "")
+    .replace(/[\u4e00-\u9fff]*[路街巷][\u4e00-\u9fff0-9号]*/g, "");
+  const rest = normalizeForMatch(stripped);
+  const full = normalizeForMatch(placeName);
+  return full.includes(queryNorm) && !rest.includes(queryNorm);
+}
+
+/**
+ * Full name match: unique auto-hit only when the query is the venue title
+ * (or a complete Latin multi-word name), not a short CJK fragment or road token.
+ */
+export function isFullOriginNameMatch(userQuery: string, placeName: string): boolean {
+  const qText = stripOriginParenthetical(userQuery);
+  const q = normalizeForMatch(qText);
+  const nameNorm = normalizeForMatch(placeName);
+  if (!q || !nameNorm) return false;
+
+  if (/[\u4e00-\u9fff]/.test(qText)) {
+    const titleNorm = normalizeForMatch(primaryVenueTitle(placeName));
+    if (titleNorm && titleNorm === q) return true;
+    if (cjkLen(qText) < 4 && q !== titleNorm) return false;
+    if (!nameNorm.includes(q)) return false;
+    return !queryOnlyInRoadFragment(q, placeName);
+  }
+
+  const queryWords = (userQuery.toLowerCase().match(/[a-z0-9]+/g) ?? []).filter(
+    (w) => w.length >= 2,
+  );
+  const placeWords = new Set(placeName.toLowerCase().match(/[a-z0-9]+/g) ?? []);
+  if (!queryWords.length) return false;
+  const matched = queryWords.filter((w) => placeWords.has(w));
+  if (matched.length >= 2 && matched.length >= queryWords.length - 1) return true;
+  return nameNorm.includes(q);
+}
+
 export function pickAutoMatchingOrigin(
   userQuery: string,
   cards: Array<{ name: string; location?: { lat?: number; lng?: number } }>,
 ): { name: string; location?: { lat?: number; lng?: number } } | null {
-  const matches = cards.filter((c) => c.name?.trim() && originNameTokensCovered(userQuery, c.name));
+  const matches = cards.filter((c) => c.name?.trim() && isFullOriginNameMatch(userQuery, c.name));
   return matches.length === 1 ? (matches[0] ?? null) : null;
 }
 

@@ -3,10 +3,24 @@ export type DiscoverPoolRow = {
   heat: number | null;
   must_see: boolean;
   kind: "place" | "restaurant";
+  provider?: string;
 };
 
 function asCardList(raw: unknown): Record<string, unknown>[] {
   return Array.isArray(raw) ? raw.filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === "object") : [];
+}
+
+/** Top-level provider or first sources[].provider (slim trip cards often omit the former). */
+export function providerFromCard(item: Record<string, unknown>): string | undefined {
+  if (typeof item.provider === "string" && item.provider.trim()) return item.provider.trim();
+  const sources = item.sources;
+  if (!Array.isArray(sources)) return undefined;
+  for (const s of sources) {
+    if (!s || typeof s !== "object") continue;
+    const p = (s as { provider?: unknown }).provider;
+    if (typeof p === "string" && p.trim()) return p.trim();
+  }
+  return undefined;
 }
 
 export function discoverPoolRowsFromSlice(slice: Record<string, unknown>): DiscoverPoolRow[] {
@@ -22,7 +36,8 @@ export function discoverPoolRowsFromSlice(slice: Record<string, unknown>): Disco
         : typeof item.rating === "number"
           ? item.rating
           : null;
-    return { name, heat, must_see: item.must_see === true, kind };
+    const provider = providerFromCard(item);
+    return { name, heat, must_see: item.must_see === true, kind, provider };
   };
   return [
     ...places.map((p) => row(p, "place")),

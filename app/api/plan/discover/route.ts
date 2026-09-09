@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/src/auth/user";
 import { normalizeLocale } from "@/src/core/locales";
 import { startPlanDiscover } from "@/src/core/plan-start-discover";
-import { providersForDestinationText } from "@/src/places-agent/client";
 import type { PlanBoundaries } from "@/src/core/itinerary-types";
 import { emptyPlanItinerary, upsertPlanSessionCache } from "@/src/core/plan-session-cache";
 
@@ -48,9 +47,6 @@ export async function POST(request: NextRequest) {
     startDate,
     days,
     locale,
-    ...(providersForDestinationText(destination)?.length
-      ? { providers: providersForDestinationText(destination) }
-      : {}),
     partySize: Number.isFinite(partySize) ? partySize : undefined,
     budget,
     max_number: Number.isFinite(maxNumber) ? maxNumber : 5,

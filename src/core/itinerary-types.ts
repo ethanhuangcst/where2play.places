@@ -49,6 +49,18 @@ export type ItineraryTransitSlot = {
   start: string;
   end?: string;
   text: string;
+  /** From place name (previous stop). */
+  from?: string;
+  /** To place name (next stop). */
+  to?: string;
+  /** Structured legs for pill rendering (walk/transit/drive with duration). */
+  legs?: Array<{
+    mode: string;
+    duration_min: number;
+    recommended?: boolean;
+  }>;
+  /** Transit data quality: "directions" | "heuristic" | "partial". */
+  outcome?: string;
 };
 
 export type ItineraryPlaceSlot = {

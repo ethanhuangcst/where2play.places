@@ -180,6 +180,7 @@ export function mapStopDisplayToPlaceSlot(
 export function mapLegsToTransitSlot(
   legs: AgentLeg[] | undefined,
   t: (key: string, vars?: Record<string, string>) => string,
+  opts?: { from?: string; to?: string; outcome?: string },
 ): ItineraryTransitSlot | null {
   if (!legs?.length) return null;
   // F91 / F88 UI gate: hide walk>45 and transit|drive>120.
@@ -200,6 +201,14 @@ export function mapLegsToTransitSlot(
     kind: "transit",
     start: "",
     text,
+    ...(opts?.from ? { from: opts.from } : {}),
+    ...(opts?.to ? { to: opts.to } : {}),
+    ...(opts?.outcome ? { outcome: opts.outcome } : {}),
+    legs: kept.map((leg) => ({
+      mode: leg.mode ?? "transit",
+      duration_min: leg.duration_min ?? 0,
+      ...(leg.recommended ? { recommended: true } : {}),
+    })),
   };
 }
 

@@ -80,8 +80,11 @@ export async function enrichArrangedDay(input: {
   if (input.criteria.transport) {
     if (/步行优先|walk/i.test(input.criteria.transport)) {
       preferences.transit_preferred = false;
-    } else if (/捷运|metro|transit|公交|bus/i.test(input.criteria.transport)) {
+    } else if (/捷运|metro|transit|公交|交通|bus/i.test(input.criteria.transport)) {
       preferences.transit_preferred = true;
+    }
+    if (/自驾|打车|drive|car|taxi|租车/i.test(input.criteria.transport)) {
+      preferences.drive_preferred = true;
     }
   }
 

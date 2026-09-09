@@ -2,9 +2,11 @@
 
 import {
   isBrandOnlyOriginQuery,
+  isFullOriginNameMatch,
   originNameTokensCovered,
   originSearchQuery,
   pickAutoMatchingOrigin,
+  stripOriginParenthetical,
 } from "./plan-origin-name-match";
 
 /** Google Places circle bias max is 50km; 80km haversine still applied after search. */
@@ -13,7 +15,7 @@ export const ORIGIN_SEARCH_BIAS_M = 50_000;
 export const ORIGIN_NEAR_CITY_KM = 80;
 export const ORIGIN_RETRY_CHIP = "__origin_retry__";
 export const ORIGIN_PICK_PREFIX = "__origin_pick__:";
-export const ORIGIN_CANDIDATE_LIMIT = 3;
+export const ORIGIN_CANDIDATE_LIMIT = 6;
 
 export type OriginCard = {
   name: string;
@@ -22,6 +24,7 @@ export type OriginCard = {
   category?: string;
   sources?: Array<{ provider?: string; native_id?: string }>;
   photos?: string[];
+  address?: string;
 };
 
 export type OriginStayPointer = {
@@ -61,16 +64,24 @@ function haversineKm(
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
-/** ADR-053: reject pure landmarks (e.g. 钟楼) as hotel hits. */
+function hasFiniteCoords(card: OriginCard): boolean {
+  const lat = card.location?.lat;
+  const lng = card.location?.lng;
+  return typeof lat === "number" && typeof lng === "number" && Number.isFinite(lat) && Number.isFinite(lng);
+}
+
+/** ADR-053: reject pure landmarks (e.g. 钟楼) as hotel hits.
+ * Token-priority: when a user query token-covers a card, that card is admitted
+ * even if its name lacks a classic lodging keyword (e.g. 三台山庄). */
 export function looksLikeLodging(card: {
   name?: string;
   category?: string;
 }): boolean {
   const cat = (card.category ?? "").toLowerCase();
-  if (/lodging|hotel|住宿|酒店|宾馆|旅馆|resort|inn|客栈/.test(cat)) return true;
+  if (/lodging|hotel|住宿|酒店|宾馆|旅馆|resort|inn|客栈|民宿|公寓|招待所|山庄|庄园|别墅|驿站|旅社|旅店|旅舍|青年旅舍|hostel|apartment|guesthouse|homestay|bnb|精舍/.test(cat)) return true;
   const name = card.name ?? "";
   if (
-    /酒店|宾馆|旅馆|饭店|客栈|hotel|hyatt|hilton|marriott|sheraton|novotel|ibis|inn|resort|凯悦|希尔顿|万豪|喜来登|洲际|假日/i.test(
+    /酒店|宾馆|旅馆|饭店|客栈|民宿|公寓|招待所|山庄|庄园|别墅|驿站|旅社|旅店|旅舍|青年旅舍|hotel|hyatt|hilton|marriott|sheraton|novotel|ibis|inn|resort|hostel|apartment|guesthouse|homestay|bnb|凯悦|希尔顿|万豪|喜来登|洲际|假日|诺富特|宜必思|丽思|四季|精舍/i.test(
       name,
     )
   ) {
@@ -79,9 +90,16 @@ export function looksLikeLodging(card: {
   return false;
 }
 
+/** Drop hotel sub-POIs (lobby / bar / wing) when a cleaner parent tip exists. */
+export function isLodgingSubPoi(name: string): boolean {
+  const n = name.trim();
+  if (!n) return false;
+  return /(?:大堂|酒吧|茶庄|商务中心|总服务台|[0-9０-９]+号楼|紫薇厅|红吧)/.test(n);
+}
+
 /**
  * Prefer named cards with coords within maxKm of city.
- * S6A/S7: cards without lat/lng never count as in-city hits.
+ * S6A/S7: cards without lat/lng (or NaN) never count as in-city hits.
  */
 export function pickOriginCardNearCity(
   cards: OriginCard[],
@@ -100,11 +118,37 @@ export function filterOriginCardsNearCity(
   const named = cards.filter((c) => typeof c.name === "string" && c.name.trim());
   if (!named.length || !city) return [];
   return named.filter((c) => {
-    const lat = c.location?.lat;
-    const lng = c.location?.lng;
-    if (typeof lat !== "number" || typeof lng !== "number") return false;
+    if (!hasFiniteCoords(c)) return false;
+    const lat = c.location!.lat!;
+    const lng = c.location!.lng!;
     return haversineKm(city, { lat, lng }) <= maxKm;
   });
+}
+
+/** Keep tips that are near city by coords, or (no coords) mention destination in name/address. */
+export function filterOriginTipsForDestination(
+  cards: OriginCard[],
+  destination: string,
+  city: { lat: number; lng: number },
+  maxKm = ORIGIN_NEAR_CITY_KM,
+): OriginCard[] {
+  const destNorm = destination.trim().toLowerCase();
+  const destToken = destNorm.replace(/\s+/g, "");
+  return cards.filter((c) => {
+    if (!c.name?.trim()) return false;
+    if (hasFiniteCoords(c)) {
+      return haversineKm(city, { lat: c.location!.lat!, lng: c.location!.lng! }) <= maxKm;
+    }
+    if (!destToken) return false;
+    const hay = `${c.name} ${c.address ?? ""}`.toLowerCase().replace(/\s+/g, "");
+    return hay.includes(destToken);
+  });
+}
+
+export function preferPrimaryLodgingTips(cards: OriginCard[]): OriginCard[] {
+  const lodging = cards.filter(looksLikeLodging);
+  const primaries = lodging.filter((c) => !isLodgingSubPoi(c.name));
+  return primaries.length ? primaries : lodging;
 }
 
 export function originPickChipValue(index: number): string {
@@ -134,15 +178,19 @@ export function originNameFromPick(
   return cards[idx]?.name?.trim() ?? "";
 }
 
+export type ResolveOriginSearchFn = (input: {
+  query: string;
+  address?: string;
+  near?: { lat: number; lng: number };
+  locale: string;
+  providers?: string[];
+  bias_radius_m?: number;
+}) => Promise<{ ok: boolean; data?: OriginCard[] | { data?: OriginCard[] } }>;
+
 export type ResolveOriginDeps = {
-  searchPlaces: (input: {
-    query: string;
-    address?: string;
-    near?: { lat: number; lng: number };
-    locale: string;
-    providers?: string[];
-    bias_radius_m?: number;
-  }) => Promise<{ ok: boolean; data?: OriginCard[] | { data?: OriginCard[] } }>;
+  searchPlaces: ResolveOriginSearchFn;
+  /** Vendor autocomplete; omit → treat as empty tips (search fallback). */
+  suggestPlaces?: ResolveOriginSearchFn;
   geocode: (input: {
     query: string;
     locale: string;
@@ -168,7 +216,9 @@ function nativeIdOf(card: OriginCard): string | undefined {
 function hitFromCard(hit: OriginCard): ResolveOriginResult {
   const lat = hit.location?.lat;
   const lng = hit.location?.lng;
-  if (typeof lat !== "number" || typeof lng !== "number") return { kind: "not_found" };
+  if (typeof lat !== "number" || typeof lng !== "number" || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return { kind: "not_found" };
+  }
   const photos = Array.isArray(hit.photos)
     ? hit.photos.filter((p): p is string => typeof p === "string" && p.startsWith("http")).slice(0, 1)
     : undefined;
@@ -201,13 +251,68 @@ async function geocodeCity(
   return null;
 }
 
+function decideFromNearCards(
+  q: string,
+  near: OriginCard[],
+  city: { lat: number; lng: number },
+): ResolveOriginResult {
+  if (!isBrandOnlyOriginQuery(q)) {
+    const fullMatches = near.filter((c) => c.name?.trim() && isFullOriginNameMatch(q, c.name));
+    if (fullMatches.length === 1) {
+      return hitFromCard(fullMatches[0]!);
+    }
+  }
+
+  const lodging = near.filter(looksLikeLodging).slice(0, ORIGIN_CANDIDATE_LIMIT);
+  if (!lodging.length) return { kind: "not_found" };
+
+  if (!isBrandOnlyOriginQuery(q)) {
+    const auto = pickAutoMatchingOrigin(q, lodging);
+    if (auto) return hitFromCard(auto);
+  }
+
+  return { kind: "candidates", cards: lodging, city };
+}
+
+async function hydrateTipCoords(
+  tips: OriginCard[],
+  dest: string,
+  city: { lat: number; lng: number },
+  locale: string,
+  pinProviders: string[] | undefined,
+  searchPlaces: ResolveOriginSearchFn,
+): Promise<OriginCard[]> {
+  const out: OriginCard[] = [];
+  for (const tip of tips.slice(0, ORIGIN_CANDIDATE_LIMIT)) {
+    if (hasFiniteCoords(tip)) {
+      out.push(tip);
+      continue;
+    }
+    try {
+      const res = await searchPlaces({
+        query: originSearchQuery(tip.name),
+        address: dest,
+        near: city,
+        locale,
+        ...(pinProviders?.length ? { providers: pinProviders } : {}),
+        bias_radius_m: ORIGIN_SEARCH_BIAS_M,
+      });
+      if (!res.ok) continue;
+      const found = filterOriginCardsNearCity(cardsFromSearch(res.data), city).find(
+        (c) => looksLikeLodging(c) && (isFullOriginNameMatch(tip.name, c.name) || originNameTokensCovered(tip.name, c.name)),
+      ) ?? filterOriginCardsNearCity(cardsFromSearch(res.data), city).find(looksLikeLodging);
+      if (found) out.push(found);
+    } catch {
+      /* skip tip */
+    }
+  }
+  return out;
+}
+
 /**
  * S7 / ADR-053: resolve intake origin.
- * - empty query → skip with destination coords
- * - pick index → hit from prior candidates
- * - lodging-only filter; unique token match → hit with pointer fields
- * - brand-only or multiple → candidates (≤3)
- * - else not_found
+ * Flow: geocode dest → suggest_places → dest filter → hydrate → match;
+ * if no usable tips → search_places fallback (same match rules).
  */
 export async function resolvePlanOrigin(
   input: {
@@ -228,28 +333,45 @@ export async function resolvePlanOrigin(
   if (!q) return { kind: "skip", lat: city.lat, lng: city.lng };
 
   const pinProviders = deps.providersForPin?.(city.lat, city.lng) ?? input.providers;
+  const suggestQuery = stripOriginParenthetical(q) || q;
 
   try {
-    const res = await deps.searchPlaces({
-      query: originSearchQuery(q),
-      address: dest,
-      near: city,
-      locale: input.locale,
-      ...(pinProviders?.length ? { providers: pinProviders } : {}),
-      bias_radius_m: ORIGIN_SEARCH_BIAS_M,
-    });
-    if (!res.ok) return { kind: "not_found" };
-    const near = filterOriginCardsNearCity(cardsFromSearch(res.data), city)
-      .filter(looksLikeLodging)
-      .slice(0, ORIGIN_CANDIDATE_LIMIT);
-    if (!near.length) return { kind: "not_found" };
+    let near: OriginCard[] = [];
 
-    if (!isBrandOnlyOriginQuery(q)) {
-      const auto = pickAutoMatchingOrigin(q, near);
-      if (auto) return hitFromCard(auto);
+    if (deps.suggestPlaces) {
+      const tipRes = await deps.suggestPlaces({
+        query: suggestQuery,
+        address: dest,
+        near: city,
+        locale: input.locale,
+        ...(pinProviders?.length ? { providers: pinProviders } : {}),
+        bias_radius_m: ORIGIN_SEARCH_BIAS_M,
+      });
+      if (tipRes.ok) {
+        const tips = preferPrimaryLodgingTips(
+          filterOriginTipsForDestination(cardsFromSearch(tipRes.data), dest, city),
+        );
+        if (tips.length) {
+          near = await hydrateTipCoords(tips, dest, city, input.locale, pinProviders, deps.searchPlaces);
+          near = filterOriginCardsNearCity(near, city);
+        }
+      }
     }
 
-    return { kind: "candidates", cards: near, city };
+    if (!near.length) {
+      const res = await deps.searchPlaces({
+        query: originSearchQuery(q),
+        address: dest,
+        near: city,
+        locale: input.locale,
+        ...(pinProviders?.length ? { providers: pinProviders } : {}),
+        bias_radius_m: ORIGIN_SEARCH_BIAS_M,
+      });
+      if (!res.ok) return { kind: "not_found" };
+      near = filterOriginCardsNearCity(cardsFromSearch(res.data), city);
+    }
+
+    return decideFromNearCards(q, near, city);
   } catch {
     return { kind: "not_found" };
   }

@@ -94,11 +94,6 @@ export async function* planItinerarySkeletonOnly(
     }
     if (typeof nextRev === "number") revision = nextRev;
   }
-  if (!places.length) {
-    yield { type: "error", key: "errors.empty_results" };
-    return;
-  }
-
   const makeBody = buildMakeItineraryBody(criteria, {
     ...opts,
     candidates: slimPool(places, restaurants),

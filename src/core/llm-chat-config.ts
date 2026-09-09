@@ -27,9 +27,11 @@ function firstFallbackModel(raw: string | undefined): string | undefined {
   return first || undefined;
 }
 
+export type ChatLlmEnv = Partial<NodeJS.ProcessEnv> & Record<string, string | undefined>;
+
 /** Prefer Qwen (ADR-047). Fall back to OPENAI_CN when QWEN_API_KEY is empty. */
 export function resolveChatLlmConfig(
-  env: NodeJS.ProcessEnv = process.env,
+  env: ChatLlmEnv = process.env,
 ): ChatLlmConfig | null {
   const qwen = env.QWEN_API_KEY?.trim();
   if (qwen && qwen !== "fixture") {
@@ -50,6 +52,6 @@ export function resolveChatLlmConfig(
   };
 }
 
-export function chatLlmConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
+export function chatLlmConfigured(env: ChatLlmEnv = process.env): boolean {
   return resolveChatLlmConfig(env) != null;
 }

@@ -48,7 +48,14 @@ export function normalizeAgentTime(raw: string): string {
 function transitPreferred(transport?: string): boolean | undefined {
   if (!transport) return undefined;
   if (/步行优先|walk/.test(transport)) return false;
-  if (/捷运|metro|transit|公交|bus/.test(transport)) return true;
+  if (/捷运|metro|transit|公交|交通|bus/.test(transport)) return true;
+  return undefined;
+}
+
+/** drive_walk (自驾/打车+步行) → drive_preferred; does not set transit_preferred. */
+function drivePreferred(transport?: string): boolean | undefined {
+  if (!transport) return undefined;
+  if (/自驾|打车|drive|car|taxi|租车/.test(transport)) return true;
   return undefined;
 }
 
@@ -108,9 +115,11 @@ export function buildPlanItineraryBody(
   const pace = mapPace(criteria.pace);
   const spend = mapSpend(criteria.budget);
   const transit = transitPreferred(criteria.transport);
+  const drive = drivePreferred(criteria.transport);
   if (pace) preferences.pace = pace;
   if (spend) preferences.spend = spend;
   if (transit != null) preferences.transit_preferred = transit;
+  if (drive != null) preferences.drive_preferred = drive;
   if (naturalParts.length) preferences.natural_language = naturalParts.join(" · ");
 
   return {
@@ -219,7 +228,9 @@ export function buildArrangeDayBody(
   if (criteria.timeFrom) preferences.time_from = normalizeAgentTime(criteria.timeFrom);
   if (criteria.timeTo) preferences.time_to = normalizeAgentTime(criteria.timeTo);
   const transit = transitPreferred(criteria.transport);
+  const drive = drivePreferred(criteria.transport);
   if (transit != null) preferences.transit_preferred = transit;
+  if (drive != null) preferences.drive_preferred = drive;
   const naturalLanguage = buildNaturalLanguage(criteria);
   if (naturalLanguage) preferences.natural_language = naturalLanguage;
 

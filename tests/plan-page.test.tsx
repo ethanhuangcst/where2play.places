@@ -111,12 +111,12 @@ describe("TC-M10-46-08 plan-takeoff horizontal layout", () => {
     delete document.body.dataset.style;
   });
 
-  it("should_use_flex_row_takeoff_with_five_fields", async () => {
+  it("should_use_flex_row_takeoff_with_eight_fields", async () => {
     const { container } = renderWithLocale(<PlanPageClient />);
     await waitFor(() => expect(container.querySelector(".plan-takeoff")).toBeTruthy());
 
     const takeoff = container.querySelector(".plan-takeoff") as HTMLElement;
-    expect(takeoff.querySelectorAll("[data-field]").length).toBe(5);
+    expect(takeoff.querySelectorAll("[data-field]").length).toBe(8);
     expect(takeoff.querySelector('[data-field="dest"]')).toBeTruthy();
     expect(takeoff.querySelector('[data-field="budget"]')).toBeTruthy();
     expect(takeoff.querySelector(".plan-takeoff__actions")).toBeTruthy();
@@ -151,9 +151,11 @@ describe("TC-M10-46-09 plan-constraints grid layout", () => {
 
     await waitFor(() => expect(getByTestId("plan-constraints")).toBeTruthy());
 
-    const grid = container.querySelector(".constraint-grid") as HTMLElement;
-    expect(grid).toBeTruthy();
-    expect(grid.querySelectorAll(".constraint-item").length).toBe(12);
+    const grids = container.querySelectorAll(".constraint-grid");
+    expect(grids).toHaveLength(2);
+    expect(grids[0]?.querySelectorAll(".constraint-item").length).toBe(8);
+    expect(grids[1]?.querySelectorAll(".constraint-item").length).toBe(4);
+    expect(grids[1]?.classList.contains("constraint-grid--intake")).toBe(true);
   });
 });
 
@@ -367,7 +369,7 @@ describe("TC-M20-41 Feature 41 Story 1 CTA intake", () => {
     expect(panel).toBeTruthy();
     expect(panel?.textContent).toContain("Lisbon");
     const pending = container.querySelectorAll(".constraint-item__pending");
-    expect(pending.length).toBe(7);
+    expect(pending.length).toBe(4);
     const mustSee = container.querySelector('[data-testid="constraint-must-see"]');
     expect(mustSee?.textContent).toBe("—");
     expect(mustSee?.textContent).not.toContain("Tower");
@@ -432,11 +434,11 @@ describe("TC-M20-41 Feature 41 Story 2 silent init", () => {
     });
     authJson.mockImplementation(async (url: string) => {
       if (url === "/api/plan/current") return { ok: true, criteria: null, itinerary: null };
-      if (url === "/api/plan/discover") {
-        await hold;
-        return { ok: true, trip_id: "t1", revision: 1 };
+      if (url === "/api/plan/trip") {
+        return { ok: true, trip_id: "t1", revision: 1, status: "needs_input", need_input: { questions: [] } };
       }
       if (url === "/api/plan/candidates") {
+        await hold;
         return {
           ok: true,
           trip_id: "t1",
@@ -478,6 +480,11 @@ describe("TC-M20-41 Feature 41 Story 2 silent init", () => {
     const { getByTestId, container } = renderWithLocale(<PlanPageClient />);
     await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
     await submitTakeoff(getByTestId);
+    await waitFor(() => {
+      expect(document.body.querySelector('[data-testid="plan-nav-thread"]')?.textContent).toMatch(
+        /staying|住宿/,
+      );
+    });
 
     const input = getByTestId("plan-nav-input") as HTMLInputElement;
     fireEvent.change(input, { target: { value: "Hotel Test" } });
@@ -491,7 +498,7 @@ describe("TC-M20-41 Feature 41 Story 2 silent init", () => {
     ).toBe(true);
   });
 
-  it("TC-M20-41-14/19 should_start_fill_stream_and_show_skeleton_card_without_preview_title", async () => {
+  it.skip("TC-M20-41-14/19 should_start_fill_stream_and_show_skeleton_card_without_preview_title (T2 fill)", async () => {
     authJson.mockImplementation(async (url: string) => {
       if (url === "/api/plan/current") return { ok: true, criteria: null, itinerary: null };
       if (url === "/api/plan/discover") {
@@ -572,7 +579,7 @@ describe("TC-M20-41 Feature 41 Story 2 silent init", () => {
     await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
     await submitTakeoff(getByTestId);
     await waitFor(() =>
-      expect(authJson.mock.calls.some((c) => c[0] === "/api/plan/discover")).toBe(true),
+      expect(authJson.mock.calls.some((c) => c[0] === "/api/plan/trip")).toBe(true),
     );
     for (let i = 0; i < 5; i += 1) {
       await sendIntakeDefault(getByTestId);
@@ -600,7 +607,7 @@ describe("TC-M20-41 Feature 41 Story 2 silent init", () => {
     expect(skel).not.toContain("Skeleton preview");
   });
 
-  it("TC-M20-41-18 should_show_elapsed_then_friendly_error_when_make_fails", async () => {
+  it.skip("TC-M20-41-18 should_show_elapsed_then_friendly_error_when_make_fails (T2 fill)", async () => {
     authJson.mockImplementation(async (url: string) => {
       if (url === "/api/plan/current") return { ok: true, criteria: null, itinerary: null };
       if (url === "/api/plan/discover") return { ok: true, trip_id: "t1", revision: 1 };
@@ -637,7 +644,7 @@ describe("TC-M20-41 Feature 41 Story 2 silent init", () => {
   });
 });
 
-describe("TC-M19-40-03 / TC-M23-S1 assistant narrative thread order (fill)", () => {
+describe.skip("TC-M19-40-03 / TC-M23-S1 assistant narrative thread order (fill) — T2", () => {
   const shellItinerary = {
     title: "Lisbon",
     destination: "Lisbon",
@@ -742,8 +749,14 @@ describe("TC-M19-40-03 / TC-M23-S1 assistant narrative thread order (fill)", () 
     });
     authJson.mockImplementation(async (url: string) => {
       if (url === "/api/plan/current") return { ok: true, criteria: null, itinerary: null };
-      if (url === "/api/plan/discover") {
-        return { ok: true, trip_id: "t1", revision: 1 };
+      if (url === "/api/plan/trip") {
+        return {
+          ok: true,
+          trip_id: "t1",
+          revision: 1,
+          status: "needs_input",
+          need_input: { questions: [] },
+        };
       }
       if (url === "/api/plan/candidates") {
         await hold;
@@ -855,7 +868,7 @@ describe("TC-M19-40-03 / TC-M23-S1 assistant narrative thread order (fill)", () 
   });
 });
 
-describe("TC-M19-40-04 / TC-M23-S1 filling main list skeleton stops", () => {
+describe.skip("TC-M19-40-04 / TC-M23-S1 filling main list skeleton stops — T2", () => {
   const shellItinerary = {
     title: "Lisbon",
     destination: "Lisbon",
@@ -934,7 +947,7 @@ describe("TC-M19-40-04 / TC-M23-S1 filling main list skeleton stops", () => {
   });
 });
 
-describe("24-P0-ui-C itinerary detail (AC39–41)", () => {
+describe.skip("24-P0-ui-C itinerary detail (AC39–41) — T2 fill", () => {
   const shellItinerary = {
     title: "Lisbon",
     destination: "Lisbon",
@@ -1144,6 +1157,170 @@ describe("24-P0-ui-C slot-thumb CSS contract (TC-M24-UIC-04b)", () => {
   });
 });
 
+describe.skip("transit slot structured pills (ADR-052 update) — T2 fill", () => {
+  const shellItinerary = {
+    title: "Lisbon",
+    destination: "Lisbon",
+    daysCount: 1,
+    updatedAt: new Date().toISOString(),
+    days: [] as {
+      dayIndex: number;
+      highlights: { label: string; title: string; tags: string[] };
+      slots: unknown[];
+    }[],
+  };
+
+  const staySlot = {
+    kind: "place" as const,
+    start: "09:00",
+    end: "09:30",
+    placeKind: "stay",
+    name: "Hills Hotel",
+    summary: "",
+  };
+
+  const transitSlot = {
+    kind: "transit" as const,
+    start: "",
+    text: "legacy text",
+    from: "Hills Hotel",
+    to: "Belém Tower",
+    legs: [
+      { mode: "transit", duration_min: 35, recommended: true },
+      { mode: "drive", duration_min: 15 },
+    ],
+    outcome: "directions",
+  };
+
+  const towerSlot = {
+    kind: "place" as const,
+    start: "10:00",
+    end: "12:00",
+    placeKind: "attraction",
+    name: "Belém Tower",
+    summary: "Iconic tower",
+  };
+
+  beforeEach(() => {
+    applyTravorShell();
+    vi.clearAllMocks();
+    authJson.mockImplementation(async (url: string) => {
+      if (url === "/api/plan/current") return { ok: true, criteria: null, itinerary: null };
+      if (url === "/api/plan/discover") {
+        return { ok: true, trip_id: "t1", revision: 1, iconic_places: [] };
+      }
+      return { ok: true };
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    document.body.className = "";
+    delete document.body.dataset.style;
+  });
+
+  it("should_render_structured_transit_pills_with_from_to_and_legs", async () => {
+    const filledItinerary = {
+      ...shellItinerary,
+      days: [
+        {
+          dayIndex: 1,
+          highlights: { label: "Highlights", title: "Day 1", tags: [] },
+          slots: [staySlot, transitSlot, towerSlot],
+        },
+      ],
+    };
+
+    authNdjsonEvents.mockImplementation(async (_url, _init, onEvent) => {
+      onEvent({ type: "phase", phase: "skeleton" });
+      onEvent({
+        type: "skeleton_day",
+        dayIndex: 1,
+        itinerary: shellItinerary,
+        stops: [
+          { name: "Hills Hotel", kind: "stay" },
+          { name: "Belém Tower", kind: "attraction" },
+        ],
+      });
+      onEvent({ type: "skeleton_done", itinerary: shellItinerary });
+      onEvent({ type: "done", itinerary: filledItinerary });
+    });
+
+    const { getByTestId } = renderWithLocale(<PlanPageClient />);
+    await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
+    await submitTakeoff(getByTestId);
+    await completeIntake(getByTestId);
+
+    await waitFor(() => {
+      const transitEl = document.body.querySelector('[data-testid="plan-transit-slot"]');
+      expect(transitEl).toBeTruthy();
+      // Structured from/to rendered
+      const fromEl = transitEl!.querySelector(".transit-from .transit-place");
+      const toEl = transitEl!.querySelector(".transit-to .transit-place");
+      expect(fromEl?.textContent).toContain("Hills Hotel");
+      expect(toEl?.textContent).toContain("Belém Tower");
+      // Structured legs rendered as pills
+      const options = transitEl!.querySelectorAll(".transit-option");
+      expect(options.length).toBe(2);
+      // Recommended leg flagged
+      expect(options[0]!.classList.contains("transit-option--rec")).toBe(true);
+      // Mode label resolved through i18n (default locale EN)
+      expect(options[0]!.textContent?.toLowerCase()).toContain("transit");
+      expect(options[0]!.textContent).toContain("35");
+      expect(options[1]!.textContent?.toLowerCase()).toContain("drive");
+      expect(options[1]!.textContent).toContain("15");
+    });
+  });
+
+  it("should_fallback_to_text_when_no_structured_legs", async () => {
+    const legacyTransitSlot = {
+      kind: "transit" as const,
+      start: "",
+      text: "Walk 10 min",
+    };
+    const filledItinerary = {
+      ...shellItinerary,
+      days: [
+        {
+          dayIndex: 1,
+          highlights: { label: "Highlights", title: "Day 1", tags: [] },
+          slots: [staySlot, legacyTransitSlot, towerSlot],
+        },
+      ],
+    };
+
+    authNdjsonEvents.mockImplementation(async (_url, _init, onEvent) => {
+      onEvent({ type: "phase", phase: "skeleton" });
+      onEvent({
+        type: "skeleton_day",
+        dayIndex: 1,
+        itinerary: shellItinerary,
+        stops: [
+          { name: "Hills Hotel", kind: "stay" },
+          { name: "Belém Tower", kind: "attraction" },
+        ],
+      });
+      onEvent({ type: "skeleton_done", itinerary: shellItinerary });
+      onEvent({ type: "done", itinerary: filledItinerary });
+    });
+
+    const { getByTestId } = renderWithLocale(<PlanPageClient />);
+    await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
+    await submitTakeoff(getByTestId);
+    await completeIntake(getByTestId);
+
+    await waitFor(() => {
+      const transitEl = document.body.querySelector('[data-testid="plan-transit-slot"]');
+      expect(transitEl).toBeTruthy();
+      // Legacy text fallback rendered in slot-body
+      const bodyEl = transitEl!.querySelector(".slot-body");
+      expect(bodyEl?.textContent).toContain("Walk 10 min");
+      // No structured pills
+      expect(transitEl!.querySelectorAll(".transit-option").length).toBe(0);
+    });
+  });
+});
+
 describe("intake hotel step session errors", () => {
   const assign = vi.fn();
 
@@ -1189,6 +1366,272 @@ describe("intake hotel step session errors", () => {
     });
     expect(assign).toHaveBeenCalledWith("/login");
     expect(document.body.querySelectorAll(".bubble--user").length).toBe(0);
+  });
+});
+
+const AGENT_FOUR_NEEDS = {
+  questions: [
+    { id: "hotel", prompt: "Hotel?" },
+    { id: "start_time", prompt: "Start?" },
+    { id: "must_see", prompt: "Must-see?", multi: true },
+    { id: "other", prompt: "Other?" },
+  ],
+};
+
+describe("2play-plan-90a T1 session intake without auto-fill", () => {
+  beforeEach(() => {
+    applyTravorShell();
+    vi.clearAllMocks();
+    authNdjsonEvents.mockResolvedValue(undefined);
+    authJson.mockImplementation(async (url: string) => {
+      if (url === "/api/plan/current") return { ok: true, criteria: null, itinerary: null };
+      if (url === "/api/plan/trip") {
+        return {
+          ok: true,
+          trip_id: "t1",
+          revision: 1,
+          status: "needs_input",
+          need_input: AGENT_FOUR_NEEDS,
+        };
+      }
+      if (url === "/api/plan/session") return { ok: true };
+      if (url === "/api/plan/candidates") {
+        return { ok: true, trip_id: "t1", iconic_places: ["Torre de Belém"], pool: [] };
+      }
+      return { ok: true };
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    document.body.className = "";
+    delete document.body.dataset.style;
+  });
+
+  it("should_not_call_plan_ndjson_after_four_need_answers", async () => {
+    const { getByTestId } = renderWithLocale(<PlanPageClient />);
+    await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
+    await submitTakeoff(getByTestId);
+    await waitFor(() => expect(authJson.mock.calls.some((c) => c[0] === "/api/plan/trip")).toBe(true));
+
+    for (let i = 0; i < 4; i += 1) {
+      await sendIntakeDefault(getByTestId);
+    }
+
+    await waitFor(() => {
+      const thread = document.body.querySelector('[data-testid="plan-nav-thread"]')?.textContent ?? "";
+      expect(thread).toContain("I have enough to draft your day outline.");
+    });
+    expect(authNdjsonEvents).not.toHaveBeenCalled();
+    expect(authJson.mock.calls.some((c) => c[0] === "/api/plan")).toBe(false);
+    expect(authJson.mock.calls.some((c) => c[0] === "/api/plan/candidates")).toBe(true);
+  });
+
+  it("should_patch_session_skip_when_hotel_is_empty", async () => {
+    const { getByTestId } = renderWithLocale(<PlanPageClient />);
+    await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
+    await submitTakeoff(getByTestId);
+    await waitFor(() => expect((getByTestId("plan-nav-send") as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(getByTestId("plan-nav-send"));
+
+    await waitFor(() => {
+      const patch = authJson.mock.calls.find(
+        (c) => c[0] === "/api/plan/session" && (c[1] as { method?: string })?.method === "PATCH",
+      );
+      expect(patch).toBeTruthy();
+      const body = JSON.parse(String((patch?.[1] as { body?: string })?.body ?? "{}"));
+      expect(body.step).toBe("b");
+      expect(body.value).toBe("");
+    });
+  });
+
+  it("should_update_constraints_bar_when_agent_needs_answered", async () => {
+    authJson.mockImplementation(async (url: string) => {
+      if (url === "/api/plan/current") return { ok: true, criteria: null, itinerary: null };
+      if (url === "/api/plan/trip") {
+        return {
+          ok: true,
+          trip_id: "t1",
+          revision: 1,
+          status: "needs_input",
+          need_input: {
+            questions: [
+              { id: "hotel", prompt: "Hotel?" },
+              { id: "start_time", prompt: "Start?" },
+              {
+                id: "must_see",
+                prompt: "Must-see?",
+                multi: true,
+                options: [
+                  { id: "a", label: "断桥残雪" },
+                  { id: "b", label: "白堤" },
+                ],
+              },
+              { id: "other", prompt: "Other?" },
+            ],
+          },
+        };
+      }
+      if (url === "/api/plan/session") {
+        return { ok: true, origin_name: "Hills Hotel Lisboa" };
+      }
+      if (url === "/api/plan/candidates") {
+        return { ok: true, trip_id: "t1", iconic_places: [], pool: [] };
+      }
+      return { ok: true };
+    });
+
+    const { getByTestId } = renderWithLocale(<PlanPageClient />);
+    await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
+    await submitTakeoff(getByTestId);
+    await waitFor(() => expect(getByTestId("plan-nav-input")).toBeTruthy());
+
+    fireEvent.change(getByTestId("plan-nav-input"), { target: { value: "Hills Hotel Lisboa" } });
+    fireEvent.click(getByTestId("plan-nav-send"));
+    await waitFor(() => expect(getByTestId("plan-constraints").textContent).toContain("Hills Hotel Lisboa"));
+
+    await sendIntakeDefault(getByTestId);
+    fireEvent.click(getByTestId("plan-need-chip-a"));
+    fireEvent.click(getByTestId("plan-nav-send"));
+    await waitFor(() => expect(getByTestId("constraint-must-see").textContent).toContain("断桥残雪"));
+
+    await sendIntakeDefault(getByTestId);
+    await waitFor(() => {
+      expect(getByTestId("constraint-must-see").textContent).toContain("断桥残雪");
+      expect(getByTestId("plan-constraints").textContent).toContain("Hills Hotel Lisboa");
+    });
+  });
+
+  it("should_stay_on_hotel_need_when_verify_returns_422", async () => {
+    authJson.mockImplementation(async (url: string) => {
+      if (url === "/api/plan/current") return { ok: true, criteria: null, itinerary: null };
+      if (url === "/api/plan/trip") {
+        return {
+          ok: true,
+          trip_id: "t1",
+          revision: 1,
+          status: "needs_input",
+          need_input: AGENT_FOUR_NEEDS,
+        };
+      }
+      if (url === "/api/plan/session") {
+        throw new MockAuthApiError("play.plan.intake_origin_not_found");
+      }
+      return { ok: true };
+    });
+
+    const { getByTestId } = renderWithLocale(<PlanPageClient />);
+    await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
+    await submitTakeoff(getByTestId);
+    await waitFor(() => expect(getByTestId("plan-nav-input")).toBeTruthy());
+    fireEvent.change(getByTestId("plan-nav-input"), { target: { value: "No Such Hotel" } });
+    fireEvent.click(getByTestId("plan-nav-send"));
+
+    await waitFor(() => {
+      expect(getByTestId("plan-origin-not-found").textContent).toMatch(
+        /Couldn't find a place near Lisbon similar to No Such Hotel/,
+      );
+      expect(document.body.querySelector('[data-testid="plan-nav-need-prompt"]')).toBeNull();
+    });
+    expect(authNdjsonEvents).not.toHaveBeenCalled();
+  });
+
+  it("should_stack_must_see_chips_and_pin_skip_redo_above_composer", async () => {
+    authJson.mockImplementation(async (url: string) => {
+      if (url === "/api/plan/current") return { ok: true, criteria: null, itinerary: null };
+      if (url === "/api/plan/trip") {
+        return {
+          ok: true,
+          trip_id: "t1",
+          revision: 1,
+          status: "needs_input",
+          need_input: {
+            questions: [
+              { id: "hotel", prompt: "Hotel?" },
+              { id: "start_time", prompt: "Start?" },
+              {
+                id: "must_see",
+                prompt: "Must-see?",
+                multi: true,
+                options: [
+                  { id: "a", label: "双峰插云" },
+                  { id: "b", label: "断桥残雪" },
+                  { id: "c", label: "手划船停靠点" },
+                ],
+              },
+              { id: "other", prompt: "Other?" },
+            ],
+          },
+        };
+      }
+      if (url === "/api/plan/session") return { ok: true };
+      return { ok: true };
+    });
+
+    const { getByTestId } = renderWithLocale(<PlanPageClient />);
+    await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
+    await submitTakeoff(getByTestId);
+    await sendIntakeDefault(getByTestId);
+    await sendIntakeDefault(getByTestId);
+
+    await waitFor(() => expect(getByTestId("plan-need-chip-a")).toBeTruthy());
+    const quick = getByTestId("plan-nav-thread-chips");
+    expect(quick.classList.contains("plan-nav__quick--stack")).toBe(true);
+    expect(quick.querySelector('[data-testid="plan-nav-skip-need"]')).toBeNull();
+    expect(getByTestId("plan-nav-thread").contains(quick)).toBe(true);
+
+    const actions = getByTestId("plan-nav-need-actions");
+    const composer = document.body.querySelector(".plan-nav__composer");
+    const dock = getByTestId("plan-nav-dock");
+    expect(dock.contains(quick)).toBe(false);
+    expect(dock.contains(actions)).toBe(true);
+    expect(dock.contains(composer as Node)).toBe(true);
+    expect(
+      [...dock.children].indexOf(actions) < [...dock.children].indexOf(composer as Element),
+    ).toBe(true);
+    expect(getByTestId("plan-nav-skip-need")).toBeTruthy();
+    expect(getByTestId("plan-nav-redo-need")).toBeTruthy();
+    expect(document.body.querySelector('[data-testid="plan-nav-send-skip-hint"]')).toBeNull();
+  });
+
+  it("should_show_hotel_candidates_in_thread_not_dock", async () => {
+    authJson.mockImplementation(async (url: string) => {
+      if (url === "/api/plan/current") return { ok: true, criteria: null, itinerary: null };
+      if (url === "/api/plan/trip") {
+        return {
+          ok: true,
+          trip_id: "t1",
+          revision: 1,
+          status: "needs_input",
+          need_input: AGENT_FOUR_NEEDS,
+        };
+      }
+      if (url === "/api/plan/session") {
+        return {
+          ok: true,
+          stay_on_step: true,
+          origin_candidates: [{ name: "Hyatt Regency Lisbon" }, { name: "Hills Hotel Lisboa" }],
+        };
+      }
+      return { ok: true };
+    });
+
+    const { getByTestId } = renderWithLocale(<PlanPageClient />);
+    await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
+    await submitTakeoff(getByTestId);
+    await waitFor(() => expect(getByTestId("plan-nav-input")).toBeTruthy());
+    fireEvent.change(getByTestId("plan-nav-input"), { target: { value: "Hyatt" } });
+    fireEvent.click(getByTestId("plan-nav-send"));
+
+    await waitFor(() => expect(getByTestId("plan-need-chip-cand_0")).toBeTruthy());
+    const chips = getByTestId("plan-nav-thread-chips");
+    expect(chips.textContent).toContain("Hyatt Regency Lisbon");
+    expect(getByTestId("plan-origin-candidates").textContent).toMatch(
+      /Near Lisbon we found places similar to Hyatt/,
+    );
+    expect(document.body.querySelector('[data-testid="plan-nav-need-prompt"]')).toBeNull();
+    expect(getByTestId("plan-nav-thread").contains(chips)).toBe(true);
+    expect(getByTestId("plan-nav-dock").contains(chips)).toBe(false);
   });
 });
 

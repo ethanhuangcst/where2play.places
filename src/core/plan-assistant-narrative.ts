@@ -75,7 +75,7 @@ export function stripFillCoverLine(
 }
 
 export function narrativeLinesForIntakeComplete(ctx: PlanNarrativeContext): string[] {
-  return appendAssistantLine([], ctx.t("play.plan.assistant_planning_skeleton"));
+  return appendAssistantLine([], ctx.t("play.plan.assistant_know_enough"));
 }
 
 export function narrativeLineForSkeletonHeadline(ctx: PlanNarrativeContext): string {
