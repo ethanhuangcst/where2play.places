@@ -24,6 +24,7 @@ import {
 import {
   mapLegsToTransitSlot,
   mapStopDisplayToPlaceSlot,
+  mapFilledStopToDisplay,
   skeletonDayHighlights,
   type StopDisplayPayload,
 } from "./itinerary-skeleton-map";
@@ -33,6 +34,7 @@ import {
   skeletonStopCount,
   skeletonIsFillable,
   artifactsTipsFromSlice,
+  latestFilledStopFromSlice,
 } from "./plan-fetch-trip";
 import { t as catalogT } from "../i18n/catalog";
 
@@ -512,6 +514,11 @@ export async function* planItinerarySkeletonFill(
         continue;
       }
 
+      let filledDisplay: StopDisplayPayload | undefined;
+      let filledLegs:
+        | Array<{ mode?: string; duration_min?: number; recommended?: boolean }>
+        | undefined;
+
       if (tripId) {
         const fetchedFill = await fetchTripDetails({
           trip_id: tripId,
@@ -519,10 +526,19 @@ export async function* planItinerarySkeletonFill(
           locale: opts.locale,
         });
         if (fetchedFill.ok) {
-          const { revision: r } = tripFetchSlice(fetchedFill);
+          const { slice, revision: r } = tripFetchSlice(fetchedFill);
           if (typeof r === "number") revision = r;
+          const latest = latestFilledStopFromSlice(slice);
+          if (latest?.stop || latest?.slot) {
+            filledDisplay = mapFilledStopToDisplay(latest);
+            if (latest.legs?.length) filledLegs = latest.legs;
+          }
         }
       }
+
+      // U2 SoT: prefer fetch filled; degrade to write envelope only if slice missing.
+      const displaySoT: StopDisplayPayload = filledDisplay ?? fill.display ?? {};
+      const legsSoT = filledLegs ?? fill.legs;
 
       if (fill.mealSkipped) {
         const placeSlot = mapStopDisplayToPlaceSlot(
@@ -533,7 +549,7 @@ export async function* planItinerarySkeletonFill(
               card: null,
               deeplinks: {},
             },
-            slot: fill.display?.slot ?? { start: prevEndTime ?? "12:00", end: prevEndTime ?? "12:00" },
+            slot: displaySoT.slot ?? { start: prevEndTime ?? "12:00", end: prevEndTime ?? "12:00" },
             legs_to_here: [],
           },
           t,
@@ -552,13 +568,13 @@ export async function* planItinerarySkeletonFill(
         continue;
       }
 
-      if (!isOriginStay && fill.legs?.length) {
+      if (!isOriginStay && legsSoT?.length) {
         yield {
           type: "slot_preview",
           dayIndex,
-          ...previewForTransitLeg(stop.name, fill.legs, t),
+          ...previewForTransitLeg(stop.name, legsSoT, t),
         };
-        const transitSlot = mapLegsToTransitSlot(fill.legs, t, {
+        const transitSlot = mapLegsToTransitSlot(legsSoT, t, {
           from: prevStop?.name,
           to: stop.name,
         });
@@ -573,12 +589,14 @@ export async function* planItinerarySkeletonFill(
         }
       }
 
-      const placeSlot = mapStopDisplayToPlaceSlot(fill.display ?? {}, t, placeSlotMapOpts(stop, pool));
+      const placeSlot = mapStopDisplayToPlaceSlot(displaySoT, t, placeSlotMapOpts(stop, pool));
       daySlots = [...daySlots, placeSlot];
-      prevEndTime = fill.display?.slot?.end
-        ? normalizeAgentTime(fill.display.slot.end)
+      prevEndTime = displaySoT.slot?.end
+        ? normalizeAgentTime(displaySoT.slot.end)
         : prevEndTime;
-      const venueLoc = (fill.display as PlanNextStopData | undefined)?.next_stop?.location;
+      const venueLoc =
+        (displaySoT.stop as { location?: { lat?: number; lng?: number } } | undefined)?.location ??
+        (fill.display as PlanNextStopData | undefined)?.next_stop?.location;
       prevStop =
         stop.kind === "meal" || stop.meal_slot
           ? {

@@ -895,4 +895,159 @@ describe("make failure fetch recovery (TC-M19-78-02)", () => {
     expect(current?.lat).toBe(38.73);
     expect(current?.lng).toBe(-9.14);
   });
+
+  it("MVP-T5 TD-6 should_map_stop_filled_from_fetch_filled_not_write_envelope", async () => {
+    vi.spyOn(client, "geocode").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: { lat: 38.72, lng: -9.14, crs: "WGS84" },
+    });
+    vi.spyOn(client, "discoverPlaces").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: {
+        candidates: { places: [{ name: "Torre de Belém" }], restaurants: [] },
+        trip_id: "t-td6",
+        revision: 1,
+      },
+    });
+    vi.spyOn(client, "makeItinerary").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: {
+        skeleton: {
+          days: [
+            {
+              day_index: 1,
+              day_theme: "Belém",
+              stops: [
+                { name: "Hotel", kind: "stay" },
+                { name: "Torre de Belém", kind: "attraction" },
+              ],
+            },
+          ],
+        },
+        trip_id: "t-td6",
+        revision: 2,
+      },
+    });
+    let lastNextName = "Hotel";
+    vi.spyOn(client, "planNextStop").mockImplementation(async (body) => {
+      const next = (body as { next_stop?: { name?: string; kind?: string } }).next_stop;
+      const name = next?.name ?? "Hotel";
+      lastNextName = name;
+      // Stale / wrong envelope — must NOT become stop_filled SoT.
+      return {
+        agent: "places-agent",
+        ok: true,
+        data: {
+          stop: { name: `WRONG-${name}`, kind: next?.kind ?? "stay", card: null, deeplinks: {} },
+          slot: { start: "01:00", end: "02:00" },
+          legs:
+            name === "Torre de Belém"
+              ? [{ mode: "walk", duration_min: 99, recommended: true }]
+              : [],
+          trip_id: "t-td6",
+          revision: 3,
+        },
+      };
+    });
+    vi.spyOn(client, "fetchTripDetails").mockImplementation(async (body) => {
+      const fields = (body as { fields?: string[] }).fields ?? [];
+      if (fields.includes("filled")) {
+        const isAttraction = lastNextName === "Torre de Belém";
+        return {
+          agent: "places-agent",
+          ok: true,
+          data: {
+            trip_id: "t-td6",
+            revision: 4,
+            data: {
+              filled: isAttraction
+                ? {
+                    stop: {
+                      name: "Torre de Belém",
+                      kind: "attraction",
+                      card: {
+                        name: "Torre de Belém",
+                        photos: ["https://cdn.example.com/belem.jpg"],
+                      },
+                      deeplinks: {},
+                    },
+                    slot: { start: "09:30", end: "11:00" },
+                    legs: [{ mode: "walk", duration_min: 12, recommended: true }],
+                  }
+                : {
+                    stop: {
+                      name: "Hotel",
+                      kind: "stay",
+                      card: null,
+                      deeplinks: {},
+                    },
+                    slot: { start: "09:00", end: "09:00" },
+                    legs: [],
+                  },
+              cursor: { day_index: 1, stop_index: isAttraction ? 1 : 0 },
+            },
+          },
+        };
+      }
+      return {
+        agent: "places-agent",
+        ok: true,
+        data: {
+          trip_id: "t-td6",
+          revision: 2,
+          data: {
+            skeleton: {
+              days: [
+                {
+                  day_index: 1,
+                  day_theme: "Belém",
+                  stops: [
+                    { name: "Hotel", kind: "stay" },
+                    { name: "Torre de Belém", kind: "attraction" },
+                  ],
+                },
+              ],
+            },
+            candidates: { places: [{ name: "Torre de Belém" }], restaurants: [] },
+          },
+        },
+      };
+    });
+
+    const stopFilled: Array<{ name?: string; start?: string; end?: string }> = [];
+    const transitTexts: string[] = [];
+    for await (const ev of planItinerarySkeletonFill(
+      {
+        destination: "Lisbon",
+        days: 1,
+        startDate: "2026-10-10",
+        dailyStart: "Hotel",
+        timeFrom: "09:00",
+      },
+      { locale: "EN", providers: ["GOOGLE_MAPS"] },
+    )) {
+      if (ev.type === "error") break;
+      if (ev.type === "stop_filled" && ev.slot.kind === "place") {
+        stopFilled.push({
+          name: ev.slot.name,
+          start: ev.slot.start,
+          end: ev.slot.end,
+        });
+      }
+      if (ev.type === "transit" && ev.slot.kind === "transit") {
+        transitTexts.push(ev.slot.text);
+      }
+    }
+
+    const attraction = stopFilled.find((s) => s.name === "Torre de Belém");
+    expect(attraction).toBeTruthy();
+    expect(attraction?.start).toBe("09:30");
+    expect(attraction?.end).toBe("11:00");
+    expect(stopFilled.some((s) => s.name?.startsWith("WRONG-"))).toBe(false);
+    expect(transitTexts.some((t) => t.includes("12"))).toBe(true);
+    expect(transitTexts.some((t) => t.includes("99"))).toBe(false);
+  });
 });

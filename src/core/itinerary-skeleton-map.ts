@@ -225,3 +225,16 @@ export function skeletonDayHighlights(
     tags: [] as string[],
   };
 }
+
+/** MVP-T5 TD-6: convert fetch `filled` latest stop into StopDisplayPayload for existing mappers. */
+export function mapFilledStopToDisplay(filled: {
+  stop?: StopDisplayPayload["stop"];
+  slot?: { start?: string; end?: string };
+  legs?: AgentLeg[];
+}): StopDisplayPayload {
+  return {
+    stop: filled.stop,
+    slot: filled.slot,
+    legs_to_here: filled.legs,
+  };
+}
