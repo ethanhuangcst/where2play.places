@@ -165,6 +165,25 @@ describe("planTripBffBody", () => {
     expect(body.revision).toBe(1);
   });
 
+  it("should_forward_hotel_answers_to_agent (MVP-T5 TD-4)", () => {
+    const parsed = planTripBffBody.parse({
+      city: "西安",
+      startDate: "2026-09-20",
+      days: 3,
+      partySize: 3,
+      budget: "mid",
+      tripType: "city",
+      pace: "tight",
+      transit: "transit_walk",
+      locale: "CN",
+      trip_id: "trip-hotel",
+      revision: 1,
+      answers: { hotel: "西安钟楼饭店" },
+    });
+    const body = toAgentPlanTripBody(parsed);
+    expect(body.answers).toEqual({ hotel: "西安钟楼饭店" });
+  });
+
   it("should_set_bounds_end_to_start_plus_days_minus_one (TC-T3-BFF-01)", () => {
     const parsed = planTripBffBody.parse({
       city: "Lisbon",

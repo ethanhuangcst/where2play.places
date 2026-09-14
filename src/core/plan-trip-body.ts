@@ -21,10 +21,11 @@ export const planTripBffBody = z.object({
   other: z.string().trim().optional(),
   /** MVP-T3: agent stops after skeleton make/commit. */
   skeleton_only: z.boolean().optional(),
-  /** Mid-plan answers (e.g. expand_radius yes/no — 2play-plan-104). */
+  /** Mid-plan answers (expand_radius — 2play-plan-104; hotel — MVP-T5 TD-4). */
   answers: z
     .object({
       expand_radius: z.enum(["yes", "no"]).optional(),
+      hotel: z.string().optional(),
     })
     .optional(),
 });
