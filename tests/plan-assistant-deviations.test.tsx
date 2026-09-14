@@ -96,9 +96,9 @@ describe("plan-assistant deviations (TC-T3-103)", () => {
     const block = getByTestId("plan-thread-deviations");
     expect(block).toBeTruthy();
     expect(block.textContent).toContain("The places-agent itinerary could not fully match your request");
-    expect(block.textContent).toContain("Far clusters");
-    expect(block.textContent).toContain("far clusters share a day");
-    expect(block.textContent).toContain("Day count");
+    expect(block.textContent).toContain("Day 1 combines attractions that are far apart");
+    expect(block.textContent).toContain("Sintra");
+    expect(block.textContent).toContain("The framework day count differs");
     expect(getAllByTestId("plan-thread-deviation-item")).toHaveLength(2);
     expect(queryByTestId("plan-deviations-warning-panel")).toBeNull();
     expect(queryByTestId("plan-deviations-modal")).toBeNull();

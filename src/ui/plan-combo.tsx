@@ -8,6 +8,8 @@ type Props = {
   value: string;
   options: string[];
   onChange: (value: string) => void;
+  /** Fired on blur when the field is empty (required combos can restore a default). */
+  onBlurEmpty?: () => void;
   placeholder?: string;
   toggleLabel: string;
   disabled?: boolean;
@@ -21,6 +23,7 @@ export function PlanCombo({
   value,
   options,
   onChange,
+  onBlurEmpty,
   placeholder,
   toggleLabel,
   disabled,
@@ -28,8 +31,14 @@ export function PlanCombo({
   testId,
 }: Props) {
   const [open, setOpen] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [draft, setDraft] = useState(value);
   const rootRef = useRef<HTMLDivElement>(null);
   const listId = useId();
+
+  useEffect(() => {
+    if (!focused) setDraft(value);
+  }, [value, focused]);
 
   useEffect(() => {
     if (!open) return;
@@ -45,14 +54,30 @@ export function PlanCombo({
       <input
         id={id}
         name={name}
-        value={value}
+        value={focused ? draft : value}
         placeholder={placeholder}
         autoComplete="off"
         required={required}
         disabled={disabled}
         data-testid={testId}
-        onChange={(e) => onChange(e.target.value)}
-        onFocus={() => !disabled && setOpen(true)}
+        onChange={(e) => {
+          const next = e.target.value;
+          setDraft(next);
+          onChange(next);
+        }}
+        onFocus={() => {
+          if (disabled) return;
+          setFocused(true);
+          setDraft(value);
+          setOpen(true);
+        }}
+        onBlur={() => {
+          setFocused(false);
+          setOpen(false);
+          if (!(draft.trim() || value.trim())) {
+            onBlurEmpty?.();
+          }
+        }}
       />
       <button
         type="button"
@@ -61,6 +86,7 @@ export function PlanCombo({
         aria-expanded={open}
         aria-controls={listId}
         disabled={disabled}
+        onMouseDown={(e) => e.preventDefault()}
         onClick={() => !disabled && setOpen((v) => !v)}
       />
       <ul id={listId} className="combo__list" role="listbox" hidden={!open}>
@@ -69,10 +95,13 @@ export function PlanCombo({
             <button
               type="button"
               role="option"
-              aria-selected={opt === value}
+              aria-selected={opt === (focused ? draft : value)}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
+                setDraft(opt);
                 onChange(opt);
                 setOpen(false);
+                setFocused(false);
               }}
             >
               {opt}

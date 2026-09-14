@@ -9,23 +9,14 @@ import {
   type TransitOptionKey,
 } from "./plan-transit";
 
-export type AgentNeedId =
-  | "hotel"
-  | "start_time"
-  | "must_see"
-  | "other"
-  /** Mid-plan confirm (agent-discover-110d / 2play-plan-104); not an intake step. */
-  | "expand_radius";
+export type AgentNeedId = "hotel" | "start_time" | "must_see" | "other";
 
 export type AgentNeedAnswers = Partial<Record<AgentNeedId, string>>;
-
-export const EXPAND_RADIUS_NEED_ID = "expand_radius" as const;
 
 /** Assistant steps b–h per performance.md §12.11 / 2play-design §4.2.1 */
 export type IntakeStepId = "b" | "c" | "d" | "e" | "f" | "g" | "h";
 
-/** Intake-mapped needs only — `expand_radius` has no b–h step. */
-export const AGENT_NEED_TO_INTAKE_STEP: Partial<Record<AgentNeedId, IntakeStepId>> = {
+export const AGENT_NEED_TO_INTAKE_STEP: Record<AgentNeedId, IntakeStepId> = {
   hotel: "b",
   start_time: "c",
   must_see: "g",
@@ -449,14 +440,13 @@ export function formatTripTypeDisplay(raw: string | null | undefined, t: (key: s
 /** Persist takeoff combo as a catalog slug when the typed/picked text matches a locale label. */
 export function tripTypeStorageValue(raw: string, t: (key: string) => string): string {
   const v = raw.trim();
-  if (!v) return DEFAULT_TAKEOFF_TRIP_TYPE;
+  // Allow empty while the user is editing; callers restore DEFAULT on blur/submit.
+  if (!v) return "";
   const slug = v.toLowerCase().replace(/\s+/g, "_");
   if ((TRIP_TYPE_CATALOG_KEYS as readonly string[]).includes(slug)) return slug;
   for (const key of TRIP_TYPE_CATALOG_KEYS) {
     if (t(`play.plan.trip_type.${key}`) === v) return key;
   }
-  // Legacy CN/HK/TW label before「都市漫步」rename.
-  if (v === "城市漫游" || v === "城市漫遊") return "city";
   return v;
 }
 

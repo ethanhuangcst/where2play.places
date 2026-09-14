@@ -148,9 +148,44 @@ export function deviationFieldLabel(
 
 /** Agent machine reasons → locale keys (raw English stays internal). */
 const DEVIATION_REASON_KEYS: Record<string, string> = {
+  far_cluster_shared_day: "play.plan.deviation_reason.far_cluster_shared_day",
+  attraction_pool_thin: "play.plan.deviation_reason.attraction_pool_thin",
+  day_count_mismatch: "play.plan.deviation_reason.day_count_mismatch",
+  // Legacy English sentences (agent <2026-09-14) — same keys for in-flight trips.
+  "geographically far attraction clusters share a day; validate-don't-repair left the LLM day layout unchanged (no silent day-add)":
+    "play.plan.deviation_reason.far_cluster_shared_day",
   "insufficient grounded attractions for requested trip length":
     "play.plan.deviation_reason.attraction_pool_thin",
+  "skeleton day count does not match requested numDays":
+    "play.plan.deviation_reason.day_count_mismatch",
 };
+
+/** Machine-key → interpolating locale key by deviation field. */
+export const DEVIATION_REASON_KEY_BY_FIELD: Record<string, string> = {
+  far_cluster: "play.plan.deviation_reason.far_cluster_shared_day",
+  attraction_pool: "play.plan.deviation_reason.attraction_pool_thin",
+  day_count: "play.plan.deviation_reason.day_count_mismatch",
+};
+
+/**
+ * Parse agent `actual` into interpolation vars for the friendly reason lines.
+ * far_cluster: "day 1 co-schedules far cluster(s): Sintra, Cascais"
+ * day_count: expected/actual are bare numbers.
+ */
+export function parseDeviationDetail(
+  d: SkeletonDeviation,
+): Record<string, string> | null {
+  if (d.field === "far_cluster") {
+    const m = /^day (\d+) co-schedules far cluster\(s\): (.+)$/.exec(d.actual.trim());
+    if (m) return { day: m[1], places: m[2] };
+    return null;
+  }
+  if (d.field === "day_count") {
+    if (d.expected && d.actual) return { expected: d.expected, actual: d.actual };
+    return null;
+  }
+  return null;
+}
 
 /** Localize a known machine reason; fall back to the raw reason string. */
 export function deviationReasonLabel(
@@ -158,6 +193,7 @@ export function deviationReasonLabel(
   t: (key: string) => string,
 ): string {
   const trimmed = reason.trim();
+  // Stable machine keys (agent ≥2026-09-14) and legacy English sentences map to the same key.
   const key = DEVIATION_REASON_KEYS[trimmed];
   return key ? t(key) : trimmed;
 }

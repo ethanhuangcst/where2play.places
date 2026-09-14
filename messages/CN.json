@@ -462,5 +462,7 @@
   "play.plan.deviation_reason.attraction_pool_thin": "目的地周边搜索到的景点少于您的行程天数",
   "play.plan.need_prompt.expand_radius": "附近景点偏少，未能覆盖您的行程天数。要扩大搜索范围（约 160 公里）吗？",
   "play.plan.need_option.expand_radius.yes": "好，扩大搜索",
-  "play.plan.need_option.expand_radius.no": "不用，维持目前范围"
+  "play.plan.need_option.expand_radius.no": "不用，维持目前范围",
+  "play.plan.deviation_reason.far_cluster_shared_day": "第{day}天把相距较远的景点安排在了同一天（如 {places}），当天往返路程会较长；已保留智能体的原始排布，未擅自改动",
+  "play.plan.deviation_reason.day_count_mismatch": "行程框架的天数与您要求的不一致（要求 {expected} 天，实际 {actual} 天）"
 }

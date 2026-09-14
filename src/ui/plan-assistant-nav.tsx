@@ -27,6 +27,8 @@ import { PLAN_NAV_MIN_H, PLAN_NAV_MIN_W, nextPanelSizeRem } from "@/src/core/pla
 import {
   deviationFieldLabel,
   deviationReasonLabel,
+  parseDeviationDetail,
+  DEVIATION_REASON_KEY_BY_FIELD,
   type SkeletonDeviation,
 } from "@/src/core/plan-t3-hydrate";
 
@@ -76,11 +78,6 @@ type Props = {
   /** Hotel candidate click — PATCH /api/plan/session in flight. */
   verifyingHotel?: boolean;
   onAgentNeedAnswer?: (questionId: string, value: string) => void;
-  onAgentNeedRedo?: () => void;
-  canRedoNeed?: boolean;
-  onLocalNeedSkip?: () => void;
-  onLocalNeedRedo?: () => void;
-  canRedoLocal?: boolean;
   /** MVP-T3: assistant takeover + phase progress (no fixed 4Q). */
   t3Mode?: boolean;
   t3ProgressSteps?: Array<{ id: string; state: "done" | "current" | "pending" }>;
@@ -153,11 +150,6 @@ export function PlanAssistantNav({
   awaitingAgentNeeds = false,
   verifyingHotel = false,
   onAgentNeedAnswer,
-  onAgentNeedRedo,
-  canRedoNeed = false,
-  onLocalNeedSkip,
-  onLocalNeedRedo,
-  canRedoLocal = false,
   t3Mode = false,
   t3ProgressSteps,
   frameworkReadyLine = null,
@@ -209,17 +201,29 @@ export function PlanAssistantNav({
     }
   }, [currentStep, intakeComplete, answers]);
 
-  const agentQ = agentNeedQuestions?.[agentNeedIndex];
-  const useAgentNeeds = Boolean(agentNeedQuestions?.length) || awaitingAgentNeeds;
+  const visibleNeedQuestions = t3Mode
+    ? (agentNeedQuestions ?? []).filter((q) => q.id === "expand_radius")
+    : (agentNeedQuestions ?? []);
+  const visibleNeedIndex = (() => {
+    if (!t3Mode) return agentNeedIndex;
+    const unanswered = visibleNeedQuestions.findIndex(
+      (q) => !Object.prototype.hasOwnProperty.call(agentNeedAnswers, q.id),
+    );
+    return unanswered === -1 ? visibleNeedQuestions.length : unanswered;
+  })();
+  const agentQ = visibleNeedQuestions[visibleNeedIndex];
+  const useAgentNeeds = Boolean(visibleNeedQuestions.length) || (awaitingAgentNeeds && !t3Mode);
   const activeStep = t3Mode || intakeComplete || useAgentNeeds ? null : currentStep;
   const qa = intakeQaProgress(activeStep, intakeComplete, {
     useAgentNeeds,
-    agentNeedIndex,
-    agentNeedTotal: agentNeedQuestions?.length || 4,
+    agentNeedIndex: visibleNeedIndex,
+    agentNeedTotal: visibleNeedQuestions.length || 4,
   });
   const budgetKey = normalizeBudgetKey(takeoff.budget);
   const budgetLabel = budgetKey ? budgetOptionLabel(budgetKey, t) : takeoff.budget;
-  const contextSummary = `${takeoff.destination} · ${takeoff.days} ${t("play.plan.days_short")} · ${takeoff.partySize} ${t("play.plan.people_short")} · ${budgetLabel} · ${t("play.plan.nav_qa_progress", { current: qa.current, total: qa.total })}`;
+  const contextSummary = t3Mode
+    ? `${takeoff.destination} · ${takeoff.days} ${t("play.plan.days_short")} · ${takeoff.partySize} ${t("play.plan.people_short")} · ${budgetLabel}`
+    : `${takeoff.destination} · ${takeoff.days} ${t("play.plan.days_short")} · ${takeoff.partySize} ${t("play.plan.people_short")} · ${budgetLabel} · ${t("play.plan.nav_qa_progress", { current: qa.current, total: qa.total })}`;
 
   const onResizeStart = useCallback(
     (e: React.PointerEvent) => {
@@ -348,9 +352,15 @@ export function PlanAssistantNav({
     !(activeStep === "g" && mustSeeLoading);
   const stackProcessChips = true;
 
-  const railPct = intakeComplete
-    ? 100
-    : Math.round(((qa.current - (activeStep ? 0.5 : 0)) / qa.total) * 100);
+  const railPct = t3Mode
+    ? t3ProgressSteps?.every((s) => s.state === "done")
+      ? 100
+      : t3ProgressSteps?.some((s) => s.state === "current")
+        ? 55
+        : 8
+    : intakeComplete
+      ? 100
+      : Math.round(((qa.current - (activeStep ? 0.5 : 0)) / qa.total) * 100);
 
   const content = (
     <>
@@ -420,7 +430,7 @@ export function PlanAssistantNav({
                   <path d="M5 12l5-5 5 5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
-              {!intakeComplete ? (
+              {!intakeComplete || (t3Mode && !frameworkReadyLine) ? (
                 <button
                   type="button"
                   className="btn btn-danger"
@@ -444,30 +454,36 @@ export function PlanAssistantNav({
                     {t("play.plan.assistant_takeover")}
                   </div>
                   {t3ProgressSteps?.length ? (
-                    <ol className="plan-progress" data-testid="plan-progress" data-progress-list="">
-                      {t3ProgressSteps.map((step) => (
-                        <li
-                          key={step.id}
-                          className={`plan-progress__step is-${step.state}`}
-                          data-step={step.id}
-                        >
-                          <span className="plan-progress__bead" aria-hidden="true" />
-                          <p className="plan-progress__copy">
-                            <span className="plan-progress__label">
-                              {t(`play.plan.phase_${step.id}`)}
-                            </span>
-                            <span className="plan-progress__hint">
-                              {t(`play.plan.phase_${step.id}_hint`)}
-                            </span>
-                          </p>
-                        </li>
-                      ))}
-                    </ol>
+                    <div
+                      className="msg-group msg-group--agent"
+                      data-testid="plan-nav-progress"
+                      aria-live="polite"
+                    >
+                      <ol className="plan-progress" data-testid="plan-progress" data-progress-list="">
+                        {t3ProgressSteps.map((step) => (
+                          <li
+                            key={step.id}
+                            className={`plan-progress__step is-${step.state}`}
+                            data-step={step.id}
+                          >
+                            <span className="plan-progress__bead" aria-hidden="true" />
+                            <p className="plan-progress__copy">
+                              <span className="plan-progress__label">
+                                {t(`play.plan.phase_${step.id}`)}
+                              </span>
+                              <span className="plan-progress__hint">
+                                {t(`play.plan.phase_${step.id}_hint`)}
+                              </span>
+                            </p>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
                   ) : null}
                   {frameworkReadyLine ? (
                     <div
-                      className="bubble bubble--agent"
-                      data-testid="plan-nav-framework-ready"
+                      className="bubble bubble--agent bubble--agent-notice"
+                      data-testid="plan-thread-skeleton-intro"
                     >
                       {frameworkReadyLine}
                     </div>
@@ -475,13 +491,14 @@ export function PlanAssistantNav({
                 </>
               ) : null}
 
+              {!t3Mode ? (
               <div className="msg-group msg-group--agent">
                 {useAgentNeeds ? (
                   <p className="msg-group__line" data-testid="plan-nav-searching">
                     {t("play.plan.assistant_searching")}
                   </p>
                 ) : null}
-                {!t3Mode && !awaitingAgentNeeds ? (
+                {!awaitingAgentNeeds ? (
                   <p className="msg-group__line" data-testid="plan-nav-greeting">
                     {t("play.plan.assistant_greeting")}
                   </p>
@@ -514,6 +531,7 @@ export function PlanAssistantNav({
                   </p>
                 ) : null}
               </div>
+              ) : null}
 
               {!t3Mode
                 ? INTAKE_STEP_ORDER.map((step) => {
@@ -531,19 +549,19 @@ export function PlanAssistantNav({
                 : null}
 
               {useAgentNeeds
-                ? (agentNeedQuestions ?? []).map((q, i) => {
+                ? visibleNeedQuestions.map((q, i) => {
                     const answered = Object.prototype.hasOwnProperty.call(agentNeedAnswers, q.id);
-                    if (i > agentNeedIndex && !answered) return null;
+                    if (i > visibleNeedIndex && !answered) return null;
                     return (
                       <div key={q.id}>
-                        {i < agentNeedIndex || answered ? (
+                        {i < visibleNeedIndex || answered ? (
                           <>
                             <div className="bubble bubble--agent">{catalogNeedPrompt(q.id, q.prompt, t)}</div>
                             <div className="bubble bubble--user" data-testid={`plan-nav-need-answer-${q.id}`}>
                               {(agentNeedAnswers[q.id] ?? "").trim() || t("play.plan.need_skipped")}
                             </div>
                           </>
-                        ) : i === agentNeedIndex ? (
+                        ) : i === visibleNeedIndex ? (
                           <>
                             {q.id === "hotel" && (originNotFound || (originCandidates?.length ?? 0) > 0) ? (
                               <div
@@ -734,11 +752,15 @@ export function PlanAssistantNav({
                 </div>
               ) : null}
 
-              {statusLines.map((line, i) => (
-                <p key={`status-${i}`} className="msg-group__line">
-                  {line}
-                </p>
-              ))}
+              {statusLines.length > 0 ? (
+                <div className="bubble bubble--agent" data-testid="plan-nav-status">
+                  {statusLines.map((line, i) => (
+                    <p key={`status-${i}`} className="plan-nav__notice-line">
+                      {line}
+                    </p>
+                  ))}
+                </div>
+              ) : null}
 
               {makeElapsedSeconds != null ? (
                 <div
@@ -770,24 +792,30 @@ export function PlanAssistantNav({
 
               {deviations.length > 0 ? (
                 <div
-                  className="msg-group msg-group--agent plan-nav__deviations"
+                  className="bubble bubble--agent bubble--agent-notice plan-nav__deviations"
                   data-testid="plan-thread-deviations"
                 >
-                  <p className="msg-group__line">{t("play.plan.deviations_heading")}</p>
+                  <p className="plan-nav__notice-line">{t("play.plan.deviations_heading")}</p>
                   {deviations.map((d, i) => {
                     const field = deviationFieldLabel(d.field, t);
-                    const raw = d.reason.trim() || d.actual.trim() || d.field;
-                    const reason = deviationReasonLabel(raw, t);
+                    const parsed = parseDeviationDetail(d);
+                    const reasonKey = DEVIATION_REASON_KEY_BY_FIELD[d.field];
+                    let line: string;
+                    if (reasonKey && parsed) {
+                      line = t(reasonKey, parsed);
+                    } else {
+                      const raw = d.reason.trim() || d.actual.trim() || d.field;
+                      const reason = deviationReasonLabel(raw, t);
+                      line = field ? t("play.plan.deviation_line", { field, reason }) : reason;
+                    }
                     return (
                       <p
                         key={`${d.field}-${i}`}
-                        className="msg-group__line"
+                        className="plan-nav__notice-line"
                         data-testid="plan-thread-deviation-item"
                         data-field={d.field || undefined}
                       >
-                        {field
-                          ? t("play.plan.deviation_line", { field, reason })
-                          : reason}
+                        {line}
                       </p>
                     );
                   })}
@@ -842,66 +870,9 @@ export function PlanAssistantNav({
             const showComposer =
               (!intakeComplete && (activeStep || useAgentNeeds || awaitingAgentNeeds)) ||
               intakeComplete;
-            const showNeedActions =
-              showComposer &&
-              (Boolean(agentQ) ||
-                Boolean(activeStep) ||
-                (useAgentNeeds && canRedoNeed) ||
-                (!useAgentNeeds && canRedoLocal) ||
-                intakeComplete);
 
             return (
               <div className="plan-nav__dock" data-testid="plan-nav-dock">
-                {showNeedActions ? (
-                  <div
-                    className="plan-nav__need-actions"
-                    role="group"
-                    aria-label={t("play.plan.nav_quick_aria")}
-                    data-testid="plan-nav-need-actions"
-                  >
-                    <button
-                      type="button"
-                      className="chip chip--ghost"
-                      data-testid="plan-nav-skip-need"
-                      disabled={
-                        useAgentNeeds
-                          ? !agentQ || verifyingHotel
-                          : !activeStep || fillingLocked || sending
-                      }
-                      aria-disabled={
-                        useAgentNeeds
-                          ? !agentQ || verifyingHotel
-                          : !activeStep || fillingLocked || sending
-                      }
-                      onClick={() => {
-                        if (useAgentNeeds) {
-                          if (agentQ) onAgentNeedAnswer?.(agentQ.id, "");
-                          return;
-                        }
-                        onLocalNeedSkip?.();
-                      }}
-                    >
-                      {t("play.plan.need_skip_this")}
-                    </button>
-                    <button
-                      type="button"
-                      className="chip chip--ghost"
-                      data-testid="plan-nav-redo-need"
-                      disabled={useAgentNeeds ? !canRedoNeed : !canRedoLocal}
-                      aria-disabled={useAgentNeeds ? !canRedoNeed : !canRedoLocal}
-                      onClick={() => {
-                        if (useAgentNeeds) {
-                          if (canRedoNeed) onAgentNeedRedo?.();
-                          return;
-                        }
-                        if (canRedoLocal) onLocalNeedRedo?.();
-                      }}
-                    >
-                      {t("play.plan.need_redo_prev")}
-                    </button>
-                  </div>
-                ) : null}
-
                 {showComposer ? (
                   <form className="chat-composer plan-nav__composer" onSubmit={submitAnswer}>
                     <label className="sr-only" htmlFor="nav-input">

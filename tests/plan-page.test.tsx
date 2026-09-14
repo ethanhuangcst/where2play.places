@@ -294,8 +294,8 @@ describe("TC-M10-46-10 plan-nav fixed floating panel", () => {
     expect(nav.closest(".plan-stack")).toBeNull();
     expect(document.body.contains(nav)).toBe(true);
     expect(nav.querySelector(".plan-nav__panel")).toBeTruthy();
-    // T3 (`2play-plan-101`): intakeComplete=true after takeoff → terminate hidden; fold/close remains.
-    expect(nav.querySelector('[data-testid="plan-nav-terminate"]')).toBeNull();
+    // T3 mockup 06: terminate stays while framework is generating.
+    expect(nav.querySelector('[data-testid="plan-nav-terminate"]')).toBeTruthy();
     expect(nav.querySelector('[data-testid="plan-nav-close"]')).toBeTruthy();
   });
 });

@@ -3,17 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ItineraryDto, ItinerarySlot, PlanBoundaries } from "@/src/core/itinerary-types";
 import {
-  AGENT_NEED_TO_INTAKE_STEP,
   buildConstraintItems,
   intakeAnswersFromAgentNeeds,
-  INTAKE_DEFAULT_VALUES,
-  INTAKE_STEP_ORDER,
   mergeIntakeToBoundaries,
-  nextIntakeStep,
   nextOpenIntakeStep,
-  firstOpenIntakeStep,
   takeoffIsValid,
-  takeoffToBoundaries,
   DEFAULT_TAKEOFF_TRIP_TYPE,
   formatTripTypeDisplay,
   type AgentNeedAnswers,
@@ -43,7 +37,6 @@ import {
   parseOriginPickIndex,
   sanitizeDailyStartName,
 } from "@/src/core/plan-resolve-origin";
-import { redoNeedState } from "@/src/core/plan-need-nav";
 import { skeletonStopsForFocusedDay, patchSkeletonStopName } from "@/src/core/plan-skeleton-stops";
 import {
   hydrateFromAgentSkeleton,
@@ -1069,70 +1062,6 @@ export default function PlanPageClient() {
     }
   }, [locale, takeoff, t, origin, startTime, other]);
 
-  const runPlanTripIntake = useCallback(async () => {
-    const fields = takeoff;
-    try {
-      const res = await authJson<{
-        ok?: boolean;
-        trip_id?: string;
-        revision?: number;
-        status?: string;
-        need_input?: {
-          questions: Array<{
-            id: string;
-            prompt: string;
-            options?: Array<{ id: string; label: string }>;
-            multi?: boolean;
-          }>;
-        };
-      }>("/api/plan/trip", {
-        method: "POST",
-        body: JSON.stringify({
-          city: fields.destination,
-          startDate: fields.startDate,
-          days: fields.days,
-          partySize: fields.partySize,
-          budget: fields.budget,
-          tripType: fields.tripType?.trim() || t("play.plan.trip_type.couple_romance"),
-          pace: fields.pace === "tight" || fields.pace === "relaxed" ? fields.pace : "medium",
-          transit: fields.transit === "drive_walk" ? "drive_walk" : "transit_walk",
-          locale,
-          ...(origin.trim() ? { originName: origin.trim() } : {}),
-          startTime: startTime.trim() || "09:00",
-          ...(other.trim() ? { other: other.trim() } : {}),
-        }),
-      });
-      if (res.trip_id) {
-        setTripId(res.trip_id);
-        tripIdRef.current = res.trip_id;
-      }
-      if (typeof res.revision === "number") {
-        setTripRevision(res.revision);
-        tripRevisionRef.current = res.revision;
-      }
-      const qs = res.need_input?.questions ?? [];
-      setNeedQuestions(qs);
-      if (!qs.length) {
-        // Skip steps already seeded from takeoff (e.g. startTime → c).
-        setIntakeAnswers((prev) => {
-          setIntakeStep(firstOpenIntakeStep(prev));
-          return prev;
-        });
-      }
-      const chips = qs.find((q) => q.id === "must_see")?.options?.map((o) => o.label) ?? [];
-      if (chips.length) setSuggestedMustSee(chips);
-    } catch (err) {
-      const key =
-        err instanceof AuthApiError
-          ? resolveErrorKey(err.key)
-          : "play.errors.provider_failed";
-      setErrorKey(key);
-    } finally {
-      setDiscoverLoading(false);
-      setDiscoverSettled(true);
-    }
-  }, [locale, takeoff, t, origin, startTime, other]);
-
   const runSilentDiscover = useCallback(async () => {
     const fields = takeoff;
     const id = tripIdRef.current;
@@ -1699,39 +1628,6 @@ export default function PlanPageClient() {
             discoverLoading
           }
           verifyingHotel={verifyingHotel}
-          canRedoNeed={needIndex > 0}
-          onAgentNeedRedo={() => {
-            const next = redoNeedState(
-              needQuestions.map((q) => ({ id: q.id as AgentNeedId })),
-              needIndex,
-              needAnswers,
-            );
-            setNeedIndex(next.index);
-            setNeedAnswers(next.answers);
-          }}
-          canRedoLocal={
-            Boolean(intakeStep && INTAKE_STEP_ORDER.indexOf(intakeStep) > 0)
-          }
-          onLocalNeedSkip={() => {
-            if (!intakeStep) return;
-            void onIntakeAnswer(
-              intakeStep,
-              intakeStep === "b" ? "" : INTAKE_DEFAULT_VALUES[intakeStep],
-            );
-          }}
-          onLocalNeedRedo={() => {
-            if (!intakeStep) return;
-            const idx = INTAKE_STEP_ORDER.indexOf(intakeStep);
-            if (idx <= 0) return;
-            const prev = INTAKE_STEP_ORDER[idx - 1]!;
-            setIntakeAnswers((prevAns) => {
-              const copy = { ...prevAns };
-              delete copy[intakeStep];
-              delete copy[prev];
-              return copy;
-            });
-            setIntakeStep(prev);
-          }}
           onAgentNeedAnswer={(id, value) => {
             void (async () => {
               const needId = id as AgentNeedId;
@@ -1761,125 +1657,7 @@ export default function PlanPageClient() {
                   return base;
                 });
                 discoverJobRef.current = runT3SkeletonPlan({ answers: nextAnswers });
-                return;
               }
-              const step = AGENT_NEED_TO_INTAKE_STEP[needId];
-              let stored = value;
-              if (needId === "hotel") {
-                setOriginQuery(value.trim());
-              }
-              if (step) {
-                const skipHotelVerify = needId === "hotel" && !value.trim();
-                const shouldVerifyHotel = needId === "hotel" && Boolean(value.trim());
-                const isPick = parseOriginPickIndex(value.trim()) != null;
-                if (needId === "hotel" && shouldVerifyHotel && !isPick) {
-                  setOriginCandidates([]);
-                  setOriginLookupFailed(false);
-                  setErrorKey(null);
-                  setNeedQuestions((prev) =>
-                    prev.map((q) => (q.id === "hotel" ? { ...q, options: undefined } : q)),
-                  );
-                  setVerifyingHotel(true);
-                }
-                try {
-                  const res = await authJson<{
-                    originLat?: number;
-                    originLng?: number;
-                    origin_name?: string;
-                    origin_candidates?: Array<{ name: string }>;
-                    stay_on_step?: boolean;
-                  }>("/api/plan/session", {
-                    method: "PATCH",
-                    body: JSON.stringify({
-                      step,
-                      value: skipHotelVerify ? "" : value,
-                      locale,
-                      destination: takeoff.destination,
-                      trip_id: tripIdRef.current,
-                      revision: tripRevision,
-                    }),
-                  });
-                  if (needId === "hotel" && res.stay_on_step && res.origin_candidates?.length) {
-                    setOriginCandidates(res.origin_candidates.map((c) => ({ name: c.name })));
-                    setNeedQuestions((prev) =>
-                      prev.map((q) =>
-                        q.id === "hotel"
-                          ? {
-                              ...q,
-                              options: res.origin_candidates!.map((c, i) => ({
-                                id: `cand_${i}`,
-                                label: c.name,
-                              })),
-                            }
-                          : q,
-                      ),
-                    );
-                    return;
-                  }
-                  if (needId === "hotel") {
-                    setOriginCandidates([]);
-                    setOriginLookupFailed(false);
-                    if (typeof res.originLat === "number") setOriginLat(res.originLat);
-                    if (typeof res.originLng === "number") setOriginLng(res.originLng);
-                    const isPick = parseOriginPickIndex(value.trim()) != null;
-                    if (typeof res.origin_name === "string") {
-                      stored = res.origin_name;
-                    } else if (isPick) {
-                      stored = originNameFromPick(value, originCandidates) || value;
-                    }
-                  }
-                } catch (err) {
-                  if (needId === "hotel" && value.trim()) {
-                    if (err instanceof AuthApiError && err.key === "play.plan.intake_origin_not_found") {
-                      setOriginLookupFailed(true);
-                      setOriginCandidates([]);
-                      setNeedQuestions((prev) =>
-                        prev.map((q) => (q.id === "hotel" ? { ...q, options: undefined } : q)),
-                      );
-                      return;
-                    }
-                    if (err instanceof AuthApiError) {
-                      setErrorKey(resolveErrorKey(err.key));
-                      if (err.key === "errors.session_expired" || err.key === "errors.csrf") {
-                        window.location.assign("/login");
-                      }
-                      return;
-                    }
-                    setErrorKey("play.errors.network");
-                    return;
-                  }
-                } finally {
-                  setVerifyingHotel(false);
-                }
-              }
-              const nextAnswers: AgentNeedAnswers = { ...needAnswers, [needId]: stored };
-              setNeedAnswers(nextAnswers);
-              if (needIndex + 1 < needQuestions.length) {
-                setNeedIndex(needIndex + 1);
-                return;
-              }
-              setIntakeComplete(true);
-              const chips = nextAnswers.must_see;
-              if (chips) {
-                setSuggestedMustSee(chips.split(/[,，、]/).map((s) => s.trim()).filter(Boolean));
-              }
-              try {
-                await loadCandidatesFromTrip();
-              } catch {
-                setSuggestedMustSee((prev) => prev);
-                setDiscoverPool([]);
-              }
-              const boundaries = takeoffToBoundaries(takeoff, nextAnswers, t, locale);
-              const ctx = createPlanNarrativeContext({
-                t,
-                destination: takeoff.destination,
-                days: takeoff.days,
-                partySize: takeoff.partySize,
-                tripType: boundaries.tripType,
-              });
-              narrativeCtxRef.current = ctx;
-              navLinesRef.current = narrativeLinesForIntakeComplete(ctx);
-              setNavStatusLines(navLinesRef.current);
             })();
           }}
         />

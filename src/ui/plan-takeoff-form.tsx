@@ -143,8 +143,9 @@ export function PlanTakeoffForm({
   const budgetValue = normalizeBudgetKey(budget) || budget;
   const transitValue = normalizeTransitKey(transit) || transit;
   const tripTypePresets = TRIP_TYPE_PRESET_KEYS.map((key) => t(key));
-  const tripTypeValue =
-    formatTripTypeDisplay(tripType, t) || t("play.plan.trip_type.couple_romance");
+  // Do not force the default label into the input — empty must stay empty while editing.
+  const tripTypeValue = formatTripTypeDisplay(tripType, t) || tripType;
+  const tripTypeLabel = tripTypeValue || t("play.plan.trip_type.couple_romance");
 
   const budgetLabel = budgetOptionLabel(normalizeBudgetKey(budget) || "mid", t);
   const paceLabel = t(`play.plan.pace.${pace}`);
@@ -237,6 +238,11 @@ export function PlanTakeoffForm({
                     value={tripTypeValue}
                     options={tripTypePresets}
                     onChange={(v) => onTripTypeChange(tripTypeStorageValue(v, t))}
+                    onBlurEmpty={() =>
+                      onTripTypeChange(
+                        tripTypeStorageValue(t("play.plan.trip_type.couple_romance"), t),
+                      )
+                    }
                     toggleLabel={t("play.plan.trip_type_short")}
                     disabled={disabled}
                     required
@@ -506,7 +512,7 @@ export function PlanTakeoffForm({
                 <dt>{t("play.plan.submit_confirm_party")}</dt>
                 <dd>
                   {t("play.plan.submit_confirm_party_value", {
-                    tripType: tripTypeValue,
+                    tripType: tripTypeLabel,
                     party: partySize,
                   })}
                 </dd>

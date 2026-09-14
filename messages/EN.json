@@ -462,5 +462,7 @@
   "play.plan.deviation_field.pace": "Pace",
   "play.plan.need_prompt.expand_radius": "Nearby attractions are thin for your trip length. Expand the search radius (about 160 km)?",
   "play.plan.need_option.expand_radius.yes": "Yes, expand search",
-  "play.plan.need_option.expand_radius.no": "No, keep current range"
+  "play.plan.need_option.expand_radius.no": "No, keep current range",
+  "play.plan.deviation_reason.far_cluster_shared_day": "Day {day} combines attractions that are far apart (e.g. {places}), so that day involves more travel; the agent's layout was kept as-is",
+  "play.plan.deviation_reason.day_count_mismatch": "The framework day count differs from your request (requested {expected}, produced {actual})"
 }

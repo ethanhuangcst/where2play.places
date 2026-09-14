@@ -692,6 +692,29 @@ body.shell-app[data-style="travor"] {
   color: var(--ink);
 }
 
+/* T3+：须读助手说明 — 聊天气泡框（与用户 #ffe3d3 气泡对称） */
+[data-style="travor"] .plan-nav__thread .bubble--agent.bubble--agent-notice,
+[data-style="travor"] .bubble--agent.bubble--agent-notice {
+  background: #ffffff;
+  border: 1px solid color-mix(in srgb, var(--line) 90%, var(--ink) 4%);
+  border-left: 1px solid color-mix(in srgb, var(--line) 90%, var(--ink) 4%);
+  border-radius: 1rem 1rem 1rem 0.28rem;
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--ink) 4%, transparent);
+  color: var(--ink);
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0;
+  padding: 0.7rem 0.9rem;
+  max-width: min(100%, 22rem);
+}
+
+[data-style="travor"] .plan-nav__thread .bubble--agent.bubble--agent-notice + .bubble--agent-notice,
+[data-style="travor"] .plan-nav__thread .bubble--agent.bubble--agent-notice + .msg-group--agent,
+[data-style="travor"] .plan-nav__thread .bubble--agent.bubble--agent-notice + .plan-nav__soft-cta {
+  margin-top: 0.5rem;
+}
+
 /* 骨架预览 */
 [data-style="travor"] .skeleton-day__theme {
   font-family: var(--font-ui);
@@ -1449,7 +1472,8 @@ body.shell-app[data-style="travor"] {
   grid-template-columns: 1fr auto;
   align-items: stretch;
   padding: 0;
-  overflow: hidden;
+  /* keep rounded corner clipping on the input row only; dropdown escapes below */
+  overflow: visible;
 }
 [data-style="travor"] .plan-takeoff--11 .field > .combo > input {
   box-sizing: border-box;
