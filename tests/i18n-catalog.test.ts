@@ -52,6 +52,74 @@ describe("i18n Story 4 skeleton copy (TC-M20-41-20)", () => {
   });
 });
 
+describe("i18n MVP-T3++ deviations (TC-T3-103-02)", () => {
+  it("should_define_deviation_copy_keys_in_all_locales", () => {
+    for (const key of [
+      "play.plan.deviations_heading",
+      "play.plan.deviation_line",
+      "play.plan.deviation_field.far_cluster",
+      "play.plan.deviation_field.attraction_pool",
+      "play.plan.deviation_field.day_count",
+      "play.plan.deviation_field.pace",
+      "play.plan.deviation_reason.attraction_pool_thin",
+    ] as const) {
+      expect(EN[key]).toBeTruthy();
+      expect(CN[key]).toBeTruthy();
+      expect(HK[key]).toBeTruthy();
+      expect(TW[key]).toBeTruthy();
+    }
+    expect(CN["play.plan.deviations_heading"]).not.toContain("骨架");
+    expect(CN["play.plan.deviations_heading"]).toContain("未能完全匹配");
+    expect(CN["play.plan.deviation_field.attraction_pool"]).toBe("候选景点清单");
+    expect(CN["play.plan.deviation_reason.attraction_pool_thin"]).toContain("少于您的行程天数");
+    expect(EN["play.plan.deviation_line"]).toContain("{field}");
+    expect(EN["play.plan.deviation_line"]).toContain("{reason}");
+  });
+});
+
+describe("i18n MVP-T3++ expand-radius (TC-T3-104-03)", () => {
+  it("should_define_expand_radius_confirm_keys_in_all_locales", () => {
+    for (const key of [
+      "play.plan.need_prompt.expand_radius",
+      "play.plan.need_option.expand_radius.yes",
+      "play.plan.need_option.expand_radius.no",
+    ] as const) {
+      expect(EN[key]).toBeTruthy();
+      expect(CN[key]).toBeTruthy();
+      expect(HK[key]).toBeTruthy();
+      expect(TW[key]).toBeTruthy();
+    }
+    expect(EN["play.plan.need_prompt.expand_radius"]).not.toMatch(/LLM|GPT|Claude/i);
+    expect(CN["play.plan.need_prompt.expand_radius"]).not.toContain("骨架");
+  });
+});
+
+describe("i18n MVP-T3 progress (TC-T3-101-09)", () => {
+  it("should_define_phase_takeover_and_framework_keys_in_all_locales", () => {
+    for (const key of [
+      "play.plan.assistant_takeover",
+      "play.plan.phase_skeleton_generating",
+      "play.plan.phase_skeleton_generating_hint",
+      "play.plan.phase_skeleton_ready",
+      "play.plan.phase_skeleton_ready_hint",
+      "play.plan.assistant_framework_ready",
+      "play.plan.assistant_next_hint",
+      "play.plan.replan_soft",
+      "play.plan.composer_locked_ph",
+      "play.plan.composer_ready_ph",
+    ] as const) {
+      expect(EN[key]).toBeTruthy();
+      expect(CN[key]).toBeTruthy();
+      expect(HK[key]).toBeTruthy();
+      expect(TW[key]).toBeTruthy();
+    }
+    expect(CN["play.plan.phase_skeleton_generating"]).toContain("框架");
+    expect(CN["play.plan.phase_skeleton_generating"]).not.toContain("骨架");
+    expect(CN["play.plan.assistant_framework_ready"]).toContain("框架");
+    expect(CN["play.plan.assistant_framework_ready"]).not.toContain("骨架");
+  });
+});
+
 describe("i18n MVP-T2 takeoff 11 (TC-T2-100-07)", () => {
   it("should_define_takeoff_eleven_field_keys_in_all_locales", () => {
     for (const key of [
@@ -70,6 +138,18 @@ describe("i18n MVP-T2 takeoff 11 (TC-T2-100-07)", () => {
       "play.plan.constraint_party",
       "play.plan.constraint_hotel",
       "play.plan.constraint_day_start",
+      "play.plan.submit_confirm_title",
+      "play.plan.submit_confirm_body",
+      "play.plan.submit_confirm_ok",
+      "play.plan.submit_confirm_cancel",
+      "play.plan.submit_confirm_dest",
+      "play.plan.submit_confirm_when",
+      "play.plan.submit_confirm_party",
+      "play.plan.submit_confirm_prefs",
+      "play.plan.submit_confirm_origin",
+      "play.plan.submit_confirm_no_origin",
+      "play.plan.submit_confirm_when_value",
+      "play.plan.submit_confirm_party_value",
     ] as const) {
       expect(EN[key]).toBeTruthy();
       expect(CN[key]).toBeTruthy();
@@ -90,6 +170,8 @@ describe("i18n MVP-T2 takeoff 11 (TC-T2-100-07)", () => {
     expect(CN["play.plan.constraint_day_start"]).toBe("每日出发时间");
     expect(CN["play.plan.constraint_days"]).toBe("行程天数");
     expect(CN["play.plan.constraint_party"]).toBe("出行人数");
+    expect(CN["play.plan.submit_confirm_title"]).toBe("确认开始规划？");
+    expect(CN["play.plan.submit_confirm_ok"]).toBe("确认规划");
   });
 });
 

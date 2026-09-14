@@ -195,7 +195,6 @@ function slimPool(pool: CandidatePools): CandidatePools {
     if (c.provider) o.provider = c.provider;
     if (c.rating !== undefined) o.rating = c.rating;
     if (c.user_ratings_total !== undefined) o.user_ratings_total = c.user_ratings_total;
-    if (c.must_see !== undefined) o.must_see = c.must_see;
     if (c.user_requested !== undefined) o.user_requested = c.user_requested;
     // Keep first photo for itinerary thumbs (24-P0-ui-C-fix); no city encyclopedia.
     if (Array.isArray(c.photos) && typeof c.photos[0] === "string") {

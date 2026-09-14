@@ -17,7 +17,7 @@ export type FetchTripCandidatesResult = {
   trip_id?: string;
 };
 
-/** Read Trip candidates via fetch_trip_details (F41 S2 step g + debug dump). */
+/** Read Trip candidates + artifacts via fetch_trip_details (F41 S2 step g + debug dump). */
 export async function fetchTripCandidates(input: {
   trip_id: string;
   locale: string;
@@ -29,7 +29,7 @@ export async function fetchTripCandidates(input: {
   const maxNumber = input.max_number ?? 5;
   const fetched = await fetchTripDetails({
     trip_id: tripId,
-    fields: ["candidates"],
+    fields: ["candidates", "artifacts"],
     locale: input.locale,
   });
   if (!fetched.ok) {

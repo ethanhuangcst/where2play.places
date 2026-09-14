@@ -4,7 +4,6 @@ export type DebugStopRow = {
   name: string;
   kind: "origin" | "place" | "restaurant" | "attraction";
   provider?: string;
-  must_see?: boolean;
 };
 
 export function debugOriginRows(

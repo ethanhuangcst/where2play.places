@@ -47,7 +47,7 @@ export default function PlanDebugPage() {
   const [registryCount, setRegistryCount] = useState(0);
   const [tripCandCount, setTripCandCount] = useState(0);
   const [registryRows, setRegistryRows] = useState<
-    Array<{ name: string; kind?: string; must_see?: boolean; provider?: string }>
+    Array<{ name: string; kind?: string; provider?: string }>
   >([]);
   const [tips, setTips] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -84,7 +84,7 @@ export default function PlanDebugPage() {
           const stops = await authJson<{
             registry_count?: number;
             trip_candidates_count?: number;
-            registry?: Array<{ name: string; kind?: string; must_see?: boolean; provider?: string }>;
+            registry?: Array<{ name: string; kind?: string; provider?: string }>;
           }>(`/api/plan/debug/stops-pool?${q.toString()}`);
           if (!cancelled) {
             setRegistryCount(stops.registry_count ?? 0);
@@ -180,7 +180,6 @@ export default function PlanDebugPage() {
           <thead>
             <tr>
               <th>name</th>
-              <th>must_see</th>
               <th>kind</th>
               <th>source</th>
             </tr>
@@ -189,7 +188,6 @@ export default function PlanDebugPage() {
             {registryRows.map((row, i) => (
               <tr key={`reg-${i}-${row.name}`}>
                 <td>{row.name}</td>
-                <td>{row.must_see ? "yes" : ""}</td>
                 <td>{row.kind ?? "attraction"}</td>
                 <td data-testid="plan-debug-provider">{sourceLabel(row.provider)}</td>
               </tr>
@@ -206,7 +204,6 @@ export default function PlanDebugPage() {
             <tr>
               <th>name</th>
               <th>heat</th>
-              <th>must_see</th>
               <th>kind</th>
               <th>source</th>
             </tr>
@@ -216,7 +213,6 @@ export default function PlanDebugPage() {
               <tr key={`trip-${i}-${row.kind}-${row.name}`}>
                 <td>{row.name}</td>
                 <td>{row.heat ?? "—"}</td>
-                <td>{row.must_see ? "yes" : ""}</td>
                 <td>{row.kind}</td>
                 <td data-testid="plan-debug-provider">{sourceLabel(row.provider)}</td>
               </tr>

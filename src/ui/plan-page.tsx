@@ -15,6 +15,7 @@ import {
   takeoffIsValid,
   takeoffToBoundaries,
   DEFAULT_TAKEOFF_TRIP_TYPE,
+  formatTripTypeDisplay,
   type AgentNeedAnswers,
   type AgentNeedId,
   type IntakeAnswers,
@@ -44,6 +45,11 @@ import {
 } from "@/src/core/plan-resolve-origin";
 import { redoNeedState } from "@/src/core/plan-need-nav";
 import { skeletonStopsForFocusedDay, patchSkeletonStopName } from "@/src/core/plan-skeleton-stops";
+import {
+  hydrateFromAgentSkeleton,
+  t3ProgressStepStates,
+  type SkeletonDeviation,
+} from "@/src/core/plan-t3-hydrate";
 import { validatePlanBoundaries } from "@/src/core/plan-validate";
 import { resolveErrorKey } from "@/src/i18n/error-key";
 import { useLocale, useT } from "@/src/i18n/use-t";
@@ -60,7 +66,7 @@ import { usePageTitle } from "@/src/ui/use-page-title";
 import type { ItineraryPlaceSlot } from "@/src/core/itinerary-types";
 import type { DiscoverPoolRow } from "@/src/core/plan-discover-pool";
 
-type PagePhase = "idle" | "intake" | "planning" | "done";
+type PagePhase = "idle" | "intake" | "progress" | "planning" | "done";
 type PlanSubPhase = "discovering" | "skeleton" | "filling" | "idle";
 
 type PlanCurrentResponse = {
@@ -123,6 +129,8 @@ export default function PlanPageClient() {
     lng: number;
   } | null>(null);
   const [destVerifying, setDestVerifying] = useState(false);
+  const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
+  const pendingSubmitConfirmRef = useRef(false);
   const [originOverlay, setOriginOverlay] = useState<OriginOverlayState>(null);
   const [originResolving, setOriginResolving] = useState(false);
   const [focusOriginToken, setFocusOriginToken] = useState(0);
@@ -176,8 +184,11 @@ export default function PlanPageClient() {
   const [makeElapsedMs, setMakeElapsedMs] = useState<number | null>(null);
 
   const [skeletonDays, setSkeletonDays] = useState<SkeletonPreviewDay[]>([]);
+  const [skeletonDeviations, setSkeletonDeviations] = useState<SkeletonDeviation[]>([]);
   const [fillRouteDays, setFillRouteDays] = useState<FillRouteDay[]>([]);
   const [navStatusLines, setNavStatusLines] = useState<string[]>([]);
+  const [t3Phases, setT3Phases] = useState<Array<{ phase: string }>>([]);
+  const [frameworkReadyLine, setFrameworkReadyLine] = useState<string | null>(null);
   const [planCompleteLine, setPlanCompleteLine] = useState<string | null>(null);
 
   const [slotPreviewText, setSlotPreviewText] = useState<string | null>(null);
@@ -361,11 +372,17 @@ export default function PlanPageClient() {
       if (!card) return;
       setOrigin(card.name);
       setOriginOverlay(null);
+      if (pendingSubmitConfirmRef.current) {
+        pendingSubmitConfirmRef.current = false;
+        setSubmitConfirmOpen(true);
+      }
     },
     [originOverlay],
   );
 
   const onOriginRetry = useCallback(() => {
+    pendingSubmitConfirmRef.current = false;
+    setSubmitConfirmOpen(false);
     setOrigin("");
     setOriginOverlay(null);
     setFocusOriginToken((n) => n + 1);
@@ -374,12 +391,28 @@ export default function PlanPageClient() {
   const onOriginSkip = useCallback(() => {
     setOrigin("");
     setOriginOverlay(null);
+    if (pendingSubmitConfirmRef.current) {
+      pendingSubmitConfirmRef.current = false;
+      setSubmitConfirmOpen(true);
+    }
+  }, []);
+
+  const onSubmitConfirmCancel = useCallback(() => {
+    pendingSubmitConfirmRef.current = false;
+    setSubmitConfirmOpen(false);
   }, []);
 
 
   const showTakeoff = pagePhase === "idle";
   const showConstraints = pagePhase !== "idle";
-  const showItinerary = pagePhase === "planning" || pagePhase === "done" || Boolean(itinerary);
+  const showItinerary =
+    pagePhase === "planning" ||
+    pagePhase === "done" ||
+    pagePhase === "progress" ||
+    Boolean(itinerary);
+  const t3Mode =
+    pagePhase === "progress" ||
+    (pagePhase === "done" && t3Phases.length > 0);
 
   const agentOnMustSee =
     needQuestions[needIndex]?.id === "must_see" &&
@@ -393,10 +426,24 @@ export default function PlanPageClient() {
       itinerary?.days
         .find((d) => d.dayIndex === dayIdx)
         ?.slots.filter((s) => s.kind === "place").length ?? 0;
-    return skeletonStopsForFocusedDay(skeletonDays, focusDayIndex, liveSlots, planSubPhase, {
-      committedPlaceCount,
-    });
-  }, [skeletonDays, focusDayIndex, liveSlots, planSubPhase, itinerary]);
+    const stops = skeletonStopsForFocusedDay(
+      skeletonDays,
+      focusDayIndex,
+      liveSlots,
+      // T3 ready keeps outline visible with all stops marked filled.
+      t3Mode && pagePhase === "done" ? "skeleton" : planSubPhase,
+      { committedPlaceCount },
+    );
+    if (t3Mode && pagePhase === "done") {
+      return stops.map((s) => ({ ...s, filled: true, pending: false }));
+    }
+    return stops;
+  }, [skeletonDays, focusDayIndex, liveSlots, planSubPhase, itinerary, t3Mode, pagePhase]);
+
+  const t3ProgressSteps = useMemo(
+    () => t3ProgressStepStates(t3Phases, { failed: Boolean(errorKey) }),
+    [t3Phases, errorKey],
+  );
 
   const constraintItems = useMemo(
     () =>
@@ -404,7 +451,10 @@ export default function PlanPageClient() {
         takeoff,
         { ...intakeAnswersFromAgentNeeds(needAnswers), ...intakeAnswers },
         t,
-        intakeComplete || pagePhase === "planning" || pagePhase === "done",
+        intakeComplete ||
+          pagePhase === "planning" ||
+          pagePhase === "done" ||
+          pagePhase === "progress",
         suggestedMustSee.length ? suggestedMustSee : undefined,
       ),
     [takeoff, intakeAnswers, needAnswers, t, intakeComplete, pagePhase, suggestedMustSee],
@@ -467,9 +517,12 @@ export default function PlanPageClient() {
     setFocusDayIndex(null);
     setDayPending(false);
     setSkeletonDays([]);
+    setSkeletonDeviations([]);
     setFillRouteDays([]);
     setNavStatusLines([]);
     setPlanCompleteLine(null);
+    setT3Phases([]);
+    setFrameworkReadyLine(null);
     navLinesRef.current = [];
     narrativeCtxRef.current = null;
     setSlotPreviewText(null);
@@ -527,6 +580,7 @@ export default function PlanPageClient() {
       setLiveSlots([]);
       setFocusDayIndex(null);
       setSkeletonDays([]);
+      setSkeletonDeviations([]);
       setFillRouteDays([]);
       setPlanCompleteLine(null);
       setSlotPreviewText(null);
@@ -739,6 +793,7 @@ export default function PlanPageClient() {
   async function onTakeoffSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErrorKey(null);
+    setSubmitConfirmOpen(false);
 
     const errors: TakeoffFieldErrors = {};
     if (!destination.trim()) errors.destination = "play.plan.error.destination_required";
@@ -756,13 +811,14 @@ export default function PlanPageClient() {
 
     if (Object.keys(errors).length) {
       setFieldErrors(errors);
+      pendingSubmitConfirmRef.current = false;
       return;
     }
     setFieldErrors({});
 
     if (!destVerified) return;
 
-    // Auto-validate origin on submit when present (Fig2 UX).
+    // Auto-validate origin on submit when present (Fig2 UX). ADR-064: origin before confirm.
     const originQ = origin.trim();
     const dest = destination.trim();
     if (originQ && dest) {
@@ -781,6 +837,8 @@ export default function PlanPageClient() {
           setOrigin(res.name);
           setOriginOverlay(null);
         } else if (res.kind === "candidates" && res.cards?.length) {
+          pendingSubmitConfirmRef.current = true;
+          setSubmitConfirmOpen(false);
           setOriginOverlay({
             kind: "candidates",
             query: originQ,
@@ -791,16 +849,29 @@ export default function PlanPageClient() {
         } else if (res.kind === "skip") {
           setOriginOverlay(null);
         } else {
+          pendingSubmitConfirmRef.current = true;
+          setSubmitConfirmOpen(false);
           setOriginOverlay({ kind: "not_found", query: originQ, destination: dest });
           return;
         }
       } catch {
+        pendingSubmitConfirmRef.current = true;
+        setSubmitConfirmOpen(false);
         setOriginOverlay({ kind: "not_found", query: originQ, destination: dest });
         return;
       } finally {
         setOriginResolving(false);
       }
     }
+
+    pendingSubmitConfirmRef.current = false;
+    setOriginOverlay(null);
+    setSubmitConfirmOpen(true);
+  }
+
+  function onSubmitConfirmOk() {
+    setSubmitConfirmOpen(false);
+    pendingSubmitConfirmRef.current = false;
 
     const parsed = validatePlanBoundaries({
       destination,
@@ -814,36 +885,189 @@ export default function PlanPageClient() {
       return;
     }
 
-    if (pagePhase === "intake" || pagePhase === "planning" || pagePhase === "done") {
+    if (pagePhase === "intake" || pagePhase === "progress" || pagePhase === "planning" || pagePhase === "done") {
       setReplanDialogVariant("replan");
       setPendingReplanAction(() => () => resetToBlankTakeoff());
       setReplanDialogOpen(true);
       return;
     }
 
-    beginIntake();
+    beginT3Progress();
   }
 
-  function beginIntake() {
+  function beginT3Progress() {
     resetPlanningState();
-    setPagePhase("intake");
+    setPagePhase("progress");
     setNavOpen(true);
     setIntakeStep(null);
-    setIntakeComplete(false);
-    const seeded: IntakeAnswers = {
+    // Seed constraints panel from takeoff (AC1: hotel / departure / other).
+    // resetPlanningState cleared intakeAnswers; intakeComplete=true would otherwise
+    // show "no hotel" and default 09:00 instead of the user's takeoff values.
+    setIntakeAnswers({
+      b: origin.trim(),
       c: startTime.trim() || "09:00",
-    };
-    if (origin.trim()) seeded.b = origin.trim();
-    if (other.trim()) seeded.h = other.trim();
-    setIntakeAnswers(seeded);
+      h: other.trim(),
+    });
+    setIntakeComplete(true);
     setNeedQuestions([]);
     setNeedIndex(0);
     setNeedAnswers({});
-    setVerifyingHotel(false);
-    setDiscoverLoading(true);
-    setDiscoverSettled(false);
-    discoverJobRef.current = runPlanTripIntake();
+    // Optimistic progress: generating while BFF runs (trip_created is not a user-visible step).
+    setT3Phases([{ phase: "skeleton_generating" }]);
+    setFrameworkReadyLine(null);
+    setLoading(true);
+    setPlanSubPhase("skeleton");
+    setErrorKey(null);
+    discoverJobRef.current = runT3SkeletonPlan();
   }
+
+  const runT3SkeletonPlan = useCallback(async (opts?: { answers?: AgentNeedAnswers }) => {
+    const fields = takeoff;
+    // Browser-side ceiling slightly above BFF plan timeout so UI never sticks on「正在生成框架」。
+    const controller = new AbortController();
+    const abortTimer = window.setTimeout(() => controller.abort(), 130_000);
+    try {
+      const expandAnswer = opts?.answers?.expand_radius;
+      const res = await authJson<{
+        ok?: boolean;
+        trip_id?: string;
+        revision?: number;
+        status?: string;
+        phases?: Array<{ phase: string; trip_id?: string; revision?: number }>;
+        skeleton?: unknown;
+        need_input?: {
+          questions: Array<{
+            id: string;
+            prompt: string;
+            options?: Array<{ id: string; label: string }>;
+            multi?: boolean;
+          }>;
+        };
+        error?: { key?: string };
+      }>("/api/plan/trip", {
+        method: "POST",
+        signal: controller.signal,
+        body: JSON.stringify({
+          city: fields.destination,
+          startDate: fields.startDate,
+          days: fields.days,
+          partySize: fields.partySize,
+          budget: fields.budget,
+          tripType: fields.tripType?.trim() || t("play.plan.trip_type.couple_romance"),
+          pace: fields.pace === "tight" || fields.pace === "relaxed" ? fields.pace : "medium",
+          transit: fields.transit === "drive_walk" ? "drive_walk" : "transit_walk",
+          locale,
+          skeleton_only: true,
+          ...(origin.trim() ? { originName: origin.trim() } : {}),
+          startTime: startTime.trim() || "09:00",
+          ...(other.trim() ? { other: other.trim() } : {}),
+          ...(tripIdRef.current ? { trip_id: tripIdRef.current } : {}),
+          ...(typeof tripRevisionRef.current === "number"
+            ? { revision: tripRevisionRef.current }
+            : {}),
+          ...(expandAnswer === "yes" || expandAnswer === "no"
+            ? { answers: { expand_radius: expandAnswer } }
+            : {}),
+        }),
+      });
+
+      if (res.phases?.length) setT3Phases(res.phases);
+
+      if (res.trip_id) {
+        setTripId(res.trip_id);
+        tripIdRef.current = res.trip_id;
+      }
+      if (typeof res.revision === "number") {
+        setTripRevision(res.revision);
+        tripRevisionRef.current = res.revision;
+      }
+
+      if (res.status === "needs_input") {
+        const qs = (res.need_input?.questions ?? []).filter((q) => q.id === "expand_radius");
+        if (qs.length) {
+          setNeedQuestions(qs);
+          setNeedIndex(0);
+          setLoading(false);
+          setPlanSubPhase("skeleton");
+          return;
+        }
+      }
+
+      if (!res.ok || res.status === "failed" || !res.skeleton) {
+        setT3Phases((prev) =>
+          prev.some((p) => p.phase === "failed")
+            ? prev
+            : [...prev, { phase: "failed" }],
+        );
+        setErrorKey(resolveErrorKey(res.error?.key ?? "errors.provider_failed"));
+        setLoading(false);
+        setPlanSubPhase("idle");
+        return;
+      }
+
+      setNeedQuestions([]);
+      const criteria: PlanBoundaries = {
+        destination: fields.destination,
+        startDate: fields.startDate,
+        days: fields.days,
+        partySize: fields.partySize,
+        budget: fields.budget,
+        tripType: fields.tripType?.trim() || t("play.plan.trip_type.couple_romance"),
+        pace: fields.pace === "tight" || fields.pace === "relaxed" ? fields.pace : "medium",
+        transport: fields.transit === "drive_walk" ? "drive_walk" : "transit_walk",
+        locale,
+        tripId: res.trip_id,
+        revision: res.revision,
+      };
+      const hydrated = hydrateFromAgentSkeleton(criteria, res.skeleton, t);
+      if (!hydrated) {
+        setT3Phases((prev) =>
+          prev.some((p) => p.phase === "failed") ? prev : [...prev, { phase: "failed" }],
+        );
+        setErrorKey("play.plan.assistant_fetch_failed");
+        setLoading(false);
+        setPlanSubPhase("idle");
+        return;
+      }
+
+      setItinerary(hydrated.itinerary);
+      setSkeletonDays(hydrated.skeletonDays);
+      setSkeletonDeviations(hydrated.deviations);
+      setFocusDayIndex(hydrated.skeletonDays[0]?.dayIndex ?? 1);
+      setPlanSubPhase("skeleton");
+      setPagePhase("done");
+      setFrameworkReadyLine(
+        t("play.plan.assistant_framework_ready", {
+          destination: fields.destination,
+          days: String(fields.days),
+          partySize: String(fields.partySize),
+          tripType:
+            formatTripTypeDisplay(fields.tripType, t) ||
+            t("play.plan.trip_type.couple_romance"),
+        }),
+      );
+      setLoading(false);
+    } catch (err) {
+      const key =
+        err instanceof AuthApiError
+          ? resolveErrorKey(err.key)
+          : "play.errors.provider_failed";
+      setT3Phases((prev) =>
+        prev.some((p) => p.phase === "failed") ? prev : [...prev, { phase: "failed" }],
+      );
+      setErrorKey(key);
+      setLoading(false);
+      setPlanSubPhase("idle");
+      if (
+        err instanceof AuthApiError &&
+        (err.key === "errors.session_expired" || err.key === "errors.csrf")
+      ) {
+        window.location.assign("/login");
+      }
+    } finally {
+      window.clearTimeout(abortTimer);
+    }
+  }, [locale, takeoff, t, origin, startTime, other]);
 
   const runPlanTripIntake = useCallback(async () => {
     const fields = takeoff;
@@ -1308,6 +1532,9 @@ export default function PlanPageClient() {
             onOriginPick={onOriginPick}
             onOriginRetry={onOriginRetry}
             onOriginSkip={onOriginSkip}
+            submitConfirmOpen={submitConfirmOpen}
+            onSubmitConfirmCancel={onSubmitConfirmCancel}
+            onSubmitConfirmOk={onSubmitConfirmOk}
             onSubmit={(e) => {
               void onTakeoffSubmit(e);
             }}
@@ -1351,7 +1578,7 @@ export default function PlanPageClient() {
           {errorKey ? t(errorKey) : ""}
         </p>
 
-        {showItinerary && (itinerary || loading) ? (
+        {showItinerary && (itinerary || loading || pagePhase === "progress") ? (
           <PlanItineraryView
             itinerary={
               itinerary ?? {
@@ -1366,11 +1593,18 @@ export default function PlanPageClient() {
             daysTotal={genProgress?.total ?? (Number(days) || itinerary?.days.length || 1)}
             liveSlots={planSubPhase === "filling" ? liveSlots : []}
             showPending={loading && planSubPhase === "filling" && dayPending}
-            generating={loading && (planSubPhase === "skeleton" || planSubPhase === "filling")}
+            generating={
+              (loading && (planSubPhase === "skeleton" || planSubPhase === "filling")) ||
+              (t3Mode && pagePhase === "done" && skeletonDays.length > 0)
+            }
             skeletonStops={displaySkeletonStops}
             slotPreviewText={slotPreviewText}
             saving={saving}
-            onReplan={pagePhase === "done" || pagePhase === "planning" ? requestReplan : undefined}
+            onReplan={
+              pagePhase === "done" || pagePhase === "planning" || pagePhase === "progress"
+                ? requestReplan
+                : undefined
+            }
             onSave={pagePhase === "done" ? () => void onSaveItinerary() : undefined}
             onOpenPlaceSheet={(slot, dayIndex) => void openPlaceSheet(slot, dayIndex)}
           />
@@ -1406,16 +1640,37 @@ export default function PlanPageClient() {
           takeoff={takeoff}
           currentStep={intakeStep}
           answers={intakeAnswers}
-          intakeComplete={intakeComplete || pagePhase === "planning" || pagePhase === "done"}
+          intakeComplete={
+            intakeComplete ||
+            pagePhase === "planning" ||
+            pagePhase === "done" ||
+            pagePhase === "progress"
+          }
           fillingLocked={
             loading ||
             mustSeeLoading ||
-            travelTipsLoading
+            travelTipsLoading ||
+            pagePhase === "progress"
           }
           skeletonDays={skeletonDays}
           fillRouteDays={fillRouteDays}
           statusLines={navStatusLines}
           planCompleteLine={planCompleteLine}
+          t3Mode={t3Mode}
+          t3ProgressSteps={t3Mode ? t3ProgressSteps : undefined}
+          frameworkReadyLine={frameworkReadyLine}
+          deviations={skeletonDeviations}
+          nextHintLine={
+            frameworkReadyLine ? t("play.plan.assistant_next_hint") : null
+          }
+          onSoftReplan={frameworkReadyLine ? requestReplan : undefined}
+          composerPlaceholder={
+            t3Mode
+              ? pagePhase === "progress" || loading
+                ? t("play.plan.composer_locked_ph")
+                : t("play.plan.composer_ready_ph")
+              : undefined
+          }
           suggestedMustSee={suggestedMustSee.length ? suggestedMustSee : undefined}
           mustSeeLoading={mustSeeLoading}
           onRetryMustSee={retryMustSee}
@@ -1480,6 +1735,34 @@ export default function PlanPageClient() {
           onAgentNeedAnswer={(id, value) => {
             void (async () => {
               const needId = id as AgentNeedId;
+              if (needId === "expand_radius") {
+                const answer =
+                  value === "yes" || value === "no"
+                    ? value
+                    : /^(yes|y|true|1|expand)/i.test(value.trim())
+                      ? "yes"
+                      : "no";
+                const nextAnswers: AgentNeedAnswers = {
+                  ...needAnswers,
+                  expand_radius: answer,
+                };
+                setNeedAnswers(nextAnswers);
+                setLoading(true);
+                setPlanSubPhase("skeleton");
+                setPagePhase("progress");
+                setFrameworkReadyLine(null);
+                setT3Phases((prev) => {
+                  const base = prev.length
+                    ? prev.filter((p) => p.phase !== "skeleton_ready" && p.phase !== "failed")
+                    : [{ phase: "skeleton_generating" }];
+                  if (!base.some((p) => p.phase === "skeleton_generating")) {
+                    return [...base, { phase: "skeleton_generating" }];
+                  }
+                  return base;
+                });
+                discoverJobRef.current = runT3SkeletonPlan({ answers: nextAnswers });
+                return;
+              }
               const step = AGENT_NEED_TO_INTAKE_STEP[needId];
               let stored = value;
               if (needId === "hotel") {

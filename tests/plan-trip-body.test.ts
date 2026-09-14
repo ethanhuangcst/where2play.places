@@ -121,4 +121,63 @@ describe("planTripBffBody", () => {
     expect(body.start_time).toBe("09:30");
     expect(body.other).toBe("No early flights");
   });
+
+  it("should_include_skeleton_only_flag_for_t3 (TC-T3-101-03)", () => {
+    const parsed = planTripBffBody.parse({
+      city: "Lisbon",
+      startDate: "2026-09-20",
+      days: 4,
+      partySize: 2,
+      budget: "mid",
+      tripType: "couple",
+      pace: "medium",
+      transit: "transit_walk",
+      locale: "EN",
+      originName: "Hills Hotel",
+      startTime: "09:30",
+      skeleton_only: true,
+    });
+    const body = toAgentPlanTripBody(parsed);
+    expect(body.skeleton_only).toBe(true);
+    expect(body.providers).toBeUndefined();
+    expect(body.party_size).toBe(2);
+  });
+
+  it("should_forward_expand_radius_answers_to_agent (TC-T3-104-02)", () => {
+    const parsed = planTripBffBody.parse({
+      city: "Lisbon",
+      startDate: "2026-09-20",
+      days: 3,
+      partySize: 2,
+      budget: "mid",
+      tripType: "couple",
+      pace: "medium",
+      transit: "transit_walk",
+      locale: "EN",
+      skeleton_only: true,
+      trip_id: "trip-expand",
+      revision: 1,
+      answers: { expand_radius: "yes" },
+    });
+    const body = toAgentPlanTripBody(parsed);
+    expect(body.answers).toEqual({ expand_radius: "yes" });
+    expect(body.trip_id).toBe("trip-expand");
+    expect(body.revision).toBe(1);
+  });
+
+  it("should_set_bounds_end_to_start_plus_days_minus_one (TC-T3-BFF-01)", () => {
+    const parsed = planTripBffBody.parse({
+      city: "Lisbon",
+      startDate: "2026-09-20",
+      days: 4,
+      partySize: 2,
+      budget: "mid",
+      tripType: "couple",
+      pace: "medium",
+      transit: "transit_walk",
+      locale: "EN",
+    });
+    const body = toAgentPlanTripBody(parsed);
+    expect(body.bounds).toEqual({ start: "2026-09-20", end: "2026-09-23" });
+  });
 });

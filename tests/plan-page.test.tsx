@@ -97,6 +97,8 @@ describe("TC-M10-46-05 plan-page takeoff", () => {
     fireEvent.change(getByTestId("plan-budget"), { target: { value: "mid" } });
 
     fireEvent.click(getByTestId("plan-submit"));
+    await waitFor(() => expect(getByTestId("plan-submit-confirm-ok")).toBeTruthy());
+    fireEvent.click(getByTestId("plan-submit-confirm-ok"));
 
     await waitFor(() => {
       expect(document.body.querySelector('[data-testid="plan-nav"]')).toBeTruthy();
@@ -105,7 +107,7 @@ describe("TC-M10-46-05 plan-page takeoff", () => {
 
     expect(authNdjsonEvents).not.toHaveBeenCalled();
     expect(container.querySelector(".plan-takeoff")).toBeNull();
-    expect(document.body.querySelector('[data-testid="plan-nav-terminate"]')).toBeTruthy();
+    expect(document.body.querySelector('[data-testid="plan-nav-takeover"]')).toBeTruthy();
     expect(document.body.querySelector('[data-testid="plan-nav-default"]')).toBeNull();
   });
 });
@@ -230,14 +232,14 @@ describe("TC-M10-46-09 plan-constraints grid layout", () => {
     fireEvent.change(getByTestId("plan-party"), { target: { value: "2" } });
     fireEvent.change(getByTestId("plan-budget"), { target: { value: "mid" } });
     fireEvent.click(getByTestId("plan-submit"));
+    await waitFor(() => expect(getByTestId("plan-submit-confirm-ok")).toBeTruthy());
+    fireEvent.click(getByTestId("plan-submit-confirm-ok"));
 
     await waitFor(() => expect(getByTestId("plan-constraints")).toBeTruthy());
 
     const grids = container.querySelectorAll(".constraint-grid");
-    expect(grids).toHaveLength(2);
-    expect(grids[0]?.querySelectorAll(".constraint-item").length).toBe(8);
-    expect(grids[1]?.querySelectorAll(".constraint-item").length).toBe(3);
-    expect(grids[1]?.classList.contains("constraint-grid--intake")).toBe(true);
+    expect(grids).toHaveLength(1);
+    expect(grids[0]?.querySelectorAll(".constraint-item").length).toBe(11);
     expect(container.querySelector('[data-testid="constraint-must-see"]')).toBeNull();
   });
 });
@@ -282,6 +284,8 @@ describe("TC-M10-46-10 plan-nav fixed floating panel", () => {
     fireEvent.change(getByTestId("plan-party"), { target: { value: "2" } });
     fireEvent.change(getByTestId("plan-budget"), { target: { value: "mid" } });
     fireEvent.click(getByTestId("plan-submit"));
+    await waitFor(() => expect(getByTestId("plan-submit-confirm-ok")).toBeTruthy());
+    fireEvent.click(getByTestId("plan-submit-confirm-ok"));
 
     await waitFor(() => expect(document.body.querySelector(".plan-nav.is-open")).toBeTruthy());
 
@@ -290,7 +294,9 @@ describe("TC-M10-46-10 plan-nav fixed floating panel", () => {
     expect(nav.closest(".plan-stack")).toBeNull();
     expect(document.body.contains(nav)).toBe(true);
     expect(nav.querySelector(".plan-nav__panel")).toBeTruthy();
-    expect(nav.querySelector('[data-testid="plan-nav-terminate"]')).toBeTruthy();
+    // T3 (`2play-plan-101`): intakeComplete=true after takeoff → terminate hidden; fold/close remains.
+    expect(nav.querySelector('[data-testid="plan-nav-terminate"]')).toBeNull();
+    expect(nav.querySelector('[data-testid="plan-nav-close"]')).toBeTruthy();
   });
 });
 
@@ -429,6 +435,8 @@ describe("Feature 37 AC13 iconic single source", () => {
     fireEvent.change(getByTestId("plan-party"), { target: { value: "2" } });
     fireEvent.change(getByTestId("plan-budget"), { target: { value: "mid" } });
     fireEvent.click(getByTestId("plan-submit"));
+    await waitFor(() => expect(getByTestId("plan-submit-confirm-ok")).toBeTruthy());
+    fireEvent.click(getByTestId("plan-submit-confirm-ok"));
 
     await waitFor(() => expect(document.body.querySelector('[data-testid="plan-nav"]')).toBeTruthy());
     expect(container.querySelector('[data-testid="plan-travel-tips"]')).toBeNull();
@@ -500,6 +508,7 @@ describe("TC-M20-41 Feature 41 Story 1 CTA intake", () => {
   });
 
   it("TC-M20-41-02 should_show_takeoff_values_and_pending_assistant_constraints", async () => {
+    // Rewritten for `2play-plan-101` AC1: no fixed four-question pending; constraints from takeoff.
     const { getByTestId, container } = renderWithLocale(<PlanPageClient />);
     await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
     await submitTakeoff(getByTestId);
@@ -508,10 +517,11 @@ describe("TC-M20-41 Feature 41 Story 1 CTA intake", () => {
     expect(panel).toBeTruthy();
     expect(panel?.textContent).toContain("Lisbon");
     const pending = container.querySelectorAll(".constraint-item__pending");
-    // hotel + other pending; dayStart seeded from takeoff default 09:00
-    expect(pending.length).toBe(2);
+    expect(pending.length).toBe(0);
     expect(container.querySelector('[data-testid="constraint-must-see"]')).toBeNull();
     expect(panel?.textContent).toContain("09:00");
+    // Empty takeoff origin → "no hotel" display (i18n), not a pending assistant hotel step.
+    expect(panel?.textContent).toMatch(/None \(no daily transit routing\)|无（不安排每日交通）|無（不安排每日交通）/);
   });
 
   it("TC-M20-41-04 should_not_show_search_copy_chips_or_tips_on_cta", async () => {
@@ -527,6 +537,52 @@ describe("TC-M20-41 Feature 41 Story 1 CTA intake", () => {
   });
 });
 
+/** Minimal agent skeleton accepted by hydrateFromAgentSkeleton (T3 / `2play-plan-101`). */
+const T3_SKELETON = {
+  days: [
+    {
+      day_index: 1,
+      day_theme: "Belém",
+      stops: [
+        { name: "Hills Hotel", kind: "stay" },
+        { name: "Torre de Belém", kind: "place" },
+      ],
+    },
+  ],
+};
+
+function mockT3TripSuccess(url: string, init?: RequestInit) {
+  if (url === "/api/plan/current") return { ok: true, criteria: null, itinerary: null };
+  if (url === "/api/geocode") {
+    return {
+      ok: true,
+      country: "Portugal",
+      city: "Lisbon",
+      lat: 38.72,
+      lng: -9.14,
+      crs: "WGS84",
+    };
+  }
+  if (url === "/api/plan/resolve-origin") {
+    return { ok: true, kind: "hit", name: "Hills Hotel", lat: 38.73, lng: -9.14 };
+  }
+  if (url === "/api/plan/trip" && init?.method === "POST") {
+    return {
+      ok: true,
+      trip_id: "t1",
+      revision: 1,
+      status: "ready",
+      phases: [
+        { phase: "trip_created", trip_id: "t1" },
+        { phase: "skeleton_generating", trip_id: "t1" },
+        { phase: "skeleton_ready", trip_id: "t1", revision: 1 },
+      ],
+      skeleton: T3_SKELETON,
+    };
+  }
+  return { ok: true };
+}
+
 async function submitTakeoff(getByTestId: (id: string) => HTMLElement) {
   fireEvent.change(getByTestId("plan-dest"), { target: { value: "Lisbon" } });
   fireEvent.blur(getByTestId("plan-dest"));
@@ -535,6 +591,8 @@ async function submitTakeoff(getByTestId: (id: string) => HTMLElement) {
   fireEvent.change(getByTestId("plan-party"), { target: { value: "2" } });
   fireEvent.change(getByTestId("plan-budget"), { target: { value: "mid" } });
   fireEvent.click(getByTestId("plan-submit"));
+  await waitFor(() => expect(getByTestId("plan-submit-confirm-ok")).toBeTruthy());
+  fireEvent.click(getByTestId("plan-submit-confirm-ok"));
   await waitFor(() => expect(document.body.querySelector('[data-testid="plan-nav"]')).toBeTruthy());
 }
 
@@ -568,7 +626,9 @@ describe("TC-M20-41 Feature 41 Story 2 silent init", () => {
     delete document.body.dataset.style;
   });
 
-  it("TC-M20-41-12 should_hide_g_chips_until_discover_settles", async () => {
+  // Fixed four-question intake + g chips superseded by `2play-plan-101` / ADR-062 (T3 skeleton path).
+  // Must-see chips / hotel refill after takeoff are non-goals; expand-radius covered in plan-expand-radius.test.tsx.
+  it.skip("TC-M20-41-12 should_hide_g_chips_until_discover_settles — superseded by 2play-plan-101 (no step g after takeoff)", async () => {
     let release: () => void = () => undefined;
     const hold = new Promise<void>((resolve) => {
       release = resolve;
@@ -627,7 +687,7 @@ describe("TC-M20-41 Feature 41 Story 2 silent init", () => {
     expect(authJson.mock.calls.some((c) => c[0] === "/api/plan/candidates")).toBe(true);
   });
 
-  it("TC-M20-41-13 should_refill_constraint_and_patch_session", async () => {
+  it.skip("TC-M20-41-13 should_refill_constraint_and_patch_session — superseded by 2play-plan-101 (no hotel intake step)", async () => {
     authJson.mockImplementation(async (url: string) => {
       if (url === "/api/plan/current") return { ok: true, criteria: null, itinerary: null };
       if (url === "/api/plan/discover") {
@@ -1593,11 +1653,12 @@ describe("intake hotel step session errors", () => {
       configurable: true,
       value: { ...window.location, assign },
     });
-    authJson.mockImplementation(async (url: string) => {
+    authJson.mockImplementation(async (url: string, init?: RequestInit) => {
       if (url === "/api/plan/current") {
         return { ok: true, criteria: null, itinerary: null };
       }
-      if (url === "/api/plan/session") {
+      // T3 (`2play-plan-101`): auth failure surfaces on POST /api/plan/trip, not hotel PATCH.
+      if (url === "/api/plan/trip" && init?.method === "POST") {
         throw new MockAuthApiError("errors.session_expired");
       }
       if (url === "/api/geocode") {
@@ -1629,11 +1690,6 @@ describe("intake hotel step session errors", () => {
     await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
     await submitTakeoff(getByTestId);
 
-    fireEvent.change(getByTestId("plan-nav-input"), {
-      target: { value: "Hills Hotel Lisboa" },
-    });
-    fireEvent.click(getByTestId("plan-nav-send"));
-
     await waitFor(() => {
       const err = getByTestId("plan-error");
       expect(err.getAttribute("hidden")).toBeNull();
@@ -1652,41 +1708,15 @@ const AGENT_FOUR_NEEDS = {
   ],
 };
 
+// Fixed four-need intake after takeoff superseded by `2play-plan-101` / ADR-062.
+// Hotel / must-see chip / PATCH session flows remain in component code for expand_radius only;
+// keep bodies skipped so regressions can be revived if a post-T3 hotel need returns.
 describe("2play-plan-90a T1 session intake without auto-fill", () => {
   beforeEach(() => {
     applyTravorShell();
     vi.clearAllMocks();
     authNdjsonEvents.mockResolvedValue(undefined);
-    authJson.mockImplementation(async (url: string) => {
-      if (url === "/api/plan/current") return { ok: true, criteria: null, itinerary: null };
-      if (url === "/api/plan/trip") {
-        return {
-          ok: true,
-          trip_id: "t1",
-          revision: 1,
-          status: "needs_input",
-          need_input: AGENT_FOUR_NEEDS,
-        };
-      }
-      if (url === "/api/geocode") {
-        return {
-          ok: true,
-          country: "Portugal",
-          city: "Lisbon",
-          lat: 38.72,
-          lng: -9.14,
-          crs: "WGS84",
-        };
-      }
-      if (url === "/api/plan/resolve-origin") {
-        return { ok: true, kind: "hit", name: "Hills Hotel", lat: 38.73, lng: -9.14 };
-      }
-      if (url === "/api/plan/session") return { ok: true };
-      if (url === "/api/plan/candidates") {
-        return { ok: true, trip_id: "t1", iconic_places: ["Torre de Belém"], pool: [] };
-      }
-      return { ok: true };
-    });
+    authJson.mockImplementation(async (url: string, init?: RequestInit) => mockT3TripSuccess(url, init));
   });
 
   afterEach(() => {
@@ -1696,25 +1726,32 @@ describe("2play-plan-90a T1 session intake without auto-fill", () => {
   });
 
   it("should_not_call_plan_ndjson_after_four_need_answers", async () => {
+    // Rewritten for T3: takeoff → skeleton_only trip; no NDJSON /api/plan fill stream.
     const { getByTestId } = renderWithLocale(<PlanPageClient />);
     await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
     await submitTakeoff(getByTestId);
     await waitFor(() => expect(authJson.mock.calls.some((c) => c[0] === "/api/plan/trip")).toBe(true));
 
-    for (let i = 0; i < 4; i += 1) {
-      await sendIntakeDefault(getByTestId);
-    }
-
     await waitFor(() => {
-      const thread = document.body.querySelector('[data-testid="plan-nav-thread"]')?.textContent ?? "";
-      expect(thread).toContain("I have enough to draft your day outline.");
+      expect(document.body.querySelector('[data-testid="plan-progress"]')).toBeTruthy();
+      expect(document.body.querySelector('[data-testid="plan-thread-skeleton"]')).toBeTruthy();
+      expect(document.body.querySelector('[data-testid="plan-nav-takeover"]')).toBeTruthy();
+      expect(document.body.querySelector('[data-testid="plan-nav-greeting"]')).toBeNull();
+      expect(document.body.querySelector('[data-step="trip_created"]')).toBeNull();
+      expect(document.body.querySelector('[data-step="skeleton_generating"]')).toBeTruthy();
     });
+
+    const tripPost = authJson.mock.calls.find(
+      (c) => c[0] === "/api/plan/trip" && (c[1] as RequestInit | undefined)?.method === "POST",
+    );
+    expect(tripPost).toBeTruthy();
+    const body = JSON.parse(String((tripPost?.[1] as { body?: string })?.body ?? "{}"));
+    expect(body.skeleton_only).toBe(true);
     expect(authNdjsonEvents).not.toHaveBeenCalled();
     expect(authJson.mock.calls.some((c) => c[0] === "/api/plan")).toBe(false);
-    expect(authJson.mock.calls.some((c) => c[0] === "/api/plan/candidates")).toBe(true);
   });
 
-  it("should_patch_session_skip_when_hotel_is_empty", async () => {
+  it.skip("should_patch_session_skip_when_hotel_is_empty — superseded by 2play-plan-101 (no hotel need after takeoff)", async () => {
     const { getByTestId } = renderWithLocale(<PlanPageClient />);
     await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
     await submitTakeoff(getByTestId);
@@ -1732,249 +1769,19 @@ describe("2play-plan-90a T1 session intake without auto-fill", () => {
     });
   });
 
-  it("should_update_constraints_bar_when_agent_needs_answered", async () => {
-    authJson.mockImplementation(async (url: string) => {
-      if (url === "/api/plan/current") return { ok: true, criteria: null, itinerary: null };
-      if (url === "/api/plan/trip") {
-        return {
-          ok: true,
-          trip_id: "t1",
-          revision: 1,
-          status: "needs_input",
-          need_input: {
-            questions: [
-              { id: "hotel", prompt: "Hotel?" },
-              { id: "start_time", prompt: "Start?" },
-              {
-                id: "must_see",
-                prompt: "Must-see?",
-                multi: true,
-                options: [
-                  { id: "a", label: "断桥残雪" },
-                  { id: "b", label: "白堤" },
-                ],
-              },
-              { id: "other", prompt: "Other?" },
-            ],
-          },
-        };
-      }
-      if (url === "/api/plan/session") {
-        return { ok: true, origin_name: "Hills Hotel Lisboa" };
-      }
-      if (url === "/api/plan/candidates") {
-        return { ok: true, trip_id: "t1", iconic_places: [], pool: [] };
-      }
-      if (url === "/api/geocode") {
-        return {
-          ok: true,
-          country: "Portugal",
-          city: "Lisbon",
-          lat: 38.72,
-          lng: -9.14,
-          crs: "WGS84",
-        };
-      }
-      if (url === "/api/plan/resolve-origin") {
-        return { ok: true, kind: "hit", name: "Hills Hotel", lat: 38.73, lng: -9.14 };
-      }
-      return { ok: true };
-    });
-
-    const { getByTestId } = renderWithLocale(<PlanPageClient />);
-    await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
-    await submitTakeoff(getByTestId);
-    await waitFor(() => expect(getByTestId("plan-nav-input")).toBeTruthy());
-
-    fireEvent.change(getByTestId("plan-nav-input"), { target: { value: "Hills Hotel Lisboa" } });
-    fireEvent.click(getByTestId("plan-nav-send"));
-    await waitFor(() => expect(getByTestId("plan-constraints").textContent).toContain("Hills Hotel Lisboa"));
-
-    await sendIntakeDefault(getByTestId);
-    fireEvent.click(getByTestId("plan-need-chip-a"));
-    fireEvent.click(getByTestId("plan-nav-send"));
-    await waitFor(() => {
-      expect(getByTestId("plan-constraints").textContent).toContain("Hills Hotel Lisboa");
-      expect(document.body.textContent).toContain("断桥残雪");
-    });
-
-    await sendIntakeDefault(getByTestId);
-    await waitFor(() => {
-      expect(getByTestId("plan-constraints").textContent).toContain("Hills Hotel Lisboa");
-      expect(document.body.textContent).toContain("断桥残雪");
-      expect(document.body.querySelector('[data-testid="constraint-must-see"]')).toBeNull();
-    });
+  it.skip("should_update_constraints_bar_when_agent_needs_answered — superseded by 2play-plan-101", async () => {
+    expect(AGENT_FOUR_NEEDS.questions.length).toBe(4);
   });
 
-  it("should_stay_on_hotel_need_when_verify_returns_422", async () => {
-    authJson.mockImplementation(async (url: string) => {
-      if (url === "/api/plan/current") return { ok: true, criteria: null, itinerary: null };
-      if (url === "/api/plan/trip") {
-        return {
-          ok: true,
-          trip_id: "t1",
-          revision: 1,
-          status: "needs_input",
-          need_input: AGENT_FOUR_NEEDS,
-        };
-      }
-      if (url === "/api/plan/session") {
-        throw new MockAuthApiError("play.plan.intake_origin_not_found");
-      }
-      if (url === "/api/geocode") {
-        return {
-          ok: true,
-          country: "Portugal",
-          city: "Lisbon",
-          lat: 38.72,
-          lng: -9.14,
-          crs: "WGS84",
-        };
-      }
-      if (url === "/api/plan/resolve-origin") {
-        return { ok: true, kind: "hit", name: "Hills Hotel", lat: 38.73, lng: -9.14 };
-      }
-      return { ok: true };
-    });
-
-    const { getByTestId } = renderWithLocale(<PlanPageClient />);
-    await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
-    await submitTakeoff(getByTestId);
-    await waitFor(() => expect(getByTestId("plan-nav-input")).toBeTruthy());
-    fireEvent.change(getByTestId("plan-nav-input"), { target: { value: "No Such Hotel" } });
-    fireEvent.click(getByTestId("plan-nav-send"));
-
-    await waitFor(() => {
-      expect(getByTestId("plan-origin-not-found").textContent).toMatch(
-        /Couldn't find a place near Lisbon similar to No Such Hotel/,
-      );
-      expect(document.body.querySelector('[data-testid="plan-nav-need-prompt"]')).toBeNull();
-    });
-    expect(authNdjsonEvents).not.toHaveBeenCalled();
+  it.skip("should_stay_on_hotel_need_when_verify_returns_422 — superseded by 2play-plan-101", async () => {
+    expect(AGENT_FOUR_NEEDS.questions[0]?.id).toBe("hotel");
   });
 
-  it("should_stack_must_see_chips_and_pin_skip_redo_above_composer", async () => {
-    authJson.mockImplementation(async (url: string) => {
-      if (url === "/api/plan/current") return { ok: true, criteria: null, itinerary: null };
-      if (url === "/api/plan/trip") {
-        return {
-          ok: true,
-          trip_id: "t1",
-          revision: 1,
-          status: "needs_input",
-          need_input: {
-            questions: [
-              { id: "hotel", prompt: "Hotel?" },
-              { id: "start_time", prompt: "Start?" },
-              {
-                id: "must_see",
-                prompt: "Must-see?",
-                multi: true,
-                options: [
-                  { id: "a", label: "双峰插云" },
-                  { id: "b", label: "断桥残雪" },
-                  { id: "c", label: "手划船停靠点" },
-                ],
-              },
-              { id: "other", prompt: "Other?" },
-            ],
-          },
-        };
-      }
-      if (url === "/api/geocode") {
-        return {
-          ok: true,
-          country: "Portugal",
-          city: "Lisbon",
-          lat: 38.72,
-          lng: -9.14,
-          crs: "WGS84",
-        };
-      }
-      if (url === "/api/plan/resolve-origin") {
-        return { ok: true, kind: "hit", name: "Hills Hotel", lat: 38.73, lng: -9.14 };
-      }
-      if (url === "/api/plan/session") return { ok: true };
-      return { ok: true };
-    });
-
-    const { getByTestId } = renderWithLocale(<PlanPageClient />);
-    await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
-    await submitTakeoff(getByTestId);
-    await sendIntakeDefault(getByTestId);
-    await sendIntakeDefault(getByTestId);
-
-    await waitFor(() => expect(getByTestId("plan-need-chip-a")).toBeTruthy());
-    const quick = getByTestId("plan-nav-thread-chips");
-    expect(quick.classList.contains("plan-nav__quick--stack")).toBe(true);
-    expect(quick.querySelector('[data-testid="plan-nav-skip-need"]')).toBeNull();
-    expect(getByTestId("plan-nav-thread").contains(quick)).toBe(true);
-
-    const actions = getByTestId("plan-nav-need-actions");
-    const composer = document.body.querySelector(".plan-nav__composer");
-    const dock = getByTestId("plan-nav-dock");
-    expect(dock.contains(quick)).toBe(false);
-    expect(dock.contains(actions)).toBe(true);
-    expect(dock.contains(composer as Node)).toBe(true);
-    expect(
-      [...dock.children].indexOf(actions) < [...dock.children].indexOf(composer as Element),
-    ).toBe(true);
-    expect(getByTestId("plan-nav-skip-need")).toBeTruthy();
-    expect(getByTestId("plan-nav-redo-need")).toBeTruthy();
-    expect(document.body.querySelector('[data-testid="plan-nav-send-skip-hint"]')).toBeNull();
+  it.skip("should_stack_must_see_chips_and_pin_skip_redo_above_composer — superseded by 2play-plan-101", async () => {
+    expect(true).toBe(true);
   });
 
-  it("should_show_hotel_candidates_in_thread_not_dock", async () => {
-    authJson.mockImplementation(async (url: string) => {
-      if (url === "/api/plan/current") return { ok: true, criteria: null, itinerary: null };
-      if (url === "/api/plan/trip") {
-        return {
-          ok: true,
-          trip_id: "t1",
-          revision: 1,
-          status: "needs_input",
-          need_input: AGENT_FOUR_NEEDS,
-        };
-      }
-      if (url === "/api/plan/session") {
-        return {
-          ok: true,
-          stay_on_step: true,
-          origin_candidates: [{ name: "Hyatt Regency Lisbon" }, { name: "Hills Hotel Lisboa" }],
-        };
-      }
-      if (url === "/api/geocode") {
-        return {
-          ok: true,
-          country: "Portugal",
-          city: "Lisbon",
-          lat: 38.72,
-          lng: -9.14,
-          crs: "WGS84",
-        };
-      }
-      if (url === "/api/plan/resolve-origin") {
-        return { ok: true, kind: "hit", name: "Hills Hotel", lat: 38.73, lng: -9.14 };
-      }
-      return { ok: true };
-    });
-
-    const { getByTestId } = renderWithLocale(<PlanPageClient />);
-    await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
-    await submitTakeoff(getByTestId);
-    await waitFor(() => expect(getByTestId("plan-nav-input")).toBeTruthy());
-    fireEvent.change(getByTestId("plan-nav-input"), { target: { value: "Hyatt" } });
-    fireEvent.click(getByTestId("plan-nav-send"));
-
-    await waitFor(() => expect(getByTestId("plan-need-chip-cand_0")).toBeTruthy());
-    const chips = getByTestId("plan-nav-thread-chips");
-    expect(chips.textContent).toContain("Hyatt Regency Lisbon");
-    expect(getByTestId("plan-origin-candidates").textContent).toMatch(
-      /Near Lisbon we found places similar to Hyatt/,
-    );
-    expect(document.body.querySelector('[data-testid="plan-nav-need-prompt"]')).toBeNull();
-    expect(getByTestId("plan-nav-thread").contains(chips)).toBe(true);
-    expect(getByTestId("plan-nav-dock").contains(chips)).toBe(false);
+  it.skip("should_show_hotel_candidates_in_thread_not_dock — superseded by 2play-plan-101", async () => {
+    expect(true).toBe(true);
   });
 });
-

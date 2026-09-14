@@ -19,6 +19,14 @@ export const planTripBffBody = z.object({
   mustInclude: z.array(z.string().min(1)).optional(),
   startTime: z.string().trim().optional(),
   other: z.string().trim().optional(),
+  /** MVP-T3: agent stops after skeleton make/commit. */
+  skeleton_only: z.boolean().optional(),
+  /** Mid-plan answers (e.g. expand_radius yes/no — 2play-plan-104). */
+  answers: z
+    .object({
+      expand_radius: z.enum(["yes", "no"]).optional(),
+    })
+    .optional(),
 });
 
 export type PlanTripBffBody = z.infer<typeof planTripBffBody>;
@@ -57,6 +65,17 @@ export function mapBudgetToAgent(budget: string): string {
   return budget.trim();
 }
 
+/** Inclusive end date: startDate + (days - 1), noon UTC to avoid DST edge cases. */
+export function planTripBoundsEnd(startDate: string, days: number): string {
+  const start = startDate.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !Number.isFinite(days) || days < 1) {
+    return start;
+  }
+  const d = new Date(`${start}T12:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + (Math.round(days) - 1));
+  return d.toISOString().slice(0, 10);
+}
+
 /** Pass stable keys so agent renders L3 labels (2play-plan-99). */
 export function toAgentPlanTripBody(input: PlanTripBffBody): Record<string, unknown> {
   const transitKey = normalizeTransitKey(input.transit) || input.transit;
@@ -71,7 +90,7 @@ export function toAgentPlanTripBody(input: PlanTripBffBody): Record<string, unkn
     transit_preference: transitKey,
     bounds: {
       start: input.startDate,
-      end: input.startDate,
+      end: planTripBoundsEnd(input.startDate, input.days),
     },
   };
   if (input.trip_id) body.trip_id = input.trip_id;
@@ -80,5 +99,9 @@ export function toAgentPlanTripBody(input: PlanTripBffBody): Record<string, unkn
   if (input.mustInclude?.length) body.must_include = input.mustInclude;
   if (input.startTime?.trim()) body.start_time = input.startTime.trim();
   if (input.other?.trim()) body.other = input.other.trim();
+  if (input.skeleton_only === true) body.skeleton_only = true;
+  if (input.answers && Object.keys(input.answers).length > 0) {
+    body.answers = { ...input.answers };
+  }
   return body;
 }

@@ -90,6 +90,10 @@ type Props = {
   onOriginRetry: () => void;
   onOriginSkip: () => void;
   onSubmit: (e: React.FormEvent) => void;
+  /** ADR-064 Option A submit confirm sheet. */
+  submitConfirmOpen?: boolean;
+  onSubmitConfirmCancel?: () => void;
+  onSubmitConfirmOk?: () => void;
   disabled?: boolean;
 };
 
@@ -128,6 +132,9 @@ export function PlanTakeoffForm({
   onOriginRetry,
   onOriginSkip,
   onSubmit,
+  submitConfirmOpen = false,
+  onSubmitConfirmCancel,
+  onSubmitConfirmOk,
 }: Props) {
   const t = useT();
   const originRef = useRef<HTMLInputElement>(null);
@@ -138,6 +145,13 @@ export function PlanTakeoffForm({
   const tripTypePresets = TRIP_TYPE_PRESET_KEYS.map((key) => t(key));
   const tripTypeValue =
     formatTripTypeDisplay(tripType, t) || t("play.plan.trip_type.couple_romance");
+
+  const budgetLabel = budgetOptionLabel(normalizeBudgetKey(budget) || "mid", t);
+  const paceLabel = t(`play.plan.pace.${pace}`);
+  const transitLabel = t(`play.plan.transit.${transitValue}`);
+  const confirmOriginLine = origin.trim()
+    ? (startTime.trim() ? `${origin.trim()} · ${startTime.trim()}` : origin.trim())
+    : (startTime.trim() ? startTime.trim() : "—");
 
   useEffect(() => {
     if (!focusOriginToken) return;
@@ -454,6 +468,76 @@ export function PlanTakeoffForm({
                 onClick={onOriginSkip}
               >
                 {t("play.plan.intake_origin_skip")}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {submitConfirmOpen && !originOverlay ? (
+        <div
+          className="takeoff-origin-overlay"
+          data-testid="plan-submit-confirm-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="plan-submit-confirm-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) onSubmitConfirmCancel?.();
+          }}
+        >
+          <div className="takeoff-origin-sheet">
+            <h2 id="plan-submit-confirm-title">{t("play.plan.submit_confirm_title")}</h2>
+            <p data-testid="plan-submit-confirm-body">{t("play.plan.submit_confirm_body")}</p>
+            <dl className="takeoff-confirm-summary" data-testid="plan-submit-confirm-summary">
+              <div>
+                <dt>{t("play.plan.submit_confirm_dest")}</dt>
+                <dd>{destVerifiedLabel || destination}</dd>
+              </div>
+              <div>
+                <dt>{t("play.plan.submit_confirm_when")}</dt>
+                <dd>
+                  {t("play.plan.submit_confirm_when_value", {
+                    date: startDate,
+                    days,
+                  })}
+                </dd>
+              </div>
+              <div>
+                <dt>{t("play.plan.submit_confirm_party")}</dt>
+                <dd>
+                  {t("play.plan.submit_confirm_party_value", {
+                    tripType: tripTypeValue,
+                    party: partySize,
+                  })}
+                </dd>
+              </div>
+              <div>
+                <dt>{t("play.plan.submit_confirm_prefs")}</dt>
+                <dd>
+                  {budgetLabel} · {paceLabel} · {transitLabel}
+                </dd>
+              </div>
+              <div>
+                <dt>{t("play.plan.submit_confirm_origin")}</dt>
+                <dd>{confirmOriginLine}</dd>
+              </div>
+            </dl>
+            <div className="takeoff-origin-sheet__actions">
+              <button
+                type="button"
+                className="btn btn-quiet"
+                data-testid="plan-submit-confirm-cancel"
+                onClick={() => onSubmitConfirmCancel?.()}
+              >
+                {t("play.plan.submit_confirm_cancel")}
+              </button>
+              <button
+                type="button"
+                className="btn"
+                data-testid="plan-submit-confirm-ok"
+                onClick={() => onSubmitConfirmOk?.()}
+              >
+                {t("play.plan.submit_confirm_ok")}
               </button>
             </div>
           </div>

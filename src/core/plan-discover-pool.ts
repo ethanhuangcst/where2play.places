@@ -1,7 +1,6 @@
 export type DiscoverPoolRow = {
   name: string;
   heat: number | null;
-  must_see: boolean;
   kind: "place" | "restaurant";
   provider?: string;
 };
@@ -37,7 +36,7 @@ export function discoverPoolRowsFromSlice(slice: Record<string, unknown>): Disco
           ? item.rating
           : null;
     const provider = providerFromCard(item);
-    return { name, heat, must_see: item.must_see === true, kind, provider };
+    return { name, heat, kind, provider };
   };
   return [
     ...places.map((p) => row(p, "place")),

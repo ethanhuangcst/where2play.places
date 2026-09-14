@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: { key: "errors.validation" } }, { status: 400 });
   }
 
-  let registry: Array<{ name: string; kind?: string; must_see?: boolean; provider?: string }> = [];
+  let registry: Array<{ name: string; kind?: string; provider?: string }> = [];
   let registryCount = 0;
   if (city) {
     const listed = await listDestinationPois({ city, locale });
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  let tripPool: Array<{ name: string; kind?: string; must_see?: boolean; provider?: string }> = [];
+  let tripPool: Array<{ name: string; kind?: string; provider?: string }> = [];
   if (tripId) {
     const result = await fetchTripCandidates({
       trip_id: tripId,
@@ -40,7 +40,6 @@ export async function GET(request: NextRequest) {
       tripPool = (result.pool ?? []).map((row) => ({
         name: row.name,
         kind: row.kind,
-        must_see: row.must_see,
         provider: row.provider,
       }));
     }

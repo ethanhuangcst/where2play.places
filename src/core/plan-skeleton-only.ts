@@ -46,7 +46,6 @@ function slimPool(places: unknown[], restaurants: unknown[]) {
     if (c.provider) o.provider = c.provider;
     if (c.rating !== undefined) o.rating = c.rating;
     if (c.user_ratings_total !== undefined) o.user_ratings_total = c.user_ratings_total;
-    if (c.must_see !== undefined) o.must_see = c.must_see;
     if (c.user_requested !== undefined) o.user_requested = c.user_requested;
     return o;
   };

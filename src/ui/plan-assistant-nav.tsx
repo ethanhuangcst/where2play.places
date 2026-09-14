@@ -24,6 +24,11 @@ import {
 } from "@/src/core/plan-intake";
 import { ORIGIN_RETRY_CHIP, originPickChipValue } from "@/src/core/plan-resolve-origin";
 import { PLAN_NAV_MIN_H, PLAN_NAV_MIN_W, nextPanelSizeRem } from "@/src/core/plan-nav-resize";
+import {
+  deviationFieldLabel,
+  deviationReasonLabel,
+  type SkeletonDeviation,
+} from "@/src/core/plan-t3-hydrate";
 
 export type SkeletonPreviewDay = {
   dayIndex: number;
@@ -76,6 +81,15 @@ type Props = {
   onLocalNeedSkip?: () => void;
   onLocalNeedRedo?: () => void;
   canRedoLocal?: boolean;
+  /** MVP-T3: assistant takeover + phase progress (no fixed 4Q). */
+  t3Mode?: boolean;
+  t3ProgressSteps?: Array<{ id: string; state: "done" | "current" | "pending" }>;
+  frameworkReadyLine?: string | null;
+  /** Soft boundary deviations under skeleton (2play-plan-103). */
+  deviations?: SkeletonDeviation[];
+  nextHintLine?: string | null;
+  onSoftReplan?: () => void;
+  composerPlaceholder?: string;
 };
 
 function catalogNeedPrompt(
@@ -88,9 +102,22 @@ function catalogNeedPrompt(
     start_time: "play.plan.need_prompt.start_time",
     must_see: "play.plan.need_prompt.must_see",
     other: "play.plan.need_prompt.other",
+    expand_radius: "play.plan.need_prompt.expand_radius",
   };
   const key = keys[id];
   return key ? t(key) : fallback;
+}
+
+
+function catalogNeedOptionLabel(
+  questionId: string,
+  optionId: string,
+  fallback: string,
+  t: (key: string) => string,
+): string {
+  const key = `play.plan.need_option.${questionId}.${optionId}`;
+  const translated = t(key);
+  return translated !== key ? translated : fallback;
 }
 
 const MIN_W = PLAN_NAV_MIN_W;
@@ -131,6 +158,13 @@ export function PlanAssistantNav({
   onLocalNeedSkip,
   onLocalNeedRedo,
   canRedoLocal = false,
+  t3Mode = false,
+  t3ProgressSteps,
+  frameworkReadyLine = null,
+  deviations = [],
+  nextHintLine = null,
+  onSoftReplan,
+  composerPlaceholder,
 }: Props) {
   const t = useT();
   const navRef = useRef<HTMLElement>(null);
@@ -177,7 +211,7 @@ export function PlanAssistantNav({
 
   const agentQ = agentNeedQuestions?.[agentNeedIndex];
   const useAgentNeeds = Boolean(agentNeedQuestions?.length) || awaitingAgentNeeds;
-  const activeStep = intakeComplete || useAgentNeeds ? null : currentStep;
+  const activeStep = t3Mode || intakeComplete || useAgentNeeds ? null : currentStep;
   const qa = intakeQaProgress(activeStep, intakeComplete, {
     useAgentNeeds,
     agentNeedIndex,
@@ -401,14 +435,56 @@ export function PlanAssistantNav({
 
           <div className="plan-nav__body" ref={bodyRef} data-testid="plan-nav-body">
             <div className="plan-nav__thread" data-testid="plan-nav-thread">
+              {t3Mode ? (
+                <>
+                  <div
+                    className="bubble bubble--agent bubble--agent-notice"
+                    data-testid="plan-nav-takeover"
+                  >
+                    {t("play.plan.assistant_takeover")}
+                  </div>
+                  {t3ProgressSteps?.length ? (
+                    <ol className="plan-progress" data-testid="plan-progress" data-progress-list="">
+                      {t3ProgressSteps.map((step) => (
+                        <li
+                          key={step.id}
+                          className={`plan-progress__step is-${step.state}`}
+                          data-step={step.id}
+                        >
+                          <span className="plan-progress__bead" aria-hidden="true" />
+                          <p className="plan-progress__copy">
+                            <span className="plan-progress__label">
+                              {t(`play.plan.phase_${step.id}`)}
+                            </span>
+                            <span className="plan-progress__hint">
+                              {t(`play.plan.phase_${step.id}_hint`)}
+                            </span>
+                          </p>
+                        </li>
+                      ))}
+                    </ol>
+                  ) : null}
+                  {frameworkReadyLine ? (
+                    <div
+                      className="bubble bubble--agent"
+                      data-testid="plan-nav-framework-ready"
+                    >
+                      {frameworkReadyLine}
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+
               <div className="msg-group msg-group--agent">
                 {useAgentNeeds ? (
                   <p className="msg-group__line" data-testid="plan-nav-searching">
                     {t("play.plan.assistant_searching")}
                   </p>
                 ) : null}
-                {!awaitingAgentNeeds ? (
-                  <p className="msg-group__line">{t("play.plan.assistant_greeting")}</p>
+                {!t3Mode && !awaitingAgentNeeds ? (
+                  <p className="msg-group__line" data-testid="plan-nav-greeting">
+                    {t("play.plan.assistant_greeting")}
+                  </p>
                 ) : null}
                 {activeStep === "b" && !("b" in answers) && !originNotFound && !originCandidates?.length ? (
                   <p className="msg-group__line">
@@ -439,14 +515,20 @@ export function PlanAssistantNav({
                 ) : null}
               </div>
 
-              {INTAKE_STEP_ORDER.map((step) => {
-                if (!(step in answers)) return null;
-                return (
-                  <div key={step} className="bubble bubble--user">
-                    {displayIntakeAnswer(step, answers[step], t, suggestedMustSee)}
-                  </div>
-                );
-              })}
+              {!t3Mode
+                ? INTAKE_STEP_ORDER.map((step) => {
+                    if (!(step in answers)) return null;
+                    return (
+                      <div
+                        key={step}
+                        className="bubble bubble--user"
+                        data-testid={`plan-nav-intake-answer-${step}`}
+                      >
+                        {displayIntakeAnswer(step, answers[step], t, suggestedMustSee)}
+                      </div>
+                    );
+                  })
+                : null}
 
               {useAgentNeeds
                 ? (agentNeedQuestions ?? []).map((q, i) => {
@@ -544,10 +626,17 @@ export function PlanAssistantNav({
                                         onAgentNeedAnswer?.(q.id, originPickChipValue(idx));
                                         return;
                                       }
+                                      if (q.id === "expand_radius") {
+                                        onAgentNeedAnswer?.(
+                                          q.id,
+                                          opt.id === "yes" || opt.id === "no" ? opt.id : opt.label,
+                                        );
+                                        return;
+                                      }
                                       onAgentNeedAnswer?.(q.id, opt.label);
                                     }}
                                   >
-                                    {opt.label}
+                                    {catalogNeedOptionLabel(q.id, opt.id, opt.label, t)}
                                   </button>
                                 ))}
                               </div>
@@ -679,6 +768,54 @@ export function PlanAssistantNav({
                 </div>
               ) : null}
 
+              {deviations.length > 0 ? (
+                <div
+                  className="msg-group msg-group--agent plan-nav__deviations"
+                  data-testid="plan-thread-deviations"
+                >
+                  <p className="msg-group__line">{t("play.plan.deviations_heading")}</p>
+                  {deviations.map((d, i) => {
+                    const field = deviationFieldLabel(d.field, t);
+                    const raw = d.reason.trim() || d.actual.trim() || d.field;
+                    const reason = deviationReasonLabel(raw, t);
+                    return (
+                      <p
+                        key={`${d.field}-${i}`}
+                        className="msg-group__line"
+                        data-testid="plan-thread-deviation-item"
+                        data-field={d.field || undefined}
+                      >
+                        {field
+                          ? t("play.plan.deviation_line", { field, reason })
+                          : reason}
+                      </p>
+                    );
+                  })}
+                </div>
+              ) : null}
+
+              {nextHintLine ? (
+                <div
+                  className="bubble bubble--agent bubble--agent-notice"
+                  data-testid="plan-nav-next-hint"
+                >
+                  {nextHintLine}
+                </div>
+              ) : null}
+
+              {onSoftReplan && frameworkReadyLine ? (
+                <div className="plan-nav__soft-cta">
+                  <button
+                    type="button"
+                    className="chip"
+                    data-testid="plan-nav-soft-replan"
+                    onClick={onSoftReplan}
+                  >
+                    {t("play.plan.replan_soft")}
+                  </button>
+                </div>
+              ) : null}
+
               {fillRouteDays.length > 0 ? (
                 <div className="msg-group msg-group--agent">
                   <PlanFillRoute
@@ -773,7 +910,7 @@ export function PlanAssistantNav({
                     <input
                       id="nav-input"
                       name="q"
-                      placeholder={t("play.plan.nav_input_ph")}
+                      placeholder={composerPlaceholder ?? t("play.plan.nav_input_ph")}
                       data-testid="plan-nav-input"
                       value={draft}
                       onChange={(e) => setDraft(e.target.value)}

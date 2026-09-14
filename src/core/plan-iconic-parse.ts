@@ -23,33 +23,27 @@ export function iconicLimitForTripDays(numDays?: number): number {
   return Math.min(12, Math.max(3, days + 2));
 }
 
-/** Grounded must-see chips from fetch `candidates` (must_see flags only), heat order. */
+/**
+ * Iconic / must-see chip names from trip slice (ADR-069).
+ * Prefer `artifacts.tips.iconic_places`; fall back to travel_tips / tips.
+ * Does not read PlaceCard.must_see flags.
+ */
 export function mustSeeNamesFromCandidates(
   slice: Record<string, unknown>,
   numDays?: number,
   limit?: number,
 ): string[] {
   const cap = limit ?? iconicLimitForTripDays(numDays);
-  const rawCand = slice.candidates;
-  const placesRaw =
-    rawCand && typeof rawCand === "object"
-      ? (rawCand as { places?: unknown }).places
-      : (slice as { places?: unknown }).places;
-  const places = Array.isArray(placesRaw) ? placesRaw : [];
-  const mustSee = places.filter((item) => {
-    if (!item || typeof item !== "object") return false;
-    const c = item as { name?: unknown; must_see?: unknown };
-    return c.must_see === true && typeof c.name === "string" && c.name.trim().length > 0;
-  }) as Array<{ name: string }>;
 
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const c of mustSee) {
-    const name = c.name.trim();
-    if (!name || seen.has(name)) continue;
-    seen.add(name);
-    out.push(name);
-    if (out.length >= cap) break;
-  }
-  return out;
+  const fromArtifacts = iconicPlacesFromTravelTips(slice.artifacts);
+  if (fromArtifacts.length > 0) return fromArtifacts.slice(0, cap);
+
+  const fromTravelTips = iconicPlacesFromTravelTips(slice.travel_tips);
+  if (fromTravelTips.length > 0) return fromTravelTips.slice(0, cap);
+
+  const fromTips = iconicPlacesFromTravelTips(slice.tips);
+  if (fromTips.length > 0) return fromTips.slice(0, cap);
+
+  // Slice may already be the tips / artifacts.tips object.
+  return iconicPlacesFromTravelTips(slice).slice(0, cap);
 }

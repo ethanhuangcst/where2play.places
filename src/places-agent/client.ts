@@ -338,7 +338,7 @@ export async function planTrip(
 
 export type ListDestinationPoisData = {
   count: number;
-  places: Array<{ name: string; kind?: string; must_see?: boolean; provider?: string }>;
+  places: Array<{ name: string; kind?: string; provider?: string }>;
 };
 
 export async function listDestinationPois(
