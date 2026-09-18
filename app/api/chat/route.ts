@@ -5,13 +5,9 @@ import { requireUser, authError } from "@/src/auth/user";
 import { normalizeLocale } from "@/src/core/locales";
 import type { ItineraryDto } from "@/src/core/itinerary-types";
 import { truncateChatMessages } from "@/src/core/chat-truncate";
-import {
-  buildAssistantSystemPrompt,
-  buildAssistantUserPayload,
-  parseAssistantModelText,
-  streamAssistantChat,
-} from "@/src/core/chat-assistant";
-import { applyAssistantItineraryResult } from "@/src/core/itinerary-patch";
+import { mergeRefineSkeletonIntoItinerary } from "@/src/core/plan-chat-refine";
+import { planTrip } from "@/src/places-agent/client";
+import { t as catalogT } from "@/src/i18n/catalog";
 
 export const maxDuration = 120;
 
@@ -23,7 +19,8 @@ const messageSchema = z.object({
 const bodySchema = z.object({
   messages: z.array(messageSchema).min(1),
   itinerary: z.custom<ItineraryDto>((v) => Boolean(v && typeof v === "object")),
-  itineraryId: z.string().optional(),
+  trip_id: z.string().min(1),
+  revision: z.number().int().positive().optional(),
   locale: z.string().optional(),
 });
 
@@ -34,14 +31,7 @@ function contextMaxChars(): number {
   return Number.isFinite(raw) && raw > 0 ? raw : 12_000;
 }
 
-function encodeNdjson(event: unknown): Uint8Array {
-  return new TextEncoder().encode(`${JSON.stringify(event)}\n`);
-}
-
-async function upsertPlanCache(
-  userId: string,
-  itinerary: ItineraryDto,
-): Promise<void> {
+async function upsertPlanCache(userId: string, itinerary: ItineraryDto): Promise<void> {
   const existing = await prisma.planSessionCache.findUnique({ where: { userId } });
   if (!existing) return;
   await prisma.planSessionCache.update({
@@ -64,74 +54,50 @@ export async function POST(request: NextRequest) {
 
   const locale = normalizeLocale(parsed.data.locale ?? gate.user.locale);
   const truncated = truncateChatMessages(parsed.data.messages, contextMaxChars());
-  const system = buildAssistantSystemPrompt({
-    locale,
-    itinerary: parsed.data.itinerary,
-  });
-  const user = buildAssistantUserPayload({
-    messages: truncated,
-    itinerary: parsed.data.itinerary,
-  });
-
-  const wantStream = request.headers.get("accept")?.includes("application/x-ndjson");
+  const lastUser = [...truncated].reverse().find((m) => m.role === "user");
+  if (!lastUser?.content.trim()) {
+    return authError("errors.validation", 400);
+  }
 
   try {
-    if (!wantStream) {
-      const raw = await streamAssistantChat({ system, user });
-      const parsedOut = parseAssistantModelText(raw);
-      const next = applyAssistantItineraryResult(parsed.data.itinerary, parsedOut);
-      await upsertPlanCache(gate.user.id, next);
-      return NextResponse.json({
-        ok: true,
-        reply: parsedOut.reply,
-        ...(parsedOut.itineraryPatch ? { itineraryPatch: parsedOut.itineraryPatch } : {}),
-        itinerary: next,
-      });
+    const envelope = await planTrip({
+      city: parsed.data.itinerary.destination,
+      trip_id: parsed.data.trip_id,
+      revision: parsed.data.revision,
+      locale,
+      refine: { instruction: lastUser.content.trim() },
+    });
+
+    if (!envelope.ok || !envelope.data) {
+      const key = envelope.outcome?.key ?? "errors.provider_failed";
+      return authError(key, key === "errors.trip_revision_conflict" ? 409 : 502);
     }
 
-    const body = new ReadableStream<Uint8Array>({
-      async start(controller) {
-        try {
-          const raw = await streamAssistantChat({ system, user });
-          const parsedOut = parseAssistantModelText(raw);
-          const next = applyAssistantItineraryResult(parsed.data.itinerary, parsedOut);
-          await upsertPlanCache(gate.user.id, next);
-          for (const ch of parsedOut.reply) {
-            controller.enqueue(encodeNdjson({ type: "token", text: ch }));
-          }
-          controller.enqueue(
-            encodeNdjson({
-              type: "done",
-              reply: parsedOut.reply,
-              ...(parsedOut.itineraryPatch
-                ? { itineraryPatch: parsedOut.itineraryPatch }
-                : {}),
-              itinerary: next,
-            }),
-          );
-        } catch (err) {
-          const key =
-            err && typeof err === "object" && "outcomeKey" in err
-              ? String((err as { outcomeKey: string }).outcomeKey)
-              : "errors.chat_failed";
-          controller.enqueue(encodeNdjson({ type: "error", key }));
-        } finally {
-          controller.close();
-        }
-      },
-    });
+    const data = envelope.data;
+    const reply =
+      typeof (data as { reply?: string }).reply === "string" && (data as { reply?: string }).reply
+        ? (data as { reply: string }).reply
+        : catalogT(locale, "play.chat.refine_default_reply");
 
-    return new Response(body, {
-      headers: {
-        "Content-Type": "application/x-ndjson; charset=utf-8",
-        "Cache-Control": "no-store",
-      },
+    let next = parsed.data.itinerary;
+    if (data.itinerary?.skeleton) {
+      next = mergeRefineSkeletonIntoItinerary(
+        parsed.data.itinerary,
+        data.itinerary.skeleton,
+        (key, vars) => catalogT(locale, key, vars),
+      );
+    }
+
+    await upsertPlanCache(gate.user.id, next);
+
+    return NextResponse.json({
+      ok: true,
+      reply,
+      itinerary: next,
+      trip_id: data.trip_id,
+      revision: data.revision,
     });
-  } catch (err) {
-    const key =
-      err && typeof err === "object" && "outcomeKey" in err
-        ? String((err as { outcomeKey: string }).outcomeKey)
-        : "errors.chat_failed";
-    return authError(key, key === "errors.openai_not_configured" ? 503 : 502);
+  } catch {
+    return authError("errors.chat_failed", 502);
   }
 }

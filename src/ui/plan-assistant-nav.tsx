@@ -88,6 +88,11 @@ type Props = {
   nextHintLine?: string | null;
   onSoftReplan?: () => void;
   composerPlaceholder?: string;
+  /** MVP-T9: post-complete chat refine (forwards to agent via /api/chat). */
+  refineMessages?: Array<{ role: "user" | "assistant"; content: string }>;
+  onRefineSubmit?: (text: string) => void | Promise<void>;
+  refineSending?: boolean;
+  refineErrorKey?: string | null;
 };
 
 function catalogNeedPrompt(
@@ -157,6 +162,10 @@ export function PlanAssistantNav({
   deviations = [],
   nextHintLine = null,
   onSoftReplan,
+  refineMessages = [],
+  onRefineSubmit,
+  refineSending = false,
+  refineErrorKey = null,
   composerPlaceholder,
 }: Props) {
   const t = useT();
@@ -301,6 +310,13 @@ export function PlanAssistantNav({
   function submitAnswer(e: React.FormEvent) {
     e.preventDefault();
     if (fillingLocked) return;
+    if (planCompleteLine && onRefineSubmit) {
+      const text = draft.trim();
+      if (!text || refineSending) return;
+      setDraft("");
+      void onRefineSubmit(text);
+      return;
+    }
     if (useAgentNeeds && agentQ) {
       const qid = agentQ.id;
       const value =
@@ -903,6 +919,23 @@ export function PlanAssistantNav({
                   </button>
                 </div>
               ) : null}
+
+              {refineMessages.map((msg, i) => (
+                <div
+                  key={`refine-${i}-${msg.role}`}
+                  className={`bubble ${msg.role === "user" ? "bubble--user" : "bubble--agent"}`}
+                  data-testid={msg.role === "user" ? "plan-nav-refine-user" : "plan-nav-refine-agent"}
+                >
+                  {msg.content}
+                </div>
+              ))}
+
+              {refineErrorKey ? (
+                <div className="bubble bubble--agent bubble--agent-notice" data-testid="plan-nav-refine-error">
+                  {t(refineErrorKey)}
+                </div>
+              ) : null}
+
               <div ref={threadEndRef} data-testid="plan-nav-thread-end" aria-hidden="true" />
             </div>
           </div>
@@ -935,6 +968,7 @@ export function PlanAssistantNav({
                       disabled={
                         fillingLocked ||
                         sending ||
+                        refineSending ||
                         verifyingHotel ||
                         (awaitingAgentNeeds && !agentQ) ||
                         (activeStep === "g" && Boolean(mustSeeLoading))

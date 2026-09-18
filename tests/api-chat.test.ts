@@ -1,26 +1,34 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { POST as chatRoute } from "../app/api/chat/route";
-import { setChatLlmCompleteForTests } from "../src/core/chat-assistant";
+import { setPlacesAgentFetchForTests } from "../src/places-agent/client";
 import type { ItineraryDto } from "../src/core/itinerary-types";
 import { invokeRoute, readJson } from "./helpers/http-bff";
 import { authedRequest, loginTestUser, registerTestUser } from "./helpers/test-user";
 
 const itinerary: ItineraryDto = {
-  title: "Taipei",
-  destination: "Taipei",
+  title: "杭州",
+  destination: "杭州",
   daysCount: 1,
   updatedAt: "2026-08-22T00:00:00.000Z",
   days: [
     {
       dayIndex: 1,
-      highlights: { label: "D1", title: "City", tags: [] },
+      highlights: { label: "D1", title: "西湖", tags: [] },
       slots: [
         {
           kind: "place",
           start: "10:00",
           end: "12:00",
           placeKind: "Attraction",
-          name: "Museum",
+          name: "苏堤",
+          summary: "walk",
+        },
+        {
+          kind: "place",
+          start: "13:00",
+          end: "14:00",
+          placeKind: "Attraction",
+          name: "雷峰塔",
           summary: "visit",
         },
       ],
@@ -28,58 +36,63 @@ const itinerary: ItineraryDto = {
   ],
 };
 
-describe("POST /api/chat (C-13)", () => {
+describe("POST /api/chat (MVP-T9 agent refine)", () => {
   beforeEach(async () => {
-    setChatLlmCompleteForTests(null);
-    await registerTestUser({ email: `chat.${Date.now()}@where2play.place` }).catch(() => undefined);
-    const email = `chat.${Date.now()}@where2play.place`;
+    const email = `chat-api.${Date.now()}@where2play.place`;
     await registerTestUser({ email });
     await loginTestUser(email);
+    setPlacesAgentFetchForTests(async (input, init) => {
+      const url = String(input);
+      if (url.includes("/v1/plan_trip")) {
+        const body = init?.body ? JSON.parse(String(init.body)) : {};
+        expect(body.refine?.instruction).toBeTruthy();
+        expect(body.trip_id).toBe("trip-refine-1");
+        return new Response(
+          JSON.stringify({
+            agent: "places-agent",
+            ok: true,
+            data: {
+              trip_id: "trip-refine-1",
+              revision: 9,
+              status: "ready",
+              reply: "已删除雷峰塔。",
+              itinerary: {
+                skeleton: {
+                  days: [
+                    {
+                      day_index: 1,
+                      day_theme: "西湖",
+                      stops: [
+                        { name: "苏堤", kind: "attraction" },
+                      ],
+                    },
+                  ],
+                },
+                filledStops: [],
+              },
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return new Response(JSON.stringify({ agent: "places-agent", ok: false }), { status: 502 });
+    });
   });
 
   afterEach(() => {
-    setChatLlmCompleteForTests(null);
+    setPlacesAgentFetchForTests(null);
   });
 
-  it("should_return_reply_and_patched_itinerary_without_calling_agent_chat", async () => {
-    let sawAgentChat = false;
-    const prevFetch = globalThis.fetch;
-    globalThis.fetch = async (input, init) => {
-      const url = String(input);
-      if (url.includes("/v1/chat")) sawAgentChat = true;
-      return prevFetch(input, init);
-    };
-
-    setChatLlmCompleteForTests(async () =>
-      JSON.stringify({
-        reply: "Moved lunch earlier.",
-        itineraryPatch: {
-          days: [
-            {
-              dayIndex: 1,
-              slots: [
-                {
-                  kind: "place",
-                  start: "10:00",
-                  end: "11:00",
-                  placeKind: "Attraction",
-                  name: "Museum",
-                  summary: "shorter",
-                },
-              ],
-            },
-          ],
-        },
-      }),
-    );
-
+  it("should_forward_refine_to_agent_and_return_merged_itinerary", async () => {
     const res = await invokeRoute(
       chatRoute,
       authedRequest("/api/chat", {
         method: "POST",
         body: {
-          messages: [{ role: "user", content: "午餐早一点" }],
+          messages: [{ role: "user", content: "删掉雷峰塔" }],
           itinerary,
+          trip_id: "trip-refine-1",
+          revision: 8,
         },
       }),
     );
@@ -88,58 +101,16 @@ describe("POST /api/chat (C-13)", () => {
       ok: boolean;
       reply: string;
       itinerary: ItineraryDto;
+      revision: number;
     }>(res);
     expect(body.ok).toBe(true);
-    expect(body.reply).toMatch(/Moved lunch|earlier/i);
-    expect(body.itinerary.days[0]?.slots[0]?.kind === "place" && body.itinerary.days[0].slots[0].end).toBe(
-      "11:00",
+    expect(body.reply).toBe("已删除雷峰塔。");
+    expect(body.revision).toBe(9);
+    expect(body.itinerary.days[0]?.slots.some((s) => s.kind === "place" && s.name === "雷峰塔")).toBe(
+      false,
     );
-    expect(sawAgentChat).toBe(false);
-    globalThis.fetch = prevFetch;
-  });
-
-  it("should_stream_ndjson_tokens_then_done", async () => {
-    setChatLlmCompleteForTests(async () =>
-      JSON.stringify({ reply: "OK", itineraryPatch: {} }),
+    expect(body.itinerary.days[0]?.slots.some((s) => s.kind === "place" && s.name === "苏堤")).toBe(
+      true,
     );
-    const res = await invokeRoute(
-      chatRoute,
-      authedRequest("/api/chat", {
-        method: "POST",
-        headers: { Accept: "application/x-ndjson" },
-        body: {
-          messages: [{ role: "user", content: "hi" }],
-          itinerary,
-        },
-      }),
-    );
-    expect(res.status).toBe(200);
-    const text = await res.text();
-    const lines = text
-      .trim()
-      .split("\n")
-      .map((l) => JSON.parse(l) as { type: string; reply?: string });
-    expect(lines.some((e) => e.type === "token")).toBe(true);
-    expect(lines.some((e) => e.type === "done" && e.reply === "OK")).toBe(true);
-  });
-
-  it("should_return_openai_not_configured_when_no_key_and_no_mock", async () => {
-    setChatLlmCompleteForTests(null);
-    const prev = process.env.OPENAI_API_KEY;
-    delete process.env.OPENAI_API_KEY;
-    const res = await invokeRoute(
-      chatRoute,
-      authedRequest("/api/chat", {
-        method: "POST",
-        body: {
-          messages: [{ role: "user", content: "hi" }],
-          itinerary,
-        },
-      }),
-    );
-    expect(res.status).toBe(503);
-    const body = await readJson<{ error: { key: string } }>(res);
-    expect(body.error.key).toBe("errors.openai_not_configured");
-    if (prev !== undefined) process.env.OPENAI_API_KEY = prev;
   });
 });

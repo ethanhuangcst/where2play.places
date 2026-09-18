@@ -5,10 +5,8 @@ import { prisma } from "@/src/db/client";
 import { normalizeLocale } from "@/src/core/locales";
 import { validatePlanBoundaries } from "@/src/core/plan-validate";
 import { sanitizeDailyStartName } from "@/src/core/plan-resolve-origin";
-import { planItineraryDayByDay, type PlanProgressEvent } from "@/src/core/plan-day-by-day";
 import {
   planItinerarySkeletonFill,
-  planPipelineMode,
   type SkeletonPlanProgressEvent,
 } from "@/src/core/plan-skeleton-fill";
 import { planItinerarySkeletonOnly } from "@/src/core/plan-skeleton-only";
@@ -32,19 +30,16 @@ async function upsertPlanCache(
   await upsertPlanSessionCache(userId, criteria, itinerary);
 }
 
-function encodeNdjson(event: PlanProgressEvent | SkeletonPlanProgressEvent): Uint8Array {
+function encodeNdjson(event: SkeletonPlanProgressEvent): Uint8Array {
   return new TextEncoder().encode(`${JSON.stringify(event)}\n`);
 }
 
 function planStream(
   criteria: PlanBoundaries,
   locale: string,
-): AsyncGenerator<PlanProgressEvent | SkeletonPlanProgressEvent> {
+): AsyncGenerator<SkeletonPlanProgressEvent> {
   if (criteria.planMode === "skeleton") {
     return planItinerarySkeletonOnly(criteria, { locale });
-  }
-  if (planPipelineMode() === "legacy") {
-    return planItineraryDayByDay(criteria, { locale });
   }
   return planItinerarySkeletonFill(criteria, { locale });
 }

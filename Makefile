@@ -60,7 +60,7 @@ test-e2e-mvp-t3: up db-migrate ## T3 Hangzhou 3d takeoff → skeleton (servers r
 test-e2e-mvp3-live: up db-migrate ## MVP-3 live Mode H + transit + must-see probe
 	PLAN_SLOT_STAGE_MS=0 python3 e2e/run.py mvp3-live
 
-test-e2e-chat02: up db-migrate ## MVP-4 chat-02 (deferred MVP-T9; exits 0 with SKIP)
+test-e2e-chat02: up db-migrate ## MVP-T9 chat-02 local draft (plan-nav composer)
 	python3 e2e/run.py chat02
 
 test-e2e-mvp10-live: up db-migrate ## plan-46 Lisbon skeleton fill live probe
