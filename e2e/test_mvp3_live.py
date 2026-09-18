@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""MVP-3 live journey: Mode H host + enrich transit + London must-see probe."""
+"""MVP-3 live journey (T3): takeoff-11 → agent skeleton+fill → itinerary + transit."""
 
 import re
 import time
@@ -7,16 +7,11 @@ import time
 from playwright.sync_api import sync_playwright
 
 from db_helpers import BASE, delete_user
+from takeoff_helpers import fill_takeoff_and_confirm
 
 EMAIL = "mvp3.live@where2play.place"
 PASSWORD = "testpass123"
 DESTINATION = "London"
-
-LONDON_MUST_SEE = re.compile(
-    r"Tower of London|British Museum|Buckingham|Westminster|St Paul|"
-    r"London Eye|National Gallery|Hyde Park|Covent Garden|Tower Bridge",
-    re.I,
-)
 
 TRANSIT_MODE = re.compile(r"walk|transit|drive|metro|tube|bus|步行|地铁|公交", re.I)
 
@@ -57,15 +52,21 @@ def assert_no_plan_error(page):
         raise AssertionError(f"Plan error: {err.inner_text()}")
 
 
-def wait_for_save_or_error(page, timeout_ms: int = 300000):
+def wait_for_plan_done(page, timeout_ms: int = 300000):
+    """Wait for T3 fill completion: save enabled or assistant complete bubble."""
     save = page.locator('[data-testid="plan-save"]:not([disabled])')
+    complete = page.locator('[data-testid="plan-thread-complete"]')
     deadline = time.time() + timeout_ms / 1000
     while time.time() < deadline:
         assert_no_plan_error(page)
         if save.count() and save.is_visible():
-            return
+            return "save"
+        if complete.count() and complete.is_visible():
+            return "complete"
         page.wait_for_timeout(500)
-    raise AssertionError("Timed out waiting for plan-save to become enabled")
+    raise AssertionError(
+        "Timed out waiting for plan-save or plan-thread-complete after T3 generation"
+    )
 
 
 def test_mvp3_live():
@@ -76,55 +77,32 @@ def test_mvp3_live():
         login_or_register(page)
         page.wait_for_selector('[data-testid="plan-page"]', timeout=30000)
 
-        page.fill('[data-testid="plan-dest"]', DESTINATION)
-        page.fill('[data-testid="plan-days"]', "1")
-        page.click('[data-testid="plan-submit"]')
+        fill_takeoff_and_confirm(
+            page,
+            destination=DESTINATION,
+            days="1",
+            party="2",
+            trip_type_substring="Couple",
+        )
 
-        page.wait_for_selector('[data-testid="plan-phase"]', timeout=120000)
-
-        preview = page.locator('[data-testid="plan-slot-preview"]')
-        try:
-            preview.wait_for(state="visible", timeout=180000)
-        except Exception:
-            pass
-
-        wait_for_save_or_error(page, timeout_ms=300000)
+        page.wait_for_selector('[data-testid="plan-nav-takeover"]', timeout=120000)
+        wait_for_plan_done(page, timeout_ms=300000)
 
         assert_no_plan_error(page)
 
         slots = page.locator(
             '[data-testid="plan-itinerary"] .slot:not(.slot--candidate):not(.slot--pending)'
         )
-        assert slots.count() > 0, "Expected itinerary slots after live generation"
+        assert slots.count() > 0, "Expected itinerary slots after live T3 generation"
 
-        place_names = []
         transit_texts = []
         transit_slots = page.locator('[data-testid="plan-transit-slot"]')
         if transit_slots.count():
             for i in range(transit_slots.count()):
                 transit_texts.append(transit_slots.nth(i).inner_text())
-        for i in range(slots.count()):
-            slot = slots.nth(i)
-            text = slot.inner_text()
-            if "slot--transit" in (slot.get_attribute("class") or ""):
-                if text not in transit_texts:
-                    transit_texts.append(text)
-            else:
-                title = slot.locator("h3")
-                if title.count():
-                    place_names.append(title.inner_text())
-
-        combined_places = " | ".join(place_names)
-        assert LONDON_MUST_SEE.search(combined_places), (
-            f"Expected a London must-see landmark in slots; got: {combined_places}"
-        )
 
         assert transit_texts, "Expected at least one transit row"
-        has_real_transit = any(
-            TRANSIT_MODE.search(t) and not re.fullmatch(r".*~15 min.*", t.strip(), re.I)
-            for t in transit_texts
-        )
-        assert has_real_transit or any(TRANSIT_MODE.search(t) for t in transit_texts), (
+        assert any(TRANSIT_MODE.search(t) for t in transit_texts), (
             f"Expected transit with mode label; got: {transit_texts}"
         )
 

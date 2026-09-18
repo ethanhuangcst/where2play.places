@@ -166,11 +166,77 @@ describe("T3 takeover heading bubble (issue 2)", () => {
   it("should_render_takeover_and_headings_as_notice_bubbles", () => {
     applyTravorShell();
     const { getByTestId } = renderWithLocale(<PlanAssistantNav {...baseProps} />);
-    for (const id of ["plan-nav-takeover", "plan-thread-skeleton-intro", "plan-nav-next-hint"]) {
+    for (const id of ["plan-nav-takeover", "plan-thread-skeleton-intro"]) {
       const el = document.body.querySelector(`[data-testid="${id}"]`);
       if (!el) continue;
       expect(el.className).toContain("bubble--agent-notice");
     }
     expect(getByTestId("plan-nav-takeover").className).toContain("bubble--agent-notice");
+  });
+
+  it("should_not_render_next_hint_until_plan_complete_line", () => {
+    applyTravorShell();
+    const { queryByTestId } = renderWithLocale(<PlanAssistantNav {...baseProps} />);
+    expect(queryByTestId("plan-nav-next-hint")).toBeNull();
+    expect(queryByTestId("plan-nav-soft-replan")).toBeNull();
+  });
+
+  it("should_render_next_hint_and_soft_replan_after_complete_bubble", () => {
+    applyTravorShell();
+    const completeLine = "里斯本 · 4 天 · 2 人 · 情侣浪漫。行程已规划完毕。";
+    renderWithLocale(
+      <PlanAssistantNav
+        {...baseProps}
+        planCompleteLine={completeLine}
+        nextHintLine={CN["play.plan.assistant_next_hint"]}
+        onSoftReplan={() => undefined}
+      />,
+    );
+    const complete = document.body.querySelector('[data-testid="plan-thread-complete"]');
+    const hint = document.body.querySelector('[data-testid="plan-nav-next-hint"]');
+    const replan = document.body.querySelector('[data-testid="plan-nav-soft-replan"]');
+    expect(complete).toBeTruthy();
+    expect(hint).toBeTruthy();
+    expect(replan).toBeTruthy();
+    expect(hint!.className).toContain("bubble--agent-notice");
+    expect(
+      complete!.compareDocumentPosition(hint!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      hint!.compareDocumentPosition(replan!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("should_render_plan_complete_line_as_notice_bubble_after_fill_spine", () => {
+    applyTravorShell();
+    renderWithLocale(
+      <PlanAssistantNav
+        {...baseProps}
+        t3Mode
+        intakeComplete
+        fillRouteDays={[
+          {
+            dayIndex: 1,
+            theme: "Belém",
+            legs: [
+              {
+                kind: "stop",
+                idx: "01",
+                kindLabel: "景点",
+                name: "Torre de Belém",
+                arrive: "10:00",
+                dwellMin: 60,
+              },
+            ],
+          },
+        ]}
+        planCompleteLine="里斯本 · 4 天 · 2 人 · 情侣浪漫。行程已规划完毕。"
+      />,
+    );
+    const complete = document.body.querySelector('[data-testid="plan-thread-complete"]');
+    expect(complete).toBeTruthy();
+    expect(complete!.className).toContain("bubble--agent-notice");
+    expect(complete!.className).toContain("plan-nav__complete-bubble");
+    expect(complete!.textContent).toContain("行程已规划完毕");
   });
 });

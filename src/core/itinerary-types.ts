@@ -20,8 +20,13 @@ export type PlanBoundaries = {
   /** Early discover Trip (2play §4.10). */
   tripId?: string;
   revision?: number;
-  /** Feature 41 Story 4: stop after make + fetch skeleton. */
-  planMode?: "skeleton" | "full";
+  /**
+   * Feature 41 Story 4 / MVP-T5:
+   * - skeleton: stop after make + fetch skeleton
+   * - full: discover → make → fill (NDJSON)
+   * - fill: resume fill from existing trip skeleton (skip remake)
+   */
+  planMode?: "skeleton" | "full" | "fill";
   /** Story 5: origin resolved in destination (not hotel-only geocode). */
   originLat?: number;
   originLng?: number;

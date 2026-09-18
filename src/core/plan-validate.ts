@@ -142,7 +142,9 @@ export function validatePlanBoundaries(input: unknown): {
         : {}),
       ...(body.mode === "skeleton" || body.planMode === "skeleton"
         ? { planMode: "skeleton" as const }
-        : {}),
+        : body.mode === "fill" || body.planMode === "fill"
+          ? { planMode: "fill" as const }
+          : {}),
     },
   };
 }

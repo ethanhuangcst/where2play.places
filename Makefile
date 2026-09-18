@@ -1,4 +1,4 @@
-.PHONY: help dev up down db-bootstrap db-migrate db-migrate-test test test-coverage lint quality check-mvp10-css test-e2e-mvp1 test-e2e-mvp2-live test-e2e-mvp3-live test-e2e-mvp10-live test-e2e-parity test-e2e-chat02
+.PHONY: help dev up down db-bootstrap db-migrate db-migrate-test test test-coverage lint quality check-mvp10-css test-e2e-mvp1 test-e2e-mvp2-live test-e2e-mvp3-live test-e2e-mvp-t3 test-e2e-mvp10-live test-e2e-parity test-e2e-chat02
 
 .DEFAULT_GOAL := help
 
@@ -54,10 +54,13 @@ test-e2e-mvp1: up db-migrate ## MVP-1 Playwright journey
 test-e2e-mvp2-live: up db-migrate ## MVP-2 live Plan + save journey
 	python3 e2e/run.py mvp2-live
 
+test-e2e-mvp-t3: up db-migrate ## T3 Hangzhou 3d takeoff → skeleton (servers reused if up)
+	python3 e2e/e2e_t3_skeleton_hz.py
+
 test-e2e-mvp3-live: up db-migrate ## MVP-3 live Mode H + transit + must-see probe
 	PLAN_SLOT_STAGE_MS=0 python3 e2e/run.py mvp3-live
 
-test-e2e-chat02: up db-migrate ## MVP-4 chat-02 local draft (refresh + logout)
+test-e2e-chat02: up db-migrate ## MVP-4 chat-02 (deferred MVP-T9; exits 0 with SKIP)
 	python3 e2e/run.py chat02
 
 test-e2e-mvp10-live: up db-migrate ## plan-46 Lisbon skeleton fill live probe

@@ -196,6 +196,13 @@ export type ResolveOriginDeps = {
     locale: string;
     providers?: string[];
   }) => Promise<{ ok: boolean; data?: { lat: number; lng: number } | null }>;
+  /** ADR-053 / ADR-051: resolve https thumb via agent details when search left only stubs. */
+  getPlaceDetails?: (input: {
+    provider: string;
+    native_id: string;
+    locale: string;
+    providers?: string[];
+  }) => Promise<{ ok: boolean; data?: { photos?: string[] | null } | null }>;
   /** After city geocode — omit to let agent auto-select (ADR-052). */
   providersForPin?: (lat: number, lng: number) => string[] | undefined;
 };
@@ -220,7 +227,7 @@ function hitFromCard(hit: OriginCard): ResolveOriginResult {
     return { kind: "not_found" };
   }
   const photos = Array.isArray(hit.photos)
-    ? hit.photos.filter((p): p is string => typeof p === "string" && p.startsWith("http")).slice(0, 1)
+    ? hit.photos.filter((p): p is string => typeof p === "string" && p.startsWith("https://")).slice(0, 1)
     : undefined;
   const nid = nativeIdOf(hit);
   return {
@@ -232,6 +239,33 @@ function hitFromCard(hit: OriginCard): ResolveOriginResult {
     ...(nid ? { native_id: nid } : {}),
     ...(photos?.length ? { photos } : {}),
   };
+}
+
+/** ADR-053: complete stay card photos via agent get_place_details (not a 2play Google key path). */
+export async function ensureOriginHitPhotos(
+  hit: Extract<ResolveOriginResult, { kind: "hit" }>,
+  deps: Pick<ResolveOriginDeps, "getPlaceDetails">,
+  locale: string,
+  providers?: string[],
+): Promise<Extract<ResolveOriginResult, { kind: "hit" }>> {
+  if (hit.photos?.some((p) => typeof p === "string" && p.startsWith("https://"))) return hit;
+  if (!deps.getPlaceDetails || !hit.native_id?.trim() || !hit.provider?.trim()) return hit;
+  try {
+    const res = await deps.getPlaceDetails({
+      provider: hit.provider,
+      native_id: hit.native_id,
+      locale,
+      ...(providers?.length ? { providers } : {}),
+    });
+    if (!res.ok || !res.data) return hit;
+    const photos = Array.isArray(res.data.photos)
+      ? res.data.photos.filter((p): p is string => typeof p === "string" && p.startsWith("https://")).slice(0, 1)
+      : undefined;
+    if (!photos?.length) return hit;
+    return { ...hit, photos };
+  } catch {
+    return hit;
+  }
 }
 
 async function geocodeCity(
@@ -375,6 +409,23 @@ export async function resolvePlanOrigin(
   } catch {
     return { kind: "not_found" };
   }
+}
+
+export async function resolvePlanOriginWithPhotos(
+  input: {
+    query: string;
+    destination: string;
+    locale: string;
+    providers?: string[];
+  },
+  deps: ResolveOriginDeps,
+): Promise<ResolveOriginResult> {
+  const resolved = await resolvePlanOrigin(input, deps);
+  if (resolved.kind !== "hit") return resolved;
+  const pinProviders = deps.providersForPin
+    ? deps.providersForPin(resolved.lat, resolved.lng)
+    : input.providers;
+  return ensureOriginHitPhotos(resolved, deps, input.locale, pinProviders ?? input.providers);
 }
 
 export function resolveOriginPick(

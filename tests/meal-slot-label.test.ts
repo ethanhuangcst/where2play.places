@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mealSlotLabelKey, skeletonStopLabel } from "../src/core/meal-slot-label";
+import { mealSlotLabelKey, skeletonStopLabel, transitEndpointLabel } from "../src/core/meal-slot-label";
 
 describe("mealSlotLabelKey (TC-M22-85-04)", () => {
   it("should_map_slots_to_i18n_keys_not_locale_copy", () => {
@@ -27,6 +27,19 @@ describe("mealSlotLabelKey (TC-M22-85-04)", () => {
     expect(skeletonStopLabel({ kind: "meal", mealSlot: "dinner", name: "dinner" }, t)).toBe(
       "play.plan.meal_slot_dinner",
     );
+  });
+
+  it("should_localize_transit_endpoints_for_unresolved_meal_slots", () => {
+    const t = (key: string) =>
+      key === "play.plan.meal_slot_lunch"
+        ? "午餐"
+        : key === "play.plan.meal_slot_dinner"
+          ? "晚餐"
+          : key;
+    expect(transitEndpointLabel("lunch", t)).toBe("午餐");
+    expect(transitEndpointLabel("dinner", t)).toBe("晚餐");
+    expect(transitEndpointLabel("绿堤", t)).toBe("绿堤");
+    expect(transitEndpointLabel("", t)).toBe("");
   });
 
   it("should_resolve_attraction_and_origin_labels", () => {

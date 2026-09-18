@@ -249,6 +249,84 @@ describe("plan-skeleton-fill orchestrator (TC-M10-46-01/02)", () => {
     expect(client.fetchTripDetails).toHaveBeenCalled();
   });
 
+  it("should_retry_plan_next_stop_when_provider_failed_transiently", async () => {
+    const prevRetry = process.env.PLAN_NEXT_STOP_RETRY_MS;
+    process.env.PLAN_NEXT_STOP_RETRY_MS = "0";
+    vi.spyOn(client, "geocode").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: { lat: 1, lng: 2, crs: "WGS84" },
+    });
+    vi.spyOn(client, "discoverPlaces").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: {
+        candidates: { places: [{ name: "Tower" }], restaurants: [] },
+        trip_id: "t1",
+        revision: 2,
+      },
+    });
+    vi.spyOn(client, "makeItinerary").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: {
+        skeleton: {
+          days: [{ day_index: 1, stops: [{ name: "Hotel", kind: "stay" }] }],
+        },
+        trip_id: "t1",
+        revision: 2,
+      },
+    });
+    vi.spyOn(client, "fetchTripDetails").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: { trip_id: "t1", revision: 3, data: {} },
+    });
+    const planCalls: Record<string, unknown>[] = [];
+    vi.spyOn(client, "planNextStop").mockImplementation(async (body) => {
+      planCalls.push(body as Record<string, unknown>);
+      if (planCalls.length === 1) {
+        return {
+          agent: "places-agent",
+          ok: false,
+          outcome: { key: "errors.provider_failed" },
+        };
+      }
+      return {
+        agent: "places-agent",
+        ok: true,
+        data: {
+          stop: { name: "Hotel", kind: "stay", card: null, deeplinks: {} },
+          slot: { start: "09:00", end: "09:00" },
+          legs: [],
+        },
+      };
+    });
+
+    const events: string[] = [];
+    try {
+      for await (const ev of planItinerarySkeletonFill(
+        {
+          destination: "Lisbon",
+          days: 1,
+          startDate: "2026-10-10",
+          dailyStart: "Hotel",
+        },
+        { locale: "EN", providers: ["GOOGLE_MAPS"] },
+      )) {
+        events.push(ev.type);
+        if (ev.type === "error") break;
+      }
+    } finally {
+      if (prevRetry === undefined) delete process.env.PLAN_NEXT_STOP_RETRY_MS;
+      else process.env.PLAN_NEXT_STOP_RETRY_MS = prevRetry;
+    }
+
+    expect(events).toContain("done");
+    expect(events).not.toContain("error");
+    expect(planCalls.length).toBeGreaterThanOrEqual(2);
+  });
+
   it("TC-M18-75-01 should_fetch_skeleton_after_make_and_filled_after_plan_next_stop", async () => {
     vi.spyOn(client, "geocode").mockResolvedValue({
       agent: "places-agent",
@@ -894,6 +972,165 @@ describe("make failure fetch recovery (TC-M19-78-02)", () => {
     const current = attractionCall?.current_stop as { lat?: number; lng?: number };
     expect(current?.lat).toBe(38.73);
     expect(current?.lng).toBe(-9.14);
+  });
+
+  it("MVP-T5 should_resume_fill_from_trip_skeleton_without_make", async () => {
+    const makeSpy = vi.spyOn(client, "makeItinerary");
+    const discoverSpy = vi.spyOn(client, "discoverPlaces");
+    vi.spyOn(client, "planNextStop").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: {
+        stop: { name: "Hotel", kind: "stay", card: null, deeplinks: {} },
+        slot: { start: "09:00", end: "09:00" },
+        legs: [],
+        trip_id: "t-fill",
+        revision: 5,
+      },
+    });
+    vi.spyOn(client, "fetchTripDetails").mockImplementation(async (body) => {
+      const fields = (body as { fields?: string[] }).fields ?? [];
+      if (fields.includes("filled")) {
+        return {
+          agent: "places-agent",
+          ok: true,
+          data: {
+            trip_id: "t-fill",
+            revision: 5,
+            data: {
+              filled: {
+                stop: { name: "Hotel", kind: "stay", card: null, deeplinks: {} },
+                slot: { start: "09:00", end: "09:00" },
+                legs: [],
+              },
+            },
+          },
+        };
+      }
+      return {
+        agent: "places-agent",
+        ok: true,
+        data: {
+          trip_id: "t-fill",
+          revision: 4,
+          data: {
+            skeleton: {
+              days: [
+                {
+                  day_index: 1,
+                  day_theme: "Day 1",
+                  stops: [
+                    { name: "Hotel", kind: "stay" },
+                    { name: "Tower", kind: "attraction" },
+                  ],
+                },
+              ],
+            },
+            candidates: { places: [{ name: "Tower" }], restaurants: [] },
+            constraints: { origin: { name: "Hotel", lat: 38.7, lng: -9.1 } },
+          },
+        },
+      };
+    });
+
+    const phases: string[] = [];
+    for await (const ev of planItinerarySkeletonFill(
+      {
+        destination: "Lisbon",
+        days: 1,
+        startDate: "2026-10-10",
+        tripId: "t-fill",
+        revision: 4,
+        planMode: "fill",
+        dailyStart: "Hotel",
+      },
+      { locale: "EN", providers: ["GOOGLE_MAPS"] },
+    )) {
+      if (ev.type === "phase") phases.push(ev.phase ?? "");
+      if (ev.type === "error") break;
+    }
+
+    expect(makeSpy).not.toHaveBeenCalled();
+    expect(discoverSpy).not.toHaveBeenCalled();
+    expect(phases[0]).toBe("filling");
+    expect(phases).not.toContain("discovering");
+    expect(phases).not.toContain("skeleton");
+  });
+
+  it("should_seed_current_stop_from_day_origin_when_skeleton_has_no_stay", async () => {
+    // Hotel skip / stay-less day: first attraction must not omit current_stop (agent Zod).
+    const stops = [
+      { name: "West Lake", kind: "attraction" },
+      { name: "lunch", kind: "meal", meal_slot: "lunch" as const },
+    ];
+    vi.spyOn(client, "fetchTripDetails").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: {
+        trip_id: "t-nostay",
+        revision: 2,
+        data: {
+          skeleton: { days: [{ day_index: 1, day_theme: "Hangzhou", stops }] },
+          candidates: {
+            places: [{ name: "West Lake", location: { lat: 30.25, lng: 120.15, crs: "WGS84" } }],
+            restaurants: [],
+          },
+          constraints: { origin: { name: "Hangzhou", lat: 30.27, lng: 120.15 } },
+        },
+      },
+    });
+    const planCalls: Record<string, unknown>[] = [];
+    vi.spyOn(client, "planNextStop").mockImplementation(async (body) => {
+      planCalls.push(body as Record<string, unknown>);
+      const next = (body as { next_stop?: { name?: string; kind?: string } }).next_stop;
+      const originMode = (body as { origin_mode?: boolean }).origin_mode === true;
+      return {
+        agent: "places-agent",
+        ok: true,
+        data: {
+          stop: {
+            name: next?.name ?? "?",
+            kind: next?.kind ?? "attraction",
+            card: null,
+            deeplinks: {},
+          },
+          slot: { start: "09:00", end: originMode ? "09:00" : "11:00" },
+          legs: originMode ? [] : [{ mode: "transit", duration_min: 15, recommended: true }],
+          next_stop: {
+            name: next?.name,
+            location: { lat: 30.25, lng: 120.15 },
+          },
+        },
+      };
+    });
+
+    let sawError = false;
+    for await (const ev of planItinerarySkeletonFill(
+      {
+        destination: "Hangzhou",
+        days: 1,
+        startDate: "2026-10-10",
+        tripId: "t-nostay",
+        revision: 2,
+        planMode: "fill",
+        timeFrom: "09:00",
+      },
+      { locale: "EN", providers: ["GOOGLE_MAPS"] },
+    )) {
+      if (ev.type === "error") {
+        sawError = true;
+        break;
+      }
+    }
+
+    expect(sawError).toBe(false);
+    const first = planCalls[0];
+    expect(first).toBeTruthy();
+    expect(first?.origin_mode).not.toBe(true);
+    const current = first?.current_stop as { name?: string; kind?: string; end_time?: string };
+    expect(current?.name).toBe("Hangzhou");
+    expect(current?.kind).toBe("stay");
+    expect(current?.end_time).toBe("09:00");
   });
 
   it("MVP-T5 TD-6 should_map_stop_filled_from_fetch_filled_not_write_envelope", async () => {

@@ -30,8 +30,7 @@ def test_mvp1_journey():
         page.click('[data-testid="register-submit"]')
         page.wait_for_url("**/plan")
         assert "password=" not in page.url
-        page.wait_for_selector('[data-testid="plan-placeholder"]')
-        page.wait_for_selector('[data-testid="header-hello"]')
+        page.wait_for_selector('[data-testid="plan-page"]', timeout=30000)
 
         page.click('[data-testid="nav-profile"]')
         page.wait_for_selector('[data-testid="profile-page"]')
@@ -55,7 +54,7 @@ def test_mvp1_journey():
             page.locator('[data-testid="login-submit"]').click()
         assert resp_info.value.status == 200, resp_info.value.text()
         assert "password=" not in page.url
-        page.wait_for_selector('[data-testid="plan-placeholder"]', timeout=30000)
+        page.wait_for_selector('[data-testid="plan-page"]', timeout=30000)
 
         page.goto(f"{BASE}/profile")
         page.wait_for_selector('[data-testid="profile-interests"]')

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useLocale, useT } from "@/src/i18n/use-t";
 import type { ItineraryDto, ItinerarySlot } from "@/src/core/itinerary-types";
-import { mealSlotLabelKey, skeletonStopLabel } from "@/src/core/meal-slot-label";
+import { mealSlotLabelKey, skeletonStopLabel, transitEndpointLabel } from "@/src/core/meal-slot-label";
 import { planStopKindLabel } from "@/src/core/plan-slot-preview";
 import { planProviderKey } from "@/src/core/plan-provider-label";
 
@@ -28,6 +28,11 @@ type Props = {
   showPending?: boolean;
   /** Header shows generating instead of Updated. */
   generating?: boolean;
+  /**
+   * When true, day tabs without itinerary rows stay queued/disabled.
+   * Defaults to `generating`. Keep false after fill aborts so later days stay open.
+   */
+  queueFutureDays?: boolean;
   /** Skeleton stop names for unfilled stops on active day. */
   skeletonStops?: { name: string; filled?: boolean; pending?: boolean; mealSlot?: string }[];
   /** Current slot detail hint (itinerary-design §3). */
@@ -62,6 +67,7 @@ export function PlanItineraryView({
   liveHighlights = null,
   showPending = false,
   generating = false,
+  queueFutureDays,
   skeletonStops = [],
   slotPreviewText = null,
   saving = false,
@@ -69,6 +75,7 @@ export function PlanItineraryView({
   onSave,
   onOpenPlaceSheet,
 }: Props) {
+  const lockFutureDays = queueFutureDays ?? generating;
   const t = useT();
   const locale = useLocale();
   const maxDay = Math.max(
@@ -132,7 +139,7 @@ export function PlanItineraryView({
           {tabIndexes.map((n) => {
             const done = itinerary.days.some((d) => d.dayIndex === n);
             const isOn = n === day;
-            const queued = generating && !done && n !== (focusDayIndex ?? day);
+            const queued = lockFutureDays && !done && n !== (focusDayIndex ?? day);
             return (
               <button
                 key={n}
@@ -204,48 +211,53 @@ export function PlanItineraryView({
               return (
                 <div
                   key={`t-${idx}`}
-                  className={`transit-line slot slot--transit${onArrangeDay && liveSlots.length > 0 ? " is-entering" : ""}`}
+                  className={`slot slot--transit${onArrangeDay && liveSlots.length > 0 ? " is-entering" : ""}`}
                   data-testid="plan-transit-slot"
                 >
-                  {hasStructured ? (
-                    <p className="transit-line">
-                      {slot.from ? (
-                        <span className="transit-from">
-                          {t("play.plan.transit.from_label")}{" "}
-                          <span className="transit-place">{slot.from}</span>
-                        </span>
-                      ) : null}
-                      {slot.to ? (
-                        <span className="transit-to">
-                          {t("play.plan.transit.to_label")}{" "}
-                          <span className="transit-place">{slot.to}</span>：
-                        </span>
-                      ) : null}
-                      {slot.legs!.map((leg, legIdx) => {
-                        const modeKey = `play.plan.transit.mode.${leg.mode}`;
-                        const modeLabel = t(modeKey);
-                        const durLabel = t("play.plan.transit.line", {
-                          mode: modeLabel,
-                          minutes: String(leg.duration_min),
-                        });
-                        return (
-                          <span
-                            key={`leg-${legIdx}`}
-                            className={`transit-option${leg.recommended ? " transit-option--rec" : ""}`}
-                          >
-                            <span className="transit-bracket">[</span>
-                            <span className="transit-mode">{durLabel}</span>
-                            <span className="transit-bracket">]</span>
-                            {legIdx < slot.legs!.length - 1 ? (
-                              <span className="transit-divider"> / </span>
-                            ) : null}
+                  <div className="slot-time">{slot.start}</div>
+                  <div className="slot-body">
+                    {hasStructured ? (
+                      <p className="transit-line">
+                        {slot.from ? (
+                          <span className="transit-from">
+                            {t("play.plan.transit.from_label")}{" "}
+                            <span className="transit-place">{transitEndpointLabel(slot.from, t)}</span>
                           </span>
-                        );
-                      })}
-                    </p>
-                  ) : (
-                    <div className="slot-body">{slot.text}</div>
-                  )}
+                        ) : null}
+                        {slot.to ? (
+                          <span className="transit-to">
+                            {t("play.plan.transit.to_label")}{" "}
+                            <span className="transit-place">{transitEndpointLabel(slot.to, t)}</span>：
+                          </span>
+                        ) : null}
+                        {slot.legs!.map((leg, legIdx) => {
+                          const modeKey = `play.plan.transit.mode.${leg.mode}`;
+                          const modeLabel = t(modeKey);
+                          return (
+                            <span
+                              key={`leg-${legIdx}`}
+                              className={`transit-option${leg.recommended ? " transit-option--rec" : ""}`}
+                            >
+                              <span className="transit-bracket">[</span>
+                              <span className="transit-mode">{modeLabel}</span>
+                              <span className="transit-sep">|</span>
+                              <span className="transit-dur">
+                                {t("play.plan.transit.duration_min", {
+                                  minutes: String(leg.duration_min),
+                                })}
+                              </span>
+                              <span className="transit-bracket">]</span>
+                              {legIdx < slot.legs!.length - 1 ? (
+                                <span className="transit-divider"> / </span>
+                              ) : null}
+                            </span>
+                          );
+                        })}
+                      </p>
+                    ) : (
+                      <p className="transit-line">{slot.text}</p>
+                    )}
+                  </div>
                 </div>
               );
             }

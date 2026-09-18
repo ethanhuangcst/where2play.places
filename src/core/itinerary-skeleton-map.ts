@@ -1,4 +1,5 @@
 import type { ItineraryPlaceSlot, ItinerarySlot, ItineraryTransitSlot } from "./itinerary-types";
+import { pickResolvablePlacePointer } from "./place-native-id";
 
 export type AgentLeg = {
   mode?: string;
@@ -35,7 +36,16 @@ export type PoolCandidateLike = {
   sources?: Array<{ provider?: string; native_id?: string; deeplinks?: Record<string, string> }>;
 };
 
-/** Match discover/trip candidate by venue name or native_id for photo + ids. */
+/** Strip combining marks so Belém↔Belem exact-match after fold (no cognate table). */
+function foldDiacritics(s: string): string {
+  return s.normalize("NFD").replace(/\p{M}/gu, "");
+}
+
+/**
+ * Thin pool cache: native_id + exact / folded / substring name only.
+ * Cross-locale cognate aliases (Castelo ↔ Saint George) belong in places-agent
+ * `sharedProperToken` / `matchCardByPointer` — not duplicated here (ADR-010).
+ */
 export function lookupPoolCandidate(
   name: string | undefined,
   pool?: { places?: PoolCandidateLike[]; restaurants?: PoolCandidateLike[] } | null,
@@ -51,14 +61,19 @@ export function lookupPoolCandidate(
         )
       : undefined;
   const needle = name?.trim();
+  const normParen = (s: string) => s.replace(/[（）]/g, (ch) => (ch === "（" ? "(" : ")"));
   if (!card && needle) {
     const lower = needle.toLowerCase();
+    const needleNorm = normParen(lower);
+    const needleFold = foldDiacritics(needleNorm);
     card =
       all.find((p) => (p.name ?? "").trim() === needle) ??
       all.find((p) => (p.name ?? "").trim().toLowerCase() === lower) ??
+      all.find((p) => normParen((p.name ?? "").trim().toLowerCase()) === needleNorm) ??
+      all.find((p) => foldDiacritics(normParen((p.name ?? "").trim().toLowerCase())) === needleFold) ??
       all.find((p) => {
-        const n = (p.name ?? "").trim().toLowerCase();
-        return n.includes(lower) || lower.includes(n);
+        const n = foldDiacritics(normParen((p.name ?? "").trim().toLowerCase()));
+        return n.includes(needleFold) || needleFold.includes(n);
       });
   }
   if (!card) return null;
@@ -66,8 +81,13 @@ export function lookupPoolCandidate(
     (needleId ? card.sources?.find((s) => s.native_id === needleId) : undefined) ??
     card.sources?.find((s) => s.native_id) ??
     card.sources?.[0];
-  const photoUrl = Array.isArray(card.photos)
+  const rawPhoto = Array.isArray(card.photos)
     ? card.photos.find((p) => typeof p === "string" && p.startsWith("http"))
+    : undefined;
+  const photoUrl = rawPhoto
+    ? rawPhoto.startsWith("http://") && /autonavi\.com|amap\.com/i.test(rawPhoto)
+      ? rawPhoto.replace(/^http:\/\//i, "https://")
+      : rawPhoto
     : undefined;
   return {
     provider: src?.provider ?? card.provider ?? opts?.provider,
@@ -124,14 +144,14 @@ export function mapStopDisplayToPlaceSlot(
     nativeId: opts?.nativeId ?? stop.native_id ?? stop.nativeId,
     provider: opts?.provider ?? stop.provider,
   });
-  const provider =
-    opts?.provider ?? fromCard.provider ?? stop.provider ?? fromPool?.provider;
-  const nativeId =
-    opts?.nativeId ??
-    fromCard.nativeId ??
-    stop.native_id ??
-    stop.nativeId ??
-    fromPool?.nativeId;
+  const pointer = pickResolvablePlacePointer([
+    { provider: opts?.provider ?? fromCard.provider ?? stop.provider ?? fromPool?.provider, nativeId: opts?.nativeId },
+    { provider: fromCard.provider ?? stop.provider, nativeId: fromCard.nativeId },
+    { provider: stop.provider ?? fromPool?.provider, nativeId: stop.native_id ?? stop.nativeId },
+    { provider: fromPool?.provider, nativeId: fromPool?.nativeId },
+  ]);
+  const provider = pointer?.provider ?? opts?.provider ?? fromCard.provider ?? stop.provider ?? fromPool?.provider;
+  const nativeId = pointer?.nativeId;
   const deeplinks = {
     ...(stop.deeplinks ?? {}),
     ...(card?.sources?.[0]?.deeplinks ?? {}),
@@ -141,9 +161,7 @@ export function mapStopDisplayToPlaceSlot(
   const kind = stop.kind ?? "attraction";
   const placeKind =
     kind === "stay" ? "stay" : kind === "meal" || opts?.mealSlot ? "meal" : "attraction";
-  const photoFromCard = Array.isArray(card?.photos)
-    ? card!.photos.find((p) => typeof p === "string" && p.startsWith("http"))
-    : undefined;
+  const photoFromCard = firstHttpPhoto(card?.photos);
   const photoUrl = photoFromCard ?? opts?.photoUrl ?? fromPool?.photoUrl;
   const summary =
     (typeof (card as { address?: string } | undefined)?.address === "string"
@@ -236,5 +254,43 @@ export function mapFilledStopToDisplay(filled: {
     stop: filled.stop,
     slot: filled.slot,
     legs_to_here: filled.legs,
+  };
+}
+
+function firstHttpPhoto(photos: unknown): string | undefined {
+  if (!Array.isArray(photos)) return undefined;
+  const raw = photos.find((p): p is string => typeof p === "string" && p.startsWith("http"));
+  if (!raw) return undefined;
+  if (raw.startsWith("http://") && /autonavi\.com|amap\.com/i.test(raw)) {
+    return raw.replace(/^http:\/\//i, "https://");
+  }
+  return raw;
+}
+
+/**
+ * Prefer fetch `filled` SoT, but keep envelope `stop.card.photos` when filled omitted the card
+ * (pre-fix plan_next_stop wrote bare next_stop pointers only).
+ */
+export function coalesceStopDisplayWithPhotos(
+  filled: StopDisplayPayload | undefined,
+  envelope: StopDisplayPayload | undefined,
+): StopDisplayPayload {
+  if (!filled?.stop && !filled?.slot) return envelope ?? {};
+  if (!envelope?.stop) return filled ?? {};
+  const filledPhoto = firstHttpPhoto(filled.stop?.card?.photos);
+  if (filledPhoto) return filled;
+  const envelopePhoto = firstHttpPhoto(envelope.stop?.card?.photos);
+  if (!envelopePhoto) return filled;
+  return {
+    ...filled,
+    stop: {
+      ...envelope.stop,
+      ...filled.stop,
+      card: envelope.stop.card ?? filled.stop?.card ?? null,
+      deeplinks: {
+        ...(envelope.stop.deeplinks ?? {}),
+        ...(filled.stop?.deeplinks ?? {}),
+      },
+    },
   };
 }

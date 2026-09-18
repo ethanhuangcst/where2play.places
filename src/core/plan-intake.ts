@@ -9,14 +9,15 @@ import {
   type TransitOptionKey,
 } from "./plan-transit";
 
-export type AgentNeedId = "hotel" | "start_time" | "must_see" | "other";
+export type AgentNeedId = "hotel" | "start_time" | "must_see" | "other" | "expand_radius";
 
 export type AgentNeedAnswers = Partial<Record<AgentNeedId, string>>;
 
 /** Assistant steps b–h per performance.md §12.11 / 2play-design §4.2.1 */
 export type IntakeStepId = "b" | "c" | "d" | "e" | "f" | "g" | "h";
 
-export const AGENT_NEED_TO_INTAKE_STEP: Record<AgentNeedId, IntakeStepId> = {
+/** Classic intake needs only — expand_radius is T3 mid-plan (2play-plan-104), not b–h. */
+export const AGENT_NEED_TO_INTAKE_STEP: Partial<Record<AgentNeedId, IntakeStepId>> = {
   hotel: "b",
   start_time: "c",
   must_see: "g",

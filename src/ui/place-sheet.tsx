@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ItineraryPlaceSlot } from "@/src/core/itinerary-types";
 import { useT } from "@/src/i18n/use-t";
-import { preferSlotDisplayName } from "@/src/ui/place-display-prefer";
+import { preferSlotDisplayAddress, preferSlotDisplayName } from "@/src/ui/place-display-prefer";
 
 export type PlaceDetails = {
   name?: string;
@@ -81,6 +81,7 @@ export function PlaceSheet({
   if (!open || !slot) return null;
 
   const title = preferSlotDisplayName(slot.name, details?.name);
+  const address = preferSlotDisplayAddress(slot.summary, details?.address);
   const photo = firstHttpPhoto(details?.photos, slot.photoUrl);
   const providerLabel =
     slot.provider ?? details?.sources?.[0]?.provider ?? details?.provider ?? "";
@@ -167,10 +168,10 @@ export function PlaceSheet({
               ) : null}
               {!loading && !errorKey ? (
                 <dl className="place-facts-compact">
-                  {details?.address ? (
+                  {address ? (
                     <div className="place-facts-compact__row">
                       <dt>{t("play.plan.place_sheet_fact_address")}</dt>
-                      <dd>{details.address}</dd>
+                      <dd>{address}</dd>
                     </div>
                   ) : null}
                   {details?.phone ? (

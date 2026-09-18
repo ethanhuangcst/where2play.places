@@ -112,10 +112,32 @@ describe("plan-assistant T3 thread (mockup 06)", () => {
     );
 
     const intro = getByTestId("plan-thread-skeleton-intro");
-    expect(intro.className).toContain("bubble--agent-notice");
     expect(intro.textContent).toContain("Lisbon 4-day framework is ready:");
+    expect(
+      intro.className.includes("bubble--agent-notice") ||
+        intro.className.includes("msg-group__line"),
+    ).toBe(true);
     expect(getByTestId("plan-thread-skeleton")).toBeTruthy();
     expect(queryByTestId("plan-nav-skip-need")).toBeNull();
+    expect(queryByTestId("plan-nav-next-hint")).toBeNull();
+  });
+
+  it("should_place_next_hint_after_plan_complete_in_thread", () => {
+    applyTravorShell();
+    const { getByTestId } = renderWithLocale(
+      <PlanAssistantNav
+        {...baseProps}
+        planCompleteLine="Lisbon · 4 days · trip complete."
+        nextHintLine="Want to change the trip? Use the input below."
+        onSoftReplan={() => undefined}
+      />,
+    );
+    const complete = getByTestId("plan-thread-complete");
+    const hint = getByTestId("plan-nav-next-hint");
+    expect(
+      complete.compareDocumentPosition(hint) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(getByTestId("plan-nav-soft-replan")).toBeTruthy();
   });
 
   it("should_not_render_legacy_four_question_prompts_in_t3_mode", () => {

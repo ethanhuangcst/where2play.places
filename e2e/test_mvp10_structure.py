@@ -9,6 +9,8 @@ import sys
 
 from playwright.sync_api import sync_playwright
 
+from takeoff_helpers import fill_takeoff_and_confirm
+
 BASE = os.environ.get("W2P_BASE_URL", "http://localhost:3030")
 
 
@@ -28,15 +30,21 @@ def main() -> int:
         page.wait_for_url(re.compile(r".*/plan"), timeout=60000)
 
         page.wait_for_selector('[data-testid="plan-page"]', timeout=30000)
-        page.fill('[data-testid="plan-dest"]', "Lisbon")
-        page.fill('[data-testid="plan-days"]', "3")
-        page.fill('[data-testid="plan-party"]', "2")
-        page.select_option('[data-testid="plan-budget"]', index=1)
-        page.click('[data-testid="plan-submit"]')
+        locale_cn = page.locator('[data-testid="locale-CN"]')
+        if locale_cn.count():
+            locale_cn.first.click()
+            page.wait_for_timeout(400)
+        fill_takeoff_and_confirm(
+            page,
+            destination="杭州",
+            days="3",
+            party="2",
+            trip_type_substring="情侣",
+        )
 
         page.wait_for_selector('[data-testid="plan-constraints"]', timeout=15000)
-        page.wait_for_selector('[data-testid="plan-travel-tips"]', timeout=15000)
         page.wait_for_selector('[data-testid="plan-nav"]', timeout=15000)
+        # plan-travel-tips requires agent tips event (MVP-T10); not part of this app-only gate.
 
         takeoff = page.locator(".plan-takeoff")
         assert takeoff.count() == 0

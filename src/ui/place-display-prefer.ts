@@ -1,5 +1,7 @@
 /**
- * Prefer itinerary-slot CJK display over Latin Google details overlay (ADR-052 D9).
+ * Prefer itinerary-slot display name over cross-script details overlay (ADR-052 D9).
+ * List title must not flash when details return another writing system
+ * (CJK→Latin or Latin→CJK). Same-script details may refine the title.
  */
 
 const CJK = /[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]/;
@@ -14,24 +16,27 @@ export function isLatinOnly(text: string | undefined | null): boolean {
   return LATIN_LETTER.test(text) && !CJK.test(text);
 }
 
-/** Keep slot name when it is CJK and details name is Latin-only. */
+function isCrossScript(a: string, b: string): boolean {
+  return (hasCjk(a) && isLatinOnly(b)) || (isLatinOnly(a) && hasCjk(b));
+}
+
+/** Keep slot name when details name is a different writing system. */
 export function preferSlotDisplayName(
   slotName: string,
   detailsName?: string | null,
 ): string {
-  if (detailsName && !(hasCjk(slotName) && isLatinOnly(detailsName))) {
-    return detailsName;
-  }
-  return slotName;
+  if (!detailsName?.trim()) return slotName;
+  if (isCrossScript(slotName, detailsName)) return slotName;
+  return detailsName;
 }
 
-/** Keep slot address when it is CJK and details address is Latin-only. */
+/** Keep slot address when details address is a different writing system. */
 export function preferSlotDisplayAddress(
   slotAddress: string | undefined,
   detailsAddress?: string | null,
 ): string | undefined {
   if (!detailsAddress) return slotAddress;
-  if (slotAddress && hasCjk(slotAddress) && isLatinOnly(detailsAddress)) {
+  if (slotAddress && isCrossScript(slotAddress, detailsAddress)) {
     return slotAddress;
   }
   return detailsAddress;

@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   ORIGIN_NEAR_CITY_KM,
+  ensureOriginHitPhotos,
   originNameFromPick,
   pickOriginCardNearCity,
   resolvePlanOrigin,
+  resolvePlanOriginWithPhotos,
   resolveOriginPick,
   sanitizeDailyStartName,
 } from "../src/core/plan-resolve-origin";
@@ -494,5 +496,76 @@ describe("pickOriginCardNearCity (TC-M21-41-21)", () => {
     expect(r.kind).toBe("skip");
     expect(suggestPlaces).not.toHaveBeenCalled();
     expect(searchPlaces).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("ensureOriginHitPhotos (ADR-053)", () => {
+  it("should_attach_https_photo_from_getPlaceDetails_when_hit_has_no_photo", async () => {
+    const hit = await ensureOriginHitPhotos(
+      {
+        kind: "hit",
+        name: "Hills Hotel Lisboa",
+        lat: 38.73,
+        lng: -9.14,
+        provider: "GOOGLE_MAPS",
+        native_id: "ChIJtXlmyZ4zGQ0RUHvpxx9LsF4",
+      },
+      {
+        getPlaceDetails: async () => ({
+          ok: true,
+          data: { name: "Hills Hotel Lisboa", photos: ["https://lh3.googleusercontent.com/p/hotel"] },
+        }),
+      },
+      "EN",
+    );
+    expect(hit.photos).toEqual(["https://lh3.googleusercontent.com/p/hotel"]);
+  });
+
+  it("should_keep_existing_https_photo_without_details_call", async () => {
+    const getPlaceDetails = vi.fn();
+    const hit = await ensureOriginHitPhotos(
+      {
+        kind: "hit",
+        name: "Hills Hotel Lisboa",
+        lat: 38.73,
+        lng: -9.14,
+        provider: "GOOGLE_MAPS",
+        native_id: "ChIJ",
+        photos: ["https://cdn.example/hotel.jpg"],
+      },
+      { getPlaceDetails },
+      "EN",
+    );
+    expect(getPlaceDetails).not.toHaveBeenCalled();
+    expect(hit.photos).toEqual(["https://cdn.example/hotel.jpg"]);
+  });
+
+  it("should_resolve_photos_via_resolvePlanOriginWithPhotos", async () => {
+    const r = await resolvePlanOriginWithPhotos(
+      { query: "Hills Hotel Lisboa", destination: "Lisbon", locale: "EN" },
+      {
+        geocode: async () => ({ ok: true, data: LISBON }),
+        searchPlaces: async () => ({
+          ok: true,
+          data: [
+            {
+              name: "Hills Hotel Lisboa",
+              location: { lat: 38.73, lng: -9.14 },
+              provider: "GOOGLE_MAPS",
+              sources: [{ provider: "GOOGLE_MAPS", native_id: "ChIJtXlmyZ4zGQ0RUHvpxx9LsF4" }],
+            },
+          ],
+        }),
+        getPlaceDetails: async () => ({
+          ok: true,
+          data: { photos: ["https://lh3.googleusercontent.com/p/hills"] },
+        }),
+      },
+    );
+    expect(r.kind).toBe("hit");
+    if (r.kind === "hit") {
+      expect(r.photos).toEqual(["https://lh3.googleusercontent.com/p/hills"]);
+    }
   });
 });

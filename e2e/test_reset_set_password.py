@@ -59,7 +59,7 @@ def test_reset_set_password_flow():
         page.wait_for_selector("[data-set-done]:not([hidden])")
 
         login(page, EMAIL, NEW_PASSWORD)
-        page.wait_for_selector('[data-testid="plan-placeholder"]', timeout=30000)
+        page.wait_for_selector('[data-testid="plan-page"]', timeout=30000)
         browser.close()
 
 

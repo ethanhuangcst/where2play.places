@@ -8,6 +8,8 @@ import {
 
 const t = (key: string, vars?: Record<string, string | number>) => {
   if (key === "play.plan.constraint_none") return "None";
+  if (key === "play.plan.trip_type.family_kids") return "亲子玩乐";
+  if (key === "play.plan.trip_type.couple_romance") return "情侣浪漫";
   if (key === "play.plan.fill_day_heading" && vars) {
     return `Day ${vars.n} — ${vars.theme}`;
   }
@@ -165,6 +167,22 @@ describe("plan-assistant-narrative (TC-M19-40-03)", () => {
     expect(done.lines.filter((l) => l.startsWith("Adding ") || l.startsWith("Transit "))).toHaveLength(0);
     expect(done.completeLine).toContain("Lisbon");
     expect(done.completeLine).toContain("done");
+  });
+
+  it("should_localize_trip_type_slug_in_plan_complete_line", () => {
+    const ctx = createPlanNarrativeContext({
+      t,
+      destination: "上海",
+      days: 3,
+      partySize: 2,
+      tripType: "family_kids",
+    });
+    expect(ctx.tripType).toBe("亲子玩乐");
+    expect(ctx.tripType).not.toBe("family_kids");
+
+    const done = narrativeFromPlanEvent({ type: "done" }, ctx, []);
+    expect(done.completeLine).toContain("亲子玩乐");
+    expect(done.completeLine).not.toContain("family_kids");
   });
 
   it("should_not_stuff_timeline_strings_into_statusLines_on_stop_filled (24-P0-ui-B)", () => {

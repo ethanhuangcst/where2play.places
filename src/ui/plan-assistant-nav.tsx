@@ -18,6 +18,7 @@ import {
   intakeQuestionText,
   joinMustIncludeSelection,
   nextIntakeStep,
+  formatTripTypeDisplay,
   type IntakeAnswers,
   type IntakeStepId,
   type TakeoffFields,
@@ -221,9 +222,29 @@ export function PlanAssistantNav({
   });
   const budgetKey = normalizeBudgetKey(takeoff.budget);
   const budgetLabel = budgetKey ? budgetOptionLabel(budgetKey, t) : takeoff.budget;
+  const tripTypeLabel = formatTripTypeDisplay(takeoff.tripType, t);
   const contextSummary = t3Mode
-    ? `${takeoff.destination} · ${takeoff.days} ${t("play.plan.days_short")} · ${takeoff.partySize} ${t("play.plan.people_short")} · ${budgetLabel}`
+    ? planCompleteLine
+      ? [
+          takeoff.destination,
+          `${takeoff.days} ${t("play.plan.days_short")}`,
+          `${takeoff.partySize} ${t("play.plan.people_short")}`,
+          tripTypeLabel,
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : `${takeoff.destination} · ${takeoff.days} ${t("play.plan.days_short")} · ${takeoff.partySize} ${t("play.plan.people_short")} · ${budgetLabel}`
     : `${takeoff.destination} · ${takeoff.days} ${t("play.plan.days_short")} · ${takeoff.partySize} ${t("play.plan.people_short")} · ${budgetLabel} · ${t("play.plan.nav_qa_progress", { current: qa.current, total: qa.total })}`;
+
+  const fieldLogActive =
+    fillRouteDays.length > 0 || skeletonRouteDays.length > 0 || Boolean(planCompleteLine);
+  const threadClassName = [
+    "plan-nav__thread",
+    fieldLogActive ? "plan-nav__thread--field-log" : "",
+    planCompleteLine ? "plan-nav__thread--complete" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   const onResizeStart = useCallback(
     (e: React.PointerEvent) => {
@@ -444,11 +465,15 @@ export function PlanAssistantNav({
           </header>
 
           <div className="plan-nav__body" ref={bodyRef} data-testid="plan-nav-body">
-            <div className="plan-nav__thread" data-testid="plan-nav-thread">
+            <div className={threadClassName} data-testid="plan-nav-thread">
               {t3Mode ? (
                 <>
                   <div
-                    className="bubble bubble--agent bubble--agent-notice"
+                    className={
+                      fieldLogActive
+                        ? "plan-nav__field-intro"
+                        : "bubble bubble--agent bubble--agent-notice"
+                    }
                     data-testid="plan-nav-takeover"
                   >
                     {t("play.plan.assistant_takeover")}
@@ -481,12 +506,18 @@ export function PlanAssistantNav({
                     </div>
                   ) : null}
                   {frameworkReadyLine ? (
-                    <div
-                      className="bubble bubble--agent bubble--agent-notice"
-                      data-testid="plan-thread-skeleton-intro"
-                    >
-                      {frameworkReadyLine}
-                    </div>
+                    fieldLogActive ? (
+                      <p className="msg-group__line" data-testid="plan-thread-skeleton-intro">
+                        {frameworkReadyLine}
+                      </p>
+                    ) : (
+                      <div
+                        className="bubble bubble--agent bubble--agent-notice"
+                        data-testid="plan-thread-skeleton-intro"
+                      >
+                        {frameworkReadyLine}
+                      </div>
+                    )
                   ) : null}
                 </>
               ) : null}
@@ -752,14 +783,24 @@ export function PlanAssistantNav({
                 </div>
               ) : null}
 
-              {statusLines.length > 0 ? (
-                <div className="bubble bubble--agent" data-testid="plan-nav-status">
-                  {statusLines.map((line, i) => (
-                    <p key={`status-${i}`} className="plan-nav__notice-line">
-                      {line}
-                    </p>
-                  ))}
-                </div>
+              {statusLines.length > 0 && !planCompleteLine ? (
+                fieldLogActive ? (
+                  <div className="plan-nav__field-status" data-testid="plan-nav-status">
+                    {statusLines.map((line, i) => (
+                      <p key={`status-${i}`} className="msg-group__line">
+                        {line}
+                      </p>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bubble bubble--agent" data-testid="plan-nav-status">
+                    {statusLines.map((line, i) => (
+                      <p key={`status-${i}`} className="plan-nav__notice-line">
+                        {line}
+                      </p>
+                    ))}
+                  </div>
+                )
               ) : null}
 
               {makeElapsedSeconds != null ? (
@@ -781,7 +822,7 @@ export function PlanAssistantNav({
               ) : null}
 
               {skeletonRouteDays.length > 0 && fillRouteDays.length === 0 ? (
-                <div className="msg-group msg-group--agent plan-nav__skeleton">
+                <div className="plan-nav__spine plan-nav__skeleton">
                   <PlanFillRoute
                     days={skeletonRouteDays}
                     variant="skeleton"
@@ -822,6 +863,25 @@ export function PlanAssistantNav({
                 </div>
               ) : null}
 
+              {fillRouteDays.length > 0 ? (
+                <div className="plan-nav__spine">
+                  <PlanFillRoute
+                    days={fillRouteDays}
+                    variant="fill"
+                    data-testid="plan-thread-fill-timeline"
+                  />
+                </div>
+              ) : null}
+
+              {planCompleteLine ? (
+                <div
+                  className="bubble bubble--agent bubble--agent-notice plan-nav__complete-bubble"
+                  data-testid="plan-thread-complete"
+                >
+                  {planCompleteLine}
+                </div>
+              ) : null}
+
               {nextHintLine ? (
                 <div
                   className="bubble bubble--agent bubble--agent-notice"
@@ -831,7 +891,7 @@ export function PlanAssistantNav({
                 </div>
               ) : null}
 
-              {onSoftReplan && frameworkReadyLine ? (
+              {onSoftReplan && planCompleteLine ? (
                 <div className="plan-nav__soft-cta">
                   <button
                     type="button"
@@ -842,25 +902,6 @@ export function PlanAssistantNav({
                     {t("play.plan.replan_soft")}
                   </button>
                 </div>
-              ) : null}
-
-              {fillRouteDays.length > 0 ? (
-                <div className="msg-group msg-group--agent">
-                  <PlanFillRoute
-                    days={fillRouteDays}
-                    variant="fill"
-                    data-testid="plan-thread-fill-timeline"
-                  />
-                </div>
-              ) : null}
-
-              {planCompleteLine ? (
-                <p
-                  className="msg-group__line plan-nav__complete"
-                  data-testid="plan-thread-complete"
-                >
-                  {planCompleteLine}
-                </p>
               ) : null}
               <div ref={threadEndRef} data-testid="plan-nav-thread-end" aria-hidden="true" />
             </div>

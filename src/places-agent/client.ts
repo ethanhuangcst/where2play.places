@@ -328,6 +328,14 @@ export type PlanTripData = {
       multi?: boolean;
     }>;
   };
+  /** T3 phase stream (skeleton_generating / skeleton_ready / …). */
+  phases?: Array<{ phase: string; trip_id?: string; revision?: number }>;
+  /** Full-loop / skeleton payload when status is ready. */
+  itinerary?: {
+    skeleton: unknown;
+    filledStops: unknown[];
+    artifacts?: Record<string, unknown>;
+  };
 };
 
 export async function planTrip(

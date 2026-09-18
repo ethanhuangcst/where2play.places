@@ -1,5 +1,6 @@
 import type { SlotPreviewPayload } from "./itinerary-map";
 import type { ItineraryDto } from "./itinerary-types";
+import { formatTripTypeDisplay } from "./plan-intake";
 import { formatSlotPreviewLine } from "./plan-slot-preview";
 
 export type NarrativeT = (key: string, vars?: Record<string, string | number>) => string;
@@ -23,12 +24,17 @@ export function createPlanNarrativeContext(opts: {
   partySize: number;
   tripType?: string;
 }): PlanNarrativeContext {
+  const raw = opts.tripType?.trim() ?? "";
+  const tripTypeLabel =
+    formatTripTypeDisplay(raw, opts.t) ||
+    raw ||
+    opts.t("play.plan.constraint_none");
   return {
     t: opts.t,
     destination: opts.destination,
     days: opts.days,
     partySize: opts.partySize,
-    tripType: opts.tripType?.trim() || opts.t("play.plan.constraint_none"),
+    tripType: tripTypeLabel,
     skeletonReadyAnnounced: false,
     narratedSkeletonDays: new Set(),
     fillCoverLine: null,

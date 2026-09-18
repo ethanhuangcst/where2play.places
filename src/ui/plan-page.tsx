@@ -28,6 +28,7 @@ import {
   type PlanNarrativeContext,
 } from "@/src/core/plan-assistant-narrative";
 import { formatPlanElapsedSeconds, friendlyMakeErrorKey } from "@/src/core/format-plan-elapsed";
+import { isResolvablePlaceNativeId } from "@/src/core/place-native-id";
 import {
   buildFillRouteDays,
   type FillRouteDay,
@@ -142,6 +143,7 @@ export default function PlanPageClient() {
   const [originQuery, setOriginQuery] = useState("");
   const [originLat, setOriginLat] = useState<number | undefined>();
   const [originLng, setOriginLng] = useState<number | undefined>();
+  const [originStay, setOriginStay] = useState<PlanBoundaries["originStay"] | undefined>();
   const [intakeComplete, setIntakeComplete] = useState(false);
   const [replanDialogOpen, setReplanDialogOpen] = useState(false);
   const [replanDialogVariant, setReplanDialogVariant] = useState<"replan" | "terminate">("replan");
@@ -325,13 +327,28 @@ export default function PlanPageClient() {
           ok?: boolean;
           kind?: string;
           name?: string;
+          lat?: number;
+          lng?: number;
+          provider?: string;
+          native_id?: string;
+          photos?: string[];
           cards?: Array<{ name: string; lat?: number; lng?: number; provider?: string; native_id?: string }>;
         }>("/api/plan/resolve-origin", {
           method: "POST",
           body: JSON.stringify({ query: q, destination: dest, locale }),
         });
-        if (res.kind === "hit" && res.name) {
+        if (res.kind === "hit" && res.name && typeof res.lat === "number" && typeof res.lng === "number") {
           setOrigin(res.name);
+          setOriginLat(res.lat);
+          setOriginLng(res.lng);
+          setOriginStay({
+            name: res.name,
+            lat: res.lat,
+            lng: res.lng,
+            ...(res.provider ? { provider: res.provider } : {}),
+            ...(res.native_id ? { native_id: res.native_id } : {}),
+            ...(Array.isArray(res.photos) && res.photos.length ? { photos: res.photos.slice(0, 1) } : {}),
+          });
           setOriginOverlay(null);
           return;
         }
@@ -363,14 +380,67 @@ export default function PlanPageClient() {
       if (!originOverlay || originOverlay.kind !== "candidates") return;
       const card = originOverlay.cards[index];
       if (!card) return;
-      setOrigin(card.name);
-      setOriginOverlay(null);
-      if (pendingSubmitConfirmRef.current) {
-        pendingSubmitConfirmRef.current = false;
-        setSubmitConfirmOpen(true);
-      }
+      const dest = destination.trim();
+      setOriginResolving(true);
+      void (async () => {
+        try {
+          // Re-resolve pick so ADR-053 photos/native_id land on originStay.
+          const res = await authJson<{
+            ok?: boolean;
+            kind?: string;
+            name?: string;
+            lat?: number;
+            lng?: number;
+            provider?: string;
+            native_id?: string;
+            photos?: string[];
+          }>("/api/plan/resolve-origin", {
+            method: "POST",
+            body: JSON.stringify({ query: card.name, destination: dest, locale }),
+          });
+          if (res.kind === "hit" && res.name && typeof res.lat === "number" && typeof res.lng === "number") {
+            setOrigin(res.name);
+            setOriginLat(res.lat);
+            setOriginLng(res.lng);
+            setOriginStay({
+              name: res.name,
+              lat: res.lat,
+              lng: res.lng,
+              ...(res.provider ? { provider: res.provider } : {}),
+              ...(res.native_id ? { native_id: res.native_id } : {}),
+              ...(Array.isArray(res.photos) && res.photos.length ? { photos: res.photos.slice(0, 1) } : {}),
+            });
+          } else {
+            setOrigin(card.name);
+            if (typeof card.lat === "number" && typeof card.lng === "number") {
+              setOriginLat(card.lat);
+              setOriginLng(card.lng);
+              setOriginStay({
+                name: card.name,
+                lat: card.lat,
+                lng: card.lng,
+                ...(card.provider ? { provider: card.provider } : {}),
+                ...(card.native_id ? { native_id: card.native_id } : {}),
+              });
+            } else {
+              setOriginStay(undefined);
+            }
+          }
+          setOriginOverlay(null);
+          if (pendingSubmitConfirmRef.current) {
+            pendingSubmitConfirmRef.current = false;
+            setSubmitConfirmOpen(true);
+          }
+        } catch {
+          setOrigin(card.name);
+          setOriginStay(undefined);
+          setOriginOverlay(null);
+        } finally {
+          setOriginResolving(false);
+        }
+      })();
     },
-    [originOverlay],
+    [originOverlay, destination, locale],
   );
 
   const onOriginRetry = useCallback(() => {
@@ -570,6 +640,9 @@ export default function PlanPageClient() {
       const elapsedTimer = window.setInterval(() => {
         setMakeElapsedMs(Date.now() - makeStartedAt);
       }, 100);
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const abortTimer = window.setTimeout(() => controller.abort(), 300_000);
       setLiveSlots([]);
       setFocusDayIndex(null);
       setSkeletonDays([]);
@@ -603,6 +676,7 @@ export default function PlanPageClient() {
           "/api/plan",
           {
             method: "POST",
+            signal: controller.signal,
             body: JSON.stringify({
               ...criteria,
               locale,
@@ -642,9 +716,12 @@ export default function PlanPageClient() {
               if (event.phase === "skeleton") setPlanSubPhase("skeleton");
               if (event.phase === "filling") {
                 setPlanSubPhase("filling");
-                setLiveSlots([]);
-                setDayPending(true);
-                if (event.dayIndex != null) setFocusDayIndex(event.dayIndex);
+                // U3 / TD-7: lock Day tab on Day 1; do not follow fill dayIndex.
+                setFocusDayIndex(1);
+                if (event.dayIndex == null || event.dayIndex === 1) {
+                  setLiveSlots([]);
+                  setDayPending(true);
+                }
                 if (event.dayIndex != null && event.daysTotal != null) {
                   setGenProgress({ current: event.dayIndex, total: event.daysTotal });
                 }
@@ -652,9 +729,10 @@ export default function PlanPageClient() {
               applyNarrative(event);
             } else if (event.type === "slot_preview" && event.kind && event.name) {
               const preview = event as { type: "slot_preview"; dayIndex?: number } & SlotPreviewPayload;
-              const line = formatSlotPreviewLine(preview, t);
-              setSlotPreviewText(line);
-              if (preview.dayIndex != null) setFocusDayIndex(preview.dayIndex);
+              // Only surface Day 1 previews while tab stays on Day 1.
+              if (preview.dayIndex == null || preview.dayIndex === 1) {
+                setSlotPreviewText(formatSlotPreviewLine(preview, t));
+              }
               applyNarrative(event);
             } else if (event.type === "skeleton_start" && event.itinerary) {
               setItinerary(event.itinerary);
@@ -700,15 +778,18 @@ export default function PlanPageClient() {
               }
             } else if (event.type === "transit" && event.slot && event.itinerary) {
               setItinerary(event.itinerary);
-              setLiveSlots((prev) => [...prev, event.slot!]);
-              if (event.dayIndex != null) setFocusDayIndex(event.dayIndex);
+              // U3: stream live slots only for Day 1 while tab stays locked.
+              if (event.dayIndex == null || event.dayIndex === 1) {
+                setLiveSlots((prev) => [...prev, event.slot!]);
+              }
             } else if (event.type === "stop_filled" && event.slot && event.itinerary) {
               setItinerary(event.itinerary);
               setFillRouteDays(buildFillRouteDays(event.itinerary, t, { includeTransit: true }));
-              setLiveSlots((prev) => [...prev, event.slot!]);
-              setDayPending(true);
-              setSlotPreviewText(null);
-              if (event.dayIndex != null) setFocusDayIndex(event.dayIndex);
+              if (event.dayIndex == null || event.dayIndex === 1) {
+                setLiveSlots((prev) => [...prev, event.slot!]);
+                setDayPending(true);
+                setSlotPreviewText(null);
+              }
               const filled = event.slot;
               if (
                 filled.kind === "place" &&
@@ -727,9 +808,11 @@ export default function PlanPageClient() {
             } else if (event.type === "day_done" && event.itinerary) {
               setItinerary(event.itinerary);
               setFillRouteDays(buildFillRouteDays(event.itinerary, t, { includeTransit: true }));
-              setLiveSlots([]);
-              setDayPending(false);
-              setSlotPreviewText(null);
+              if (event.dayIndex == null || event.dayIndex === 1) {
+                setLiveSlots([]);
+                setDayPending(false);
+                setSlotPreviewText(null);
+              }
               if (event.dayIndex != null && event.daysTotal != null) {
                 setGenProgress({ current: event.dayIndex, total: event.daysTotal });
               }
@@ -743,7 +826,7 @@ export default function PlanPageClient() {
               setPlanSubPhase(criteria.planMode === "skeleton" ? "skeleton" : "idle");
               setLiveSlots([]);
               setDayPending(false);
-              setFocusDayIndex(null);
+              setFocusDayIndex(1);
               // Clear transit/slot preview residue; keep skeletonDays for assistant spine (ui-B).
               // Main panel day-bottom outline is gated by idle → [] in skeletonStopsForFocusedDay.
               setSlotPreviewText(null);
@@ -759,24 +842,254 @@ export default function PlanPageClient() {
           const friendly = friendlyMakeErrorKey(resolveErrorKey(sawError));
           setErrorKey(friendly);
           setPagePhase("done");
+          setPlanSubPhase("idle");
+          setLiveSlots([]);
+          setDayPending(false);
+          setSlotPreviewText(null);
           navLinesRef.current = appendAssistantLine(navLinesRef.current, t(friendly));
+          setNavStatusLines(navLinesRef.current);
+        } else if (!sawDone && !sawError) {
+          const key = "play.plan.assistant_fill_timeout";
+          setErrorKey(key);
+          setPagePhase("done");
+          setPlanSubPhase("idle");
+          setLiveSlots([]);
+          setDayPending(false);
+          setSlotPreviewText(null);
+          navLinesRef.current = appendAssistantLine(navLinesRef.current, t(key));
           setNavStatusLines(navLinesRef.current);
         }
       } catch (err) {
-        const key =
-          err instanceof AuthApiError
+        const aborted =
+          (err instanceof DOMException && err.name === "AbortError") ||
+          (err instanceof Error && err.name === "AbortError");
+        const key = aborted
+          ? "play.plan.assistant_fill_timeout"
+          : err instanceof AuthApiError
             ? friendlyMakeErrorKey(resolveErrorKey(err.key))
             : "play.plan.assistant_make_failed";
         setErrorKey(key);
+        setPagePhase("done");
+        setPlanSubPhase("idle");
+        setLiveSlots([]);
+        setDayPending(false);
+        setSlotPreviewText(null);
         navLinesRef.current = appendAssistantLine(navLinesRef.current, t(key));
         setNavStatusLines(navLinesRef.current);
       } finally {
+        window.clearTimeout(abortTimer);
+        if (abortRef.current === controller) abortRef.current = null;
         window.clearInterval(elapsedTimer);
         if (sawDone && !sawError) {
           setMakeElapsedMs(null);
         } else {
           setMakeElapsedMs(Date.now() - makeStartedAt);
         }
+        setLoading(false);
+      }
+    },
+    [locale, t, tripId, tripRevision],
+  );
+
+  /** After T3 skeleton: stream fill without remaking skeleton (planMode=fill). */
+  const runFillFromSkeleton = useCallback(
+    async (criteria: PlanBoundaries) => {
+      setLoading(true);
+      setPagePhase("planning");
+      setPlanSubPhase("filling");
+      setFocusDayIndex(1);
+      setLiveSlots([]);
+      setDayPending(true);
+      setErrorKey(null);
+      setPlanCompleteLine(null);
+      setSlotPreviewText(null);
+      setMakeElapsedMs(0);
+      const makeStartedAt = Date.now();
+      const elapsedTimer = window.setInterval(() => {
+        setMakeElapsedMs(Date.now() - makeStartedAt);
+      }, 100);
+      // Match BFF maxDuration (300s) so UI never sticks on queued day tabs.
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const abortTimer = window.setTimeout(() => controller.abort(), 300_000);
+
+      let sawDone = false;
+      let sawError: string | null = null;
+      try {
+        await authNdjsonEvents<
+          {
+            type: string;
+            phase?: string;
+            dayIndex?: number;
+            daysTotal?: number;
+            itinerary?: ItineraryDto;
+            slot?: ItinerarySlot;
+            theme?: string;
+            key?: string;
+            stopIndex?: number;
+            stops?: { name: string; meal_slot?: string; kind?: string }[];
+            data?: TravelTipsData;
+          } & Partial<SlotPreviewPayload>
+        >(
+          "/api/plan",
+          {
+            method: "POST",
+            signal: controller.signal,
+            body: JSON.stringify({
+              ...criteria,
+              locale,
+              planMode: "fill",
+              mode: "fill",
+              ...((criteria.tripId ?? tripId) ? { trip_id: criteria.tripId ?? tripId } : {}),
+              ...(typeof (criteria.revision ?? tripRevision) === "number"
+                ? { revision: criteria.revision ?? tripRevision }
+                : {}),
+            }),
+          },
+          (event) => {
+            const applyNarrative = (ev: typeof event) => {
+              const ctx =
+                narrativeCtxRef.current ??
+                createPlanNarrativeContext({
+                  t,
+                  destination: criteria.destination,
+                  days: criteria.days,
+                  partySize: criteria.partySize ?? 1,
+                  tripType: criteria.tripType,
+                });
+              const result = narrativeFromPlanEvent(ev, ctx, navLinesRef.current);
+              narrativeCtxRef.current = result.ctx;
+              navLinesRef.current = result.lines;
+              setNavStatusLines(result.lines);
+              if (result.completeLine !== undefined) {
+                setPlanCompleteLine(result.completeLine);
+              }
+            };
+
+            if (event.type === "tips" && event.data) {
+              setTravelTips(event.data);
+              setTravelTipsLoading(false);
+              setTravelTipsError(null);
+            } else if (event.type === "phase") {
+              if (event.phase === "filling") {
+                setPlanSubPhase("filling");
+                // U3 / TD-7: keep Day 1 selected while later days fill in background.
+                setFocusDayIndex(1);
+                if (event.dayIndex != null && event.daysTotal != null) {
+                  setGenProgress({ current: event.dayIndex, total: event.daysTotal });
+                }
+              }
+              applyNarrative(event);
+            } else if (event.type === "slot_preview" && event.kind && event.name) {
+              const preview = event as { type: "slot_preview"; dayIndex?: number } & SlotPreviewPayload;
+              if (preview.dayIndex == null || preview.dayIndex === 1) {
+                setSlotPreviewText(formatSlotPreviewLine(preview, t));
+              }
+              applyNarrative(event);
+            } else if (event.type === "transit" && event.slot && event.itinerary) {
+              setItinerary(event.itinerary);
+              if (event.dayIndex == null || event.dayIndex === 1) {
+                setLiveSlots((prev) => [...prev, event.slot!]);
+              }
+            } else if (event.type === "stop_filled" && event.slot && event.itinerary) {
+              setItinerary(event.itinerary);
+              setFillRouteDays(buildFillRouteDays(event.itinerary, t, { includeTransit: true }));
+              if (event.dayIndex == null || event.dayIndex === 1) {
+                setLiveSlots((prev) => [...prev, event.slot!]);
+                setDayPending(true);
+                setSlotPreviewText(null);
+              }
+              const filled = event.slot;
+              if (
+                filled.kind === "place" &&
+                typeof event.stopIndex === "number" &&
+                event.dayIndex != null
+              ) {
+                const placeName = filled.name?.trim();
+                if (placeName) {
+                  setSkeletonDays((prev) =>
+                    patchSkeletonStopName(prev, event.dayIndex!, event.stopIndex!, placeName),
+                  );
+                }
+              }
+              applyNarrative(event);
+            } else if (event.type === "day_done" && event.itinerary) {
+              setItinerary(event.itinerary);
+              setFillRouteDays(buildFillRouteDays(event.itinerary, t, { includeTransit: true }));
+              if (event.dayIndex == null || event.dayIndex === 1) {
+                setLiveSlots([]);
+                setDayPending(false);
+                setSlotPreviewText(null);
+              }
+              if (event.dayIndex != null && event.daysTotal != null) {
+                setGenProgress({ current: event.dayIndex, total: event.daysTotal });
+              }
+              applyNarrative(event);
+            } else if (event.type === "done" && event.itinerary) {
+              sawDone = true;
+              setItinerary(event.itinerary);
+              setFillRouteDays(buildFillRouteDays(event.itinerary, t, { includeTransit: true }));
+              setPagePhase("done");
+              setGenProgress(null);
+              setPlanSubPhase("idle");
+              setLiveSlots([]);
+              setDayPending(false);
+              setFocusDayIndex(1);
+              setSlotPreviewText(null);
+              applyNarrative(event);
+            } else if (event.type === "error") {
+              sawError = event.key ?? "errors.provider_failed";
+              console.error("fill stream error", event.key, "detail" in event ? event.detail : undefined);
+            }
+          },
+        );
+
+        if (sawError && !sawDone) {
+          const friendly = friendlyMakeErrorKey(resolveErrorKey(sawError));
+          setErrorKey(friendly);
+          setPagePhase("done");
+          // Keep partial itinerary; unlock later day tabs (do not stay in fill/skeleton lock).
+          setPlanSubPhase("idle");
+          setLiveSlots([]);
+          setDayPending(false);
+          setSlotPreviewText(null);
+          navLinesRef.current = appendAssistantLine(navLinesRef.current, t(friendly));
+          setNavStatusLines(navLinesRef.current);
+        } else if (!sawDone && !sawError) {
+          // Stream closed without done/error (BFF maxDuration kill, network drop, abort).
+          const key = "play.plan.assistant_fill_timeout";
+          setErrorKey(key);
+          setPagePhase("done");
+          setPlanSubPhase("idle");
+          setLiveSlots([]);
+          setDayPending(false);
+          setSlotPreviewText(null);
+          navLinesRef.current = appendAssistantLine(navLinesRef.current, t(key));
+          setNavStatusLines(navLinesRef.current);
+        }
+      } catch (err) {
+        const aborted =
+          (err instanceof DOMException && err.name === "AbortError") ||
+          (err instanceof Error && err.name === "AbortError");
+        const key = aborted
+          ? "play.plan.assistant_fill_timeout"
+          : err instanceof AuthApiError
+            ? friendlyMakeErrorKey(resolveErrorKey(err.key))
+            : "play.plan.assistant_make_failed";
+        setErrorKey(key);
+        setPagePhase("done");
+        setPlanSubPhase("idle");
+        setLiveSlots([]);
+        setDayPending(false);
+        setSlotPreviewText(null);
+        navLinesRef.current = appendAssistantLine(navLinesRef.current, t(key));
+        setNavStatusLines(navLinesRef.current);
+      } finally {
+        window.clearTimeout(abortTimer);
+        if (abortRef.current === controller) abortRef.current = null;
+        window.clearInterval(elapsedTimer);
+        if (sawDone && !sawError) setMakeElapsedMs(null);
+        else setMakeElapsedMs(Date.now() - makeStartedAt);
         setLoading(false);
       }
     },
@@ -821,13 +1134,28 @@ export default function PlanPageClient() {
           ok?: boolean;
           kind?: string;
           name?: string;
+          lat?: number;
+          lng?: number;
+          provider?: string;
+          native_id?: string;
+          photos?: string[];
           cards?: Array<{ name: string; lat?: number; lng?: number; provider?: string; native_id?: string }>;
         }>("/api/plan/resolve-origin", {
           method: "POST",
           body: JSON.stringify({ query: originQ, destination: dest, locale }),
         });
-        if (res.kind === "hit" && res.name) {
+        if (res.kind === "hit" && res.name && typeof res.lat === "number" && typeof res.lng === "number") {
           setOrigin(res.name);
+          setOriginLat(res.lat);
+          setOriginLng(res.lng);
+          setOriginStay({
+            name: res.name,
+            lat: res.lat,
+            lng: res.lng,
+            ...(res.provider ? { provider: res.provider } : {}),
+            ...(res.native_id ? { native_id: res.native_id } : {}),
+            ...(Array.isArray(res.photos) && res.photos.length ? { photos: res.photos.slice(0, 1) } : {}),
+          });
           setOriginOverlay(null);
         } else if (res.kind === "candidates" && res.cards?.length) {
           pendingSubmitConfirmRef.current = true;
@@ -1040,6 +1368,26 @@ export default function PlanPageClient() {
         }),
       );
       setLoading(false);
+
+      // MVP-T5: after framework, stream fill so main panel gets times/transit/meals.
+      if (res.trip_id) {
+        void runFillFromSkeleton({
+          ...criteria,
+          tripId: res.trip_id,
+          revision: res.revision,
+          planMode: "fill",
+          ...(origin.trim()
+            ? {
+                dailyStart: origin.trim(),
+                ...(typeof originLat === "number" && typeof originLng === "number"
+                  ? { originLat, originLng }
+                  : {}),
+                ...(originStay ? { originStay } : {}),
+              }
+            : {}),
+          timeFrom: startTime.trim() || "09:00",
+        });
+      }
     } catch (err) {
       const key =
         err instanceof AuthApiError
@@ -1060,7 +1408,7 @@ export default function PlanPageClient() {
     } finally {
       window.clearTimeout(abortTimer);
     }
-  }, [locale, takeoff, t, origin, startTime, other]);
+  }, [locale, takeoff, t, origin, startTime, other, originLat, originLng, originStay, runFillFromSkeleton]);
 
   const runSilentDiscover = useCallback(async () => {
     const fields = takeoff;
@@ -1381,19 +1729,47 @@ export default function PlanPageClient() {
     setPlaceSheetDay(dayIndex);
     setPlaceDetails(null);
     setPlaceDetailsError(null);
-    if (!slot.provider || !slot.nativeId) {
+    const slotDetails = {
+      name: slot.name,
+      summary: slot.summary,
+      ...(slot.photoUrl ? { photos: [slot.photoUrl] } : {}),
+      ...(slot.provider ? { provider: slot.provider } : {}),
+      ...(slot.nativeId
+        ? { sources: [{ provider: slot.provider, native_id: slot.nativeId }] }
+        : {}),
+    };
+    if (!slot.provider || !slot.nativeId || !isResolvablePlaceNativeId(slot.provider, slot.nativeId)) {
+      setPlaceDetails(slotDetails);
       setPlaceDetailsLoading(false);
       return;
     }
     setPlaceDetailsLoading(true);
     try {
       const data = await authJson<{ ok: boolean; data?: Record<string, unknown> }>(
-        `/api/places/${encodeURIComponent(slot.provider)}/${encodeURIComponent(slot.nativeId)}?locale=${locale}`,
+        `/api/places/${encodeURIComponent(slot.provider)}/${encodeURIComponent(slot.nativeId)}?locale=${locale}` +
+          `&name=${encodeURIComponent(slot.name)}` +
+          (destination.trim() ? `&city=${encodeURIComponent(destination.trim())}` : "") +
+          (typeof originLat === "number" && typeof originLng === "number"
+            ? `&lat=${originLat}&lng=${originLng}`
+            : ""),
       );
-      // ADR-051: do not treat details photos as a second thumb truth source.
-      setPlaceDetails(data.data ?? null);
+      // ADR-051: do not treat details photos as a second thumb truth source for the list;
+      // sheet may show details photos for lightbox when present.
+      const merged = {
+        ...slotDetails,
+        ...(data.data ?? {}),
+        photos:
+          (Array.isArray((data.data as { photos?: unknown })?.photos)
+            ? (data.data as { photos: string[] }).photos
+            : undefined) ?? slotDetails.photos,
+      };
+      setPlaceDetails(merged);
     } catch {
-      setPlaceDetailsError("play.plan.place_sheet_error");
+      // Soft degrade: keep slot name/photo; only show error when nothing useful to show.
+      setPlaceDetails(slotDetails);
+      if (!slot.photoUrl && !slot.summary?.trim()) {
+        setPlaceDetailsError("play.plan.place_sheet_error");
+      }
     } finally {
       setPlaceDetailsLoading(false);
     }
@@ -1523,9 +1899,9 @@ export default function PlanPageClient() {
             liveSlots={planSubPhase === "filling" ? liveSlots : []}
             showPending={loading && planSubPhase === "filling" && dayPending}
             generating={
-              (loading && (planSubPhase === "skeleton" || planSubPhase === "filling")) ||
-              (t3Mode && pagePhase === "done" && skeletonDays.length > 0)
+              loading && (planSubPhase === "skeleton" || planSubPhase === "filling")
             }
+            queueFutureDays={loading && planSubPhase === "filling"}
             skeletonStops={displaySkeletonStops}
             slotPreviewText={slotPreviewText}
             saving={saving}
@@ -1590,9 +1966,9 @@ export default function PlanPageClient() {
           frameworkReadyLine={frameworkReadyLine}
           deviations={skeletonDeviations}
           nextHintLine={
-            frameworkReadyLine ? t("play.plan.assistant_next_hint") : null
+            planCompleteLine ? t("play.plan.assistant_next_hint") : null
           }
-          onSoftReplan={frameworkReadyLine ? requestReplan : undefined}
+          onSoftReplan={planCompleteLine ? requestReplan : undefined}
           composerPlaceholder={
             t3Mode
               ? pagePhase === "progress" || loading

@@ -51,6 +51,10 @@ export async function authNdjsonEvents<T extends { type: string }>(
   init: RequestInit | undefined,
   onEvent: (event: T) => void,
 ): Promise<void> {
+  const signal = init?.signal;
+  if (signal?.aborted) {
+    throw new DOMException("The operation was aborted.", "AbortError");
+  }
   const res = await fetch(url, {
     credentials: "include",
     ...init,
@@ -69,28 +73,39 @@ export async function authNdjsonEvents<T extends { type: string }>(
     throw new AuthApiError("errors.provider_failed");
   }
   const reader = res.body.getReader();
+  const onAbort = () => {
+    void reader.cancel().catch(() => undefined);
+  };
+  signal?.addEventListener("abort", onAbort, { once: true });
   const decoder = new TextDecoder();
   let buffer = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    let nl = buffer.indexOf("\n");
-    while (nl >= 0) {
-      const line = buffer.slice(0, nl).trim();
-      buffer = buffer.slice(nl + 1);
-      if (line) {
-        try {
-          onEvent(JSON.parse(line) as T);
-        } catch {
-          throw new AuthApiError("errors.provider_failed");
-        }
+  try {
+    while (true) {
+      if (signal?.aborted) {
+        throw new DOMException("The operation was aborted.", "AbortError");
       }
-      nl = buffer.indexOf("\n");
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let nl = buffer.indexOf("\n");
+      while (nl >= 0) {
+        const line = buffer.slice(0, nl).trim();
+        buffer = buffer.slice(nl + 1);
+        if (line) {
+          try {
+            onEvent(JSON.parse(line) as T);
+          } catch {
+            throw new AuthApiError("errors.provider_failed");
+          }
+        }
+        nl = buffer.indexOf("\n");
+      }
     }
-  }
-  const tail = buffer.trim();
-  if (tail) {
-    onEvent(JSON.parse(tail) as T);
+    const tail = buffer.trim();
+    if (tail) {
+      onEvent(JSON.parse(tail) as T);
+    }
+  } finally {
+    signal?.removeEventListener("abort", onAbort);
   }
 }

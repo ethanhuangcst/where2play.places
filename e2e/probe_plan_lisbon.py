@@ -102,10 +102,11 @@ def main():
         print(f"windows: {windows[:6]}")
 
         ok = False
-        if first_block_start:
-            h, m = first_block_start.split(":")
-            mins = int(h) * 60 + int(m)
-            ok = abs(mins - (9 * 60 + 30)) <= 5
+        if first_block_start and ":" in first_block_start:
+            h, m = first_block_start.split(":", 1)
+            if h.isdigit() and m.isdigit():
+                mins = int(h) * 60 + int(m)
+                ok = abs(mins - (9 * 60 + 30)) <= 5
         print(f"AC3 first block within 09:30±5min: {'PASS' if ok else 'FAIL'}")
         browser.close()
 

@@ -28,6 +28,18 @@ export function mealPreviewRecommendName(
   return n;
 }
 
+/** Localize transit from/to when the endpoint is still an unresolved meal slot id. */
+export function transitEndpointLabel(
+  name: string | undefined | null,
+  t: (key: string, vars?: Record<string, string>) => string,
+): string {
+  const trimmed = name?.trim() ?? "";
+  if (!trimmed) return "";
+  const key = mealSlotLabelKey(trimmed);
+  if (key) return t(key);
+  return trimmed;
+}
+
 export function skeletonStopLabel(
   stop: { name?: string; kind?: string; mealSlot?: string; meal_slot?: string },
   t: (key: string, vars?: Record<string, string>) => string,

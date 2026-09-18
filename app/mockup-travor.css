@@ -711,8 +711,9 @@ body.shell-app[data-style="travor"] {
 
 [data-style="travor"] .plan-nav__thread .bubble--agent.bubble--agent-notice + .bubble--agent-notice,
 [data-style="travor"] .plan-nav__thread .bubble--agent.bubble--agent-notice + .msg-group--agent,
-[data-style="travor"] .plan-nav__thread .bubble--agent.bubble--agent-notice + .plan-nav__soft-cta {
-  margin-top: 0.5rem;
+[data-style="travor"] .plan-nav__thread .bubble--agent.bubble--agent-notice + .plan-nav__soft-cta,
+[data-style="travor"] .plan-nav__thread .plan-nav__spine + .plan-nav__complete-bubble {
+  margin-top: 0.65rem;
 }
 
 /* 骨架预览 */

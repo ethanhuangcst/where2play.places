@@ -2,6 +2,8 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import {
   mapLegsToTransitSlot,
   mapStopDisplayToPlaceSlot,
+  mapFilledStopToDisplay,
+  coalesceStopDisplayWithPhotos,
   skeletonDayHighlights,
 } from "../src/core/itinerary-skeleton-map";
 
@@ -133,6 +135,51 @@ describe("itinerary-skeleton-map (TC-M10-46-03)", () => {
     expect(slot.photoUrl).toBe("https://cdn.example/tower.jpg");
     expect(slot.provider).toBe("google");
     expect(slot.nativeId).toBe("ChIJtower");
+  });
+
+  it("should_match_belem_diacritic_folded_pool_name", () => {
+    // Exact match after diacritic fold only (Torre de Belém ↔ Torre de Belem).
+    // Cognate / word-order aliases (Belém Tower) belong in places-agent.
+    const slot = mapStopDisplayToPlaceSlot(
+      {
+        stop: { name: "Torre de Belém", kind: "attraction", card: null },
+        slot: { start: "10:00", end: "11:00" },
+      },
+      t,
+      {
+        pool: {
+          places: [
+            {
+              name: "Torre de Belem",
+              provider: "GOOGLE_MAPS",
+              photos: ["https://cdn.example/belem.jpg"],
+              sources: [{ provider: "GOOGLE_MAPS", native_id: "ChIJbelem" }],
+            },
+          ],
+        },
+      },
+    );
+    expect(slot.photoUrl).toBe("https://cdn.example/belem.jpg");
+  });
+
+  it("should_coalesce_envelope_photos_when_filled_stop_lacks_card", () => {
+    const filled = mapFilledStopToDisplay({
+      stop: { name: "Torre de Belém", kind: "attraction" },
+      slot: { start: "10:00", end: "11:30" },
+      legs: [],
+    });
+    const envelope = {
+      stop: {
+        name: "Torre de Belém",
+        kind: "attraction",
+        card: { name: "Torre de Belém", photos: ["https://cdn.example/belem.jpg"] },
+        deeplinks: {},
+      },
+      slot: { start: "10:00", end: "11:30" },
+    };
+    const merged = coalesceStopDisplayWithPhotos(filled, envelope);
+    const slot = mapStopDisplayToPlaceSlot(merged, t);
+    expect(slot.photoUrl).toBe("https://cdn.example/belem.jpg");
   });
 });
 

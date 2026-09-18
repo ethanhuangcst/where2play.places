@@ -1129,6 +1129,66 @@ html[lang^="zh"] .app-user__tools .btn {
   color: var(--ink);
 }
 
+/* Field-log thread (06-plan-fill-timeline): no chat plates during skeleton/fill/complete. */
+.plan-nav__thread--field-log {
+  gap: 1rem;
+}
+
+.plan-nav__thread--field-log .bubble--agent:not(.plan-nav__complete-bubble):not(.plan-nav__deviations),
+.plan-nav__thread--field-log .bubble--agent-notice:not(.plan-nav__complete-bubble):not(.plan-nav__deviations),
+.plan-nav__thread--field-log .msg-group--agent {
+  background: transparent !important;
+  border: 0 !important;
+  border-left: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  max-width: 100%;
+  padding: 0.15rem 0 0.35rem;
+}
+
+.plan-nav__thread--field-log .plan-nav__field-intro,
+.plan-nav__thread--field-log .plan-nav__field-status,
+.plan-nav__thread--field-log .plan-nav__deviations--field {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0.15rem 0 0.35rem;
+}
+
+.plan-nav__thread--field-log .plan-nav__deviations--field .plan-nav__notice-line {
+  font-weight: 500;
+  color: var(--ft-ink, var(--ink-2));
+}
+
+.plan-nav__thread--field-log .msg-group__line {
+  color: var(--ft-ink, var(--ink-2));
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.plan-nav__thread--field-log .msg-group__line + .msg-group__line {
+  margin-top: 0.4rem;
+}
+
+.plan-nav__spine {
+  margin: 0.15rem 0 0;
+  padding: 0;
+  background: transparent;
+}
+
+/* Complete line: white notice bubble (same as takeover); exempt from field-log de-chrome. */
+.plan-nav__thread--field-log .plan-nav__complete-bubble {
+  margin-top: 0.65rem;
+}
+
+.plan-nav__thread--complete [data-testid="plan-nav-takeover"],
+.plan-nav__thread--complete [data-testid="plan-nav-progress"],
+.plan-nav__thread--complete [data-testid="plan-thread-skeleton-intro"],
+.plan-nav__thread--complete [data-testid="plan-nav-status"],
+.plan-nav__thread--complete [data-testid="plan-make-progress"] {
+  display: none;
+}
+
 /* Bottom-right grip: height only — slim diagonal ticks */
 .chat-resize {
   position: absolute;

@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireUser } from "@/src/auth/user";
 import { normalizeLocale } from "@/src/core/locales";
-import { geocode, searchPlaces, suggestPlaces } from "@/src/places-agent/client";
-import { resolvePlanOrigin } from "@/src/core/plan-resolve-origin";
+import { geocode, getPlaceDetails, searchPlaces, suggestPlaces } from "@/src/places-agent/client";
+import { resolvePlanOriginWithPhotos } from "@/src/core/plan-resolve-origin";
 
 const schema = z.object({
   query: z.string(),
@@ -22,13 +22,35 @@ export async function POST(request: NextRequest) {
   }
 
   const locale = normalizeLocale(parsed.data.locale ?? gate.user.locale);
-  const resolved = await resolvePlanOrigin(
+  const resolved = await resolvePlanOriginWithPhotos(
     {
       query: parsed.data.query,
       destination: parsed.data.destination,
       locale,
     },
-    { searchPlaces, suggestPlaces, geocode },
+    {
+      searchPlaces,
+      suggestPlaces,
+      geocode,
+      getPlaceDetails: async (input) => {
+        const res = await getPlaceDetails({
+          provider: input.provider,
+          native_id: input.native_id,
+          locale: input.locale,
+          ...(input.providers?.length ? { providers: input.providers } : {}),
+        });
+        return {
+          ok: res.ok,
+          data: res.data
+            ? {
+                photos: Array.isArray((res.data as { photos?: unknown }).photos)
+                  ? ((res.data as { photos: string[] }).photos)
+                  : undefined,
+              }
+            : null,
+        };
+      },
+    },
   );
 
   if (resolved.kind === "hit") {
@@ -40,6 +62,7 @@ export async function POST(request: NextRequest) {
       lng: resolved.lng,
       provider: resolved.provider,
       native_id: resolved.native_id,
+      ...(resolved.photos?.length ? { photos: resolved.photos } : {}),
     });
   }
 
@@ -56,18 +79,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       kind: "candidates",
-      cards: resolved.cards.map((c) => ({
-        name: c.name,
-        lat: c.location?.lat,
-        lng: c.location?.lng,
-        provider: c.provider,
-        native_id: c.sources?.find((s) => s.native_id?.trim())?.native_id,
-      })),
+      cards: resolved.cards,
+      city: resolved.city,
     });
   }
 
-  return NextResponse.json({
-    ok: true,
-    kind: "not_found",
-  });
+  return NextResponse.json({ ok: true, kind: "not_found" });
 }
