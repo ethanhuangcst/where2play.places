@@ -80,6 +80,18 @@ describe("plan-page T3 hydrate after refresh", () => {
             dailyStart: "上海虹桥中心爱琴海亚朵S酒店",
           },
           itinerary: filledItinerary(),
+          skeleton: {
+            days: [
+              {
+                day_index: 1,
+                day_theme: "Day 1",
+                stops: [
+                  { name: "上海虹桥中心爱琴海亚朵S酒店", kind: "stay" },
+                  { name: "乐高探索中心", kind: "attraction" },
+                ],
+              },
+            ],
+          },
         };
       }
       return { ok: true };
@@ -104,5 +116,9 @@ describe("plan-page T3 hydrate after refresh", () => {
     expect(document.body.querySelector('[data-testid="plan-nav-refine-user"]')).toBeNull();
     expect(document.body.querySelector('[data-testid="plan-thread-fill-timeline"]')).toBeTruthy();
     expect(document.body.querySelector('[data-testid="plan-nav-soft-replan"]')).toBeTruthy();
+    expect(document.body.querySelector('[data-testid="plan-thread-skeleton"]')).toBeTruthy();
+    expect(document.body.querySelector('[data-testid="plan-thread-fill-begin"]')).toBeTruthy();
+    expect(document.body.querySelector('[data-testid="plan-nav-takeover"]')).toBeTruthy();
+    expect(document.body.textContent).toContain("乐高探索中心");
   });
 });

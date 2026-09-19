@@ -45,9 +45,11 @@ import {
   type SkeletonDeviation,
 } from "@/src/core/plan-t3-hydrate";
 import { validatePlanBoundaries } from "@/src/core/plan-validate";
+import { itineraryHasFilledPlaceSlots as itineraryHasFilledSlots } from "@/src/core/plan-itinerary-draft";
 import { resolveErrorKey } from "@/src/i18n/error-key";
 import { useLocale, useT } from "@/src/i18n/use-t";
 import { authJson, authNdjsonEvents, AuthApiError } from "@/src/ui/auth-api";
+import { SKELETON_HOLD_BEFORE_FILL_MS } from "@/src/core/plan-assistant-thread";
 import { PlanAssistantNav, type SkeletonPreviewDay } from "@/src/ui/plan-assistant-nav";
 import { PlanConstraintsPanel } from "@/src/ui/plan-constraints-panel";
 import { PlanItineraryView } from "@/src/ui/plan-itinerary-view";
@@ -66,11 +68,8 @@ type PlanCurrentResponse = {
   ok: boolean;
   criteria: PlanBoundaries | null;
   itinerary: ItineraryDto | null;
+  skeleton?: unknown;
 };
-
-function itineraryHasFilledSlots(it: ItineraryDto): boolean {
-  return it.days.some((d) => d.slots.some((s) => s.kind === "place"));
-}
 
 function defaultStartDate(): string {
   const d = new Date();
@@ -188,7 +187,9 @@ export default function PlanPageClient() {
   const [navStatusLines, setNavStatusLines] = useState<string[]>([]);
   const [t3Phases, setT3Phases] = useState<Array<{ phase: string }>>([]);
   const [frameworkReadyLine, setFrameworkReadyLine] = useState<string | null>(null);
+  const [fillBeginLine, setFillBeginLine] = useState<string | null>(null);
   const [planCompleteLine, setPlanCompleteLine] = useState<string | null>(null);
+  const fillHoldTimerRef = useRef<number | null>(null);
 
   const [slotPreviewText, setSlotPreviewText] = useState<string | null>(null);
 
@@ -478,6 +479,7 @@ export default function PlanPageClient() {
     pagePhase === "progress" ||
     Boolean(itinerary);
   const t3Mode =
+    pagePhase === "planning" ||
     pagePhase === "progress" ||
     (pagePhase === "done" && t3Phases.length > 0);
 
@@ -580,6 +582,22 @@ export default function PlanPageClient() {
                 tripType: tripTypeLabel,
               }),
             );
+            if (data.skeleton && c) {
+              const hydrated = hydrateFromAgentSkeleton(c, data.skeleton, t);
+              if (hydrated) {
+                setSkeletonDays(hydrated.skeletonDays);
+                setSkeletonDeviations(hydrated.deviations);
+                setFrameworkReadyLine(
+                  t("play.plan.assistant_framework_ready", {
+                    destination: c.destination,
+                    days: String(c.days),
+                    partySize: String(c.partySize ?? 2),
+                    tripType: tripTypeLabel,
+                  }),
+                );
+                setFillBeginLine(t("play.plan.assistant_fill_begin"));
+              }
+            }
             setNavOpen(true);
           }
         }
@@ -591,12 +609,24 @@ export default function PlanPageClient() {
     })();
     return () => {
       cancelled = true;
+      if (fillHoldTimerRef.current != null) {
+        window.clearTimeout(fillHoldTimerRef.current);
+        fillHoldTimerRef.current = null;
+      }
     };
+  }, []);
+
+  const clearFillHoldTimer = useCallback(() => {
+    if (fillHoldTimerRef.current != null) {
+      window.clearTimeout(fillHoldTimerRef.current);
+      fillHoldTimerRef.current = null;
+    }
   }, []);
 
   const resetPlanningState = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
+    clearFillHoldTimer();
     setItinerary(null);
     setLoading(false);
     setPlanSubPhase("idle");
@@ -611,6 +641,7 @@ export default function PlanPageClient() {
     setPlanCompleteLine(null);
     setT3Phases([]);
     setFrameworkReadyLine(null);
+    setFillBeginLine(null);
     navLinesRef.current = [];
     narrativeCtxRef.current = null;
     setSlotPreviewText(null);
@@ -632,7 +663,7 @@ export default function PlanPageClient() {
     setIntakeAnswers({});
     setIntakeStep(null);
     setIntakeComplete(false);
-  }, []);
+  }, [clearFillHoldTimer]);
 
   const resetToBlankTakeoff = useCallback(() => {
     resetPlanningState();
@@ -1308,6 +1339,7 @@ export default function PlanPageClient() {
     // Optimistic progress: generating while BFF runs (trip_created is not a user-visible step).
     setT3Phases([{ phase: "skeleton_generating" }]);
     setFrameworkReadyLine(null);
+    setFillBeginLine(null);
     setLoading(true);
     setPlanSubPhase("skeleton");
     setErrorKey(null);
@@ -1441,9 +1473,11 @@ export default function PlanPageClient() {
       );
       setLoading(false);
 
-      // MVP-T5: after framework, stream fill so main panel gets times/transit/meals.
+      // Soft two-step: show skeleton + fill-begin copy, then append fill (do not replace skeleton).
+      setFillBeginLine(t("play.plan.assistant_fill_begin"));
       if (res.trip_id) {
-        void runFillFromSkeleton({
+        clearFillHoldTimer();
+        const fillCriteria: PlanBoundaries = {
           ...criteria,
           tripId: res.trip_id,
           revision: res.revision,
@@ -1458,7 +1492,11 @@ export default function PlanPageClient() {
               }
             : {}),
           timeFrom: startTime.trim() || "09:00",
-        });
+        };
+        fillHoldTimerRef.current = window.setTimeout(() => {
+          fillHoldTimerRef.current = null;
+          void runFillFromSkeleton(fillCriteria);
+        }, SKELETON_HOLD_BEFORE_FILL_MS);
       }
     } catch (err) {
       const key =
@@ -1480,7 +1518,7 @@ export default function PlanPageClient() {
     } finally {
       window.clearTimeout(abortTimer);
     }
-  }, [locale, takeoff, t, origin, startTime, other, originLat, originLng, originStay, runFillFromSkeleton]);
+  }, [locale, takeoff, t, origin, startTime, other, originLat, originLng, originStay, runFillFromSkeleton, clearFillHoldTimer]);
 
   runFillFromSkeletonRef.current = runFillFromSkeleton;
 
@@ -2038,6 +2076,7 @@ export default function PlanPageClient() {
           t3Mode={t3Mode}
           t3ProgressSteps={t3Mode ? t3ProgressSteps : undefined}
           frameworkReadyLine={frameworkReadyLine}
+          fillBeginLine={fillBeginLine}
           deviations={skeletonDeviations}
           nextHintLine={
             planCompleteLine ? t("play.plan.assistant_next_hint") : null
@@ -2092,7 +2131,9 @@ export default function PlanPageClient() {
                 setLoading(true);
                 setPlanSubPhase("skeleton");
                 setPagePhase("progress");
+                clearFillHoldTimer();
                 setFrameworkReadyLine(null);
+                setFillBeginLine(null);
                 setT3Phases((prev) => {
                   const base = prev.length
                     ? prev.filter((p) => p.phase !== "skeleton_ready" && p.phase !== "failed")

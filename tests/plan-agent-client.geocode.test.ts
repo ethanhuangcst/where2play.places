@@ -90,4 +90,18 @@ describe("client.geocode (forward geocode: name → coordinates)", () => {
     expect(envelope.ok).toBe(false);
     expect(envelope.data).toBeUndefined();
   });
+
+  it("should_map_agent_500_html_to_provider_failed_not_dest_spelling", async () => {
+    setPlacesAgentFetchForTests(async () =>
+      new Response("<html>Internal Server Error</html>", {
+        status: 500,
+        headers: { "Content-Type": "text/html" },
+      }),
+    );
+
+    const envelope = await geocode({ query: "里斯本", locale: "CN" });
+
+    expect(envelope.ok).toBe(false);
+    expect(envelope.outcome?.key).toBe("errors.provider_failed");
+  });
 });

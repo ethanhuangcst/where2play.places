@@ -8,4 +8,5 @@ dist/
 coverage/
 *.tsbuildinfo
 .venv/
+tests/.fill-timing-spike.json
 

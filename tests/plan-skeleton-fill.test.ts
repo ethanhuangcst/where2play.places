@@ -327,7 +327,7 @@ describe("plan-skeleton-fill orchestrator (TC-M10-46-01/02)", () => {
     expect(planCalls.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("TC-M18-75-01 should_fetch_skeleton_after_make_and_filled_after_plan_next_stop", async () => {
+  it("TC-M18-75-01 should_fetch_skeleton_after_make_and_skip_filled_when_stay_envelope_complete", async () => {
     vi.spyOn(client, "geocode").mockResolvedValue({
       agent: "places-agent",
       ok: true,
@@ -377,7 +377,7 @@ describe("plan-skeleton-fill orchestrator (TC-M10-46-01/02)", () => {
 
     const fields = fetchSpy.mock.calls.map((c) => (c[0] as { fields?: string[] }).fields);
     expect(fields.some((f) => f?.includes("skeleton"))).toBe(true);
-    expect(fields.some((f) => f?.includes("filled"))).toBe(true);
+    expect(fields.some((f) => f?.includes("filled"))).toBe(false);
   });
 
   it("should_hydrate_candidates_from_fetch_when_discover_envelope_has_empty_pool", async () => {
@@ -1286,5 +1286,67 @@ describe("make failure fetch recovery (TC-M19-78-02)", () => {
     expect(stopFilled.some((s) => s.name?.startsWith("WRONG-"))).toBe(false);
     expect(transitTexts.some((t) => t.includes("12"))).toBe(true);
     expect(transitTexts.some((t) => t.includes("99"))).toBe(false);
+  });
+
+  it("should_skip_fetch_trip_details_filled_when_envelope_has_display", async () => {
+    vi.spyOn(client, "geocode").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: { lat: 1, lng: 2, crs: "WGS84" },
+    });
+    vi.spyOn(client, "discoverPlaces").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: {
+        candidates: { places: [{ name: "Tower" }], restaurants: [] },
+        trip_id: "t1",
+        revision: 1,
+      },
+    });
+    vi.spyOn(client, "makeItinerary").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: {
+        skeleton: {
+          days: [{ day_index: 1, stops: [{ name: "Hotel", kind: "stay" }] }],
+        },
+        trip_id: "t1",
+        revision: 2,
+      },
+    });
+    const fetchSpy = vi.spyOn(client, "fetchTripDetails").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: { trip_id: "t1", revision: 2, data: {} },
+    });
+    vi.spyOn(client, "planNextStop").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: {
+        trip_id: "t1",
+        revision: 2,
+        stop: { name: "Hotel", kind: "stay", card: null, deeplinks: {} },
+        slot: { start: "09:00", end: "09:00" },
+        legs: [],
+      },
+    });
+
+    for await (const ev of planItinerarySkeletonFill(
+      {
+        destination: "Lisbon",
+        days: 1,
+        startDate: "2026-10-10",
+        dailyStart: "Hotel",
+      },
+      { locale: "EN", providers: ["GOOGLE_MAPS"] },
+    )) {
+      if (ev.type === "error") break;
+    }
+
+    const filledFetches = fetchSpy.mock.calls.filter((call) => {
+      const fields = (call[0] as { fields?: string[] })?.fields;
+      return fields?.includes("filled");
+    });
+    expect(filledFetches).toHaveLength(0);
   });
 });

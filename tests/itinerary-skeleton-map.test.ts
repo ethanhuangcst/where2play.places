@@ -181,6 +181,49 @@ describe("itinerary-skeleton-map (TC-M10-46-03)", () => {
     const slot = mapStopDisplayToPlaceSlot(merged, t);
     expect(slot.photoUrl).toBe("https://cdn.example/belem.jpg");
   });
+
+  it("should_omit_photoUrl_for_rfc2606_placeholder_hosts (list slot-thumb)", () => {
+    const GOOGLE_CDN =
+      "https://lh3.googleusercontent.com/grass-cs/ACvplmOe8KCuyS9mjCCizL3TveFa1Q4VSiK833YJ1T-_jgHO0Xycbj8htOt7QAkdIyONKxwedV2LVGev_0vpxubggmLkXnkgiDGPsqRHYsBJ2qvtgkbqmYg0l5KDkuMUjd9dD56cYGiO5xfWfbQ7=s4800-w800";
+    const slot = mapStopDisplayToPlaceSlot(
+      {
+        stop: {
+          name: "Torre de Belém",
+          kind: "attraction",
+          provider: "GOOGLE_MAPS",
+          native_id: "ChIJS5zCw0LLHg0RP1FSz63cAjA",
+          card: {
+            name: "Torre de Belém",
+            photos: ["https://cdn.example.com/verify_belem.jpg", GOOGLE_CDN],
+            sources: [
+              {
+                provider: "GOOGLE_MAPS",
+                native_id: "ChIJS5zCw0LLHg0RP1FSz63cAjA",
+                deeplinks: {},
+              },
+            ],
+          },
+          deeplinks: {},
+        },
+        slot: { start: "10:00", end: "11:30" },
+        legs_to_here: [],
+      },
+      t,
+    );
+    expect(slot.photoUrl).toBe(GOOGLE_CDN);
+    const noPhoto = mapStopDisplayToPlaceSlot(
+      {
+        stop: {
+          name: "Site",
+          kind: "attraction",
+          card: { photos: ["https://cdn.example.com/only.jpg"] },
+        },
+        slot: { start: "10:00", end: "11:00" },
+      },
+      t,
+    );
+    expect(noPhoto.photoUrl).toBeUndefined();
+  });
 });
 
 describe("plan-skeleton-fill (TC-M10-46-01)", () => {

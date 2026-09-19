@@ -5,7 +5,9 @@ import { describe, expect, it } from "vitest";
 import {
   cachedDayMatchesSkeletonAttractions,
   itineraryFromSkeletonFetch,
+  refreshItineraryFromTripLedger,
 } from "@/src/core/plan-session-cache";
+import { setPlacesAgentFetchForTests } from "../src/places-agent/client";
 import type { ItineraryDto } from "@/src/core/itinerary-types";
 
 const criteria = {
@@ -82,6 +84,73 @@ describe("plan-session-cache skeleton merge", () => {
     const day2 = merged.days.find((d) => d.dayIndex === 2);
     expect(day2?.slots.length).toBe(0);
     expect(day2?.slots.some((s) => s.name.includes("海昌"))).toBe(false);
+  });
+
+  it("should_keep_full_cached_itinerary_on_refresh_when_board_has_filled_slots", async () => {
+    setPlacesAgentFetchForTests(async (input) => {
+      if (String(input).includes("/v1/fetch_trip_details")) {
+        return new Response(
+          JSON.stringify({
+            agent: "places-agent",
+            ok: true,
+            data: {
+              trip_id: "trip-draft-1",
+              revision: 9,
+              data: {
+                skeleton: {
+                  days: [
+                    {
+                      day_index: 1,
+                      stops: [
+                        { name: "Hotel", kind: "stay" },
+                        { name: "Different Attraction", kind: "attraction" },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return new Response(JSON.stringify({ agent: "places-agent", ok: false }), { status: 502 });
+    });
+
+    const cached: ItineraryDto = {
+      title: "上海",
+      destination: "上海",
+      daysCount: 1,
+      updatedAt: new Date().toISOString(),
+      days: [
+        {
+          dayIndex: 1,
+          highlights: { label: "D1", title: "Day 1", tags: [] },
+          slots: [
+            {
+              kind: "place",
+              start: "09:00",
+              end: "11:00",
+              placeKind: "Attraction",
+              name: "乐高探索中心",
+              summary: "",
+            },
+          ],
+        },
+      ],
+    };
+
+    const refreshed = await refreshItineraryFromTripLedger({
+      criteria: { ...criteria, days: 1, tripId: "trip-draft-1", revision: 8 },
+      cached,
+      locale: "CN",
+    });
+    setPlacesAgentFetchForTests(null);
+
+    const slot0 = refreshed?.itinerary.days[0]?.slots[0];
+    expect(slot0?.kind === "place" && slot0.name).toBe("乐高探索中心");
+    expect(refreshed?.criteria.revision).toBe(9);
+    expect(refreshed?.skeleton).toBeTruthy();
   });
 
   it("should_reuse_cached_day_when_skeleton_names_match", () => {

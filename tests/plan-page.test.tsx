@@ -110,6 +110,38 @@ describe("TC-M10-46-05 plan-page takeoff", () => {
     expect(document.body.querySelector('[data-testid="plan-nav-takeover"]')).toBeTruthy();
     expect(document.body.querySelector('[data-testid="plan-nav-default"]')).toBeNull();
   });
+
+  it("should_show_dest_geocode_error_without_flagging_start_date_when_date_is_set", async () => {
+    authJson.mockImplementation(async (url: string) => {
+      if (url === "/api/plan/current") {
+        return { ok: true, criteria: null, itinerary: null };
+      }
+      if (url === "/api/geocode") {
+        return { ok: false, error: { key: "play.plan.dest_geocode_failed" } };
+      }
+      return { ok: true };
+    });
+
+    const { getByTestId, container } = renderWithLocale(<PlanPageClient />, "CN");
+    await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
+
+    fireEvent.change(getByTestId("plan-dest"), { target: { value: "里斯本" } });
+    fireEvent.blur(getByTestId("plan-dest"));
+    fireEvent.change(getByTestId("plan-start-date"), { target: { value: "2026-09-20" } });
+    fireEvent.change(getByTestId("plan-days"), { target: { value: "3" } });
+    fireEvent.change(getByTestId("plan-party"), { target: { value: "2" } });
+    fireEvent.click(getByTestId("plan-submit"));
+
+    await waitFor(() => {
+      const destField = container.querySelector('[data-field="dest"]');
+      expect(destField?.className).toContain("is-invalid");
+      expect(destField?.textContent).toContain("无法核实该目的地");
+    });
+    expect(container.querySelector('[data-field="start_date"]')?.className).not.toContain(
+      "is-invalid",
+    );
+    expect(authNdjsonEvents).not.toHaveBeenCalled();
+  });
 });
 
 describe("TC-M10-46-08 plan-takeoff horizontal layout", () => {
@@ -1725,30 +1757,72 @@ describe("2play-plan-90a T1 session intake without auto-fill", () => {
     delete document.body.dataset.style;
   });
 
-  it("should_not_call_plan_ndjson_after_four_need_answers", async () => {
-    // Rewritten for T3: takeoff → skeleton_only trip; no NDJSON /api/plan fill stream.
-    const { getByTestId } = renderWithLocale(<PlanPageClient />);
+  it("should_hold_skeleton_then_start_fill_stream_without_replacing_framework", async () => {
+    authNdjsonEvents.mockImplementation(async (_url, _init, onEvent) => {
+      onEvent({ type: "phase", phase: "filling", dayIndex: 1, daysTotal: 1 });
+      onEvent({
+        type: "done",
+        itinerary: {
+          title: "Lisbon",
+          destination: "Lisbon",
+          daysCount: 1,
+          updatedAt: new Date().toISOString(),
+          days: [
+            {
+              dayIndex: 1,
+              highlights: { label: "D1", title: "Belém", tags: [] },
+              slots: [
+                {
+                  kind: "place",
+                  start: "10:00",
+                  end: "11:00",
+                  placeKind: "attraction",
+                  name: "Torre de Belém",
+                  summary: "",
+                },
+              ],
+            },
+          ],
+        },
+      });
+    });
+    const { getByTestId } = renderWithLocale(<PlanPageClient />, "CN");
     await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
     await submitTakeoff(getByTestId);
     await waitFor(() => expect(authJson.mock.calls.some((c) => c[0] === "/api/plan/trip")).toBe(true));
 
     await waitFor(() => {
-      expect(document.body.querySelector('[data-testid="plan-progress"]')).toBeTruthy();
       expect(document.body.querySelector('[data-testid="plan-thread-skeleton"]')).toBeTruthy();
-      expect(document.body.querySelector('[data-testid="plan-nav-takeover"]')).toBeTruthy();
-      expect(document.body.querySelector('[data-testid="plan-nav-greeting"]')).toBeNull();
-      expect(document.body.querySelector('[data-step="trip_created"]')).toBeNull();
-      expect(document.body.querySelector('[data-step="skeleton_generating"]')).toBeTruthy();
+      expect(document.body.querySelector('[data-testid="plan-thread-fill-begin"]')?.textContent).toContain(
+        "完善行程每一站的细节",
+      );
     });
+    expect(authNdjsonEvents).not.toHaveBeenCalled();
+
+    await waitFor(
+      () => {
+        expect(authNdjsonEvents).toHaveBeenCalled();
+      },
+      { timeout: 4000 },
+    );
+    const planCall = authNdjsonEvents.mock.calls.find((c) => c[0] === "/api/plan");
+    expect(planCall).toBeTruthy();
+    const body = JSON.parse(String((planCall?.[1] as { body?: string })?.body ?? "{}"));
+    expect(body.planMode).toBe("fill");
+    expect(body.skeleton_only).not.toBe(true);
+
+    await waitFor(() => {
+      expect(document.body.querySelector('[data-testid="plan-thread-fill-timeline"]')).toBeTruthy();
+    });
+    expect(document.body.querySelector('[data-testid="plan-thread-skeleton"]')).toBeTruthy();
+    expect(document.body.querySelector('[data-testid="plan-thread-fill-begin"]')).toBeTruthy();
 
     const tripPost = authJson.mock.calls.find(
       (c) => c[0] === "/api/plan/trip" && (c[1] as RequestInit | undefined)?.method === "POST",
     );
     expect(tripPost).toBeTruthy();
-    const body = JSON.parse(String((tripPost?.[1] as { body?: string })?.body ?? "{}"));
-    expect(body.skeleton_only).toBe(true);
-    expect(authNdjsonEvents).not.toHaveBeenCalled();
-    expect(authJson.mock.calls.some((c) => c[0] === "/api/plan")).toBe(false);
+    const tripBody = JSON.parse(String((tripPost?.[1] as { body?: string })?.body ?? "{}"));
+    expect(tripBody.skeleton_only).toBe(true);
   });
 
   it.skip("should_patch_session_skip_when_hotel_is_empty — superseded by 2play-plan-101 (no hotel need after takeoff)", async () => {

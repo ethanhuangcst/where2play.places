@@ -41,6 +41,37 @@ function foldDiacritics(s: string): string {
   return s.normalize("NFD").replace(/\p{M}/gu, "");
 }
 
+function isPlaceholderPhotoHost(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  return (
+    h === "example.com" ||
+    h.endsWith(".example.com") ||
+    h === "example.org" ||
+    h.endsWith(".example.org") ||
+    h === "example.net" ||
+    h.endsWith(".example.net")
+  );
+}
+
+function firstHttpPhoto(photos: unknown): string | undefined {
+  if (!Array.isArray(photos)) return undefined;
+  for (const p of photos) {
+    if (typeof p !== "string" || !p.startsWith("http")) continue;
+    let raw = p;
+    if (raw.startsWith("http://") && /autonavi\.com|amap\.com/i.test(raw)) {
+      raw = raw.replace(/^http:\/\//i, "https://");
+    }
+    if (!raw.startsWith("https://")) continue;
+    try {
+      if (isPlaceholderPhotoHost(new URL(raw).hostname)) continue;
+    } catch {
+      continue;
+    }
+    return raw;
+  }
+  return undefined;
+}
+
 /**
  * Thin pool cache: native_id + exact / folded / substring name only.
  * Cross-locale cognate aliases (Castelo ↔ Saint George) belong in places-agent
@@ -81,14 +112,7 @@ export function lookupPoolCandidate(
     (needleId ? card.sources?.find((s) => s.native_id === needleId) : undefined) ??
     card.sources?.find((s) => s.native_id) ??
     card.sources?.[0];
-  const rawPhoto = Array.isArray(card.photos)
-    ? card.photos.find((p) => typeof p === "string" && p.startsWith("http"))
-    : undefined;
-  const photoUrl = rawPhoto
-    ? rawPhoto.startsWith("http://") && /autonavi\.com|amap\.com/i.test(rawPhoto)
-      ? rawPhoto.replace(/^http:\/\//i, "https://")
-      : rawPhoto
-    : undefined;
+  const photoUrl = firstHttpPhoto(card.photos);
   return {
     provider: src?.provider ?? card.provider ?? opts?.provider,
     nativeId: src?.native_id ?? needleId,
@@ -255,16 +279,6 @@ export function mapFilledStopToDisplay(filled: {
     slot: filled.slot,
     legs_to_here: filled.legs,
   };
-}
-
-function firstHttpPhoto(photos: unknown): string | undefined {
-  if (!Array.isArray(photos)) return undefined;
-  const raw = photos.find((p): p is string => typeof p === "string" && p.startsWith("http"));
-  if (!raw) return undefined;
-  if (raw.startsWith("http://") && /autonavi\.com|amap\.com/i.test(raw)) {
-    return raw.replace(/^http:\/\//i, "https://");
-  }
-  return raw;
 }
 
 /**

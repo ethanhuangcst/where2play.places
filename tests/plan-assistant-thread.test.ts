@@ -38,6 +38,31 @@ describe("buildAssistantThread (ADR-071 replan-only)", () => {
     expect(kinds).not.toContain("refine_progress");
   });
 
+  it("should_append_fill_begin_after_skeleton_and_keep_both_spines", () => {
+    const items = buildAssistantThread({
+      ...baseInput,
+      planCompleteLine: null,
+      frameworkReadyLine: "里斯本 4 天框架已经规划完毕：",
+      fillBeginLine: "行程框架设计完毕，现在开始完善行程每一站的细节，并安排用餐。",
+      skeletonRouteDays: [{ dayIndex: 1, theme: "Belém", legs: [] }],
+      fillRouteDays: [{ dayIndex: 1, theme: "Belém details", legs: [] }],
+      nextHintLine: null,
+      showSoftReplan: false,
+    });
+    const kinds = items.map((i) => i.kind);
+    const introIdx = kinds.indexOf("skeleton_intro");
+    const spines = items.filter((i) => i.kind === "spine");
+    const fillBeginIdx = kinds.indexOf("fill_begin");
+    const skelIdx = items.findIndex((i) => i.kind === "spine" && i.spineVariant === "skeleton");
+    const fillIdx = items.findIndex((i) => i.kind === "spine" && i.spineVariant === "fill");
+    expect(introIdx).toBeGreaterThanOrEqual(0);
+    expect(spines).toHaveLength(2);
+    expect(skelIdx).toBeGreaterThan(introIdx);
+    expect(fillBeginIdx).toBeGreaterThan(skelIdx);
+    expect(fillIdx).toBeGreaterThan(fillBeginIdx);
+    expect(items[fillBeginIdx]?.content).toContain("完善行程每一站");
+  });
+
   it("should_omit_next_hint_when_not_provided", () => {
     const items = buildAssistantThread({ ...baseInput, nextHintLine: null, showSoftReplan: false });
     expect(items.map((i) => i.kind)).not.toContain("next_hint");

@@ -17,7 +17,8 @@ export type ThreadKind =
   | "complete"
   | "deviations"
   | "next_hint"
-  | "soft_replan";
+  | "soft_replan"
+  | "fill_begin";
 
 export type AssistantThreadItem = {
   id: string;
@@ -32,10 +33,14 @@ export type AssistantThreadItem = {
   deviations?: SkeletonDeviation[];
 };
 
+/** Soft two-step: hold skeleton on screen before auto-starting fill. */
+export const SKELETON_HOLD_BEFORE_FILL_MS = 2000;
+
 export type BuildAssistantThreadInput = {
   t3Mode: boolean;
   planCompleteLine: string | null;
   frameworkReadyLine: string | null;
+  fillBeginLine?: string | null;
   t3ProgressSteps?: Array<{ id: string; state: T3ProgressStepState }>;
   statusLines: string[];
   makeElapsedSeconds: string | null;
@@ -77,6 +82,25 @@ function buildPlanningItems(input: BuildAssistantThreadInput): AssistantThreadIt
     }
   }
 
+  if (input.skeletonRouteDays.length > 0) {
+    items.push({
+      id: nextId("spine-skel"),
+      role: "system",
+      kind: "spine",
+      spineVariant: "skeleton",
+      spineDays: input.skeletonRouteDays,
+    });
+  }
+
+  if (input.fillBeginLine) {
+    items.push({
+      id: nextId("fill-begin"),
+      role: "system",
+      kind: "fill_begin",
+      content: input.fillBeginLine,
+    });
+  }
+
   if (input.statusLines.length > 0 && !input.planCompleteLine) {
     items.push({
       id: nextId("status"),
@@ -92,16 +116,6 @@ function buildPlanningItems(input: BuildAssistantThreadInput): AssistantThreadIt
       role: "system",
       kind: "make_elapsed",
       makeElapsedSeconds: input.makeElapsedSeconds,
-    });
-  }
-
-  if (input.skeletonRouteDays.length > 0 && input.fillRouteDays.length === 0) {
-    items.push({
-      id: nextId("spine-skel"),
-      role: "system",
-      kind: "spine",
-      spineVariant: "skeleton",
-      spineDays: input.skeletonRouteDays,
     });
   }
 

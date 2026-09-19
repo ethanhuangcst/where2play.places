@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify: 1) trip-type combo opens; 2) takeover notice bubble style; 3) deviation friendly copy (via mock-free unit path, browser part checks 1+2)."""
+"""Verify assistant thread UX: takeover notice bubble + plan-progress beads after takeoff."""
 from __future__ import annotations
 
 import sys
@@ -35,32 +35,7 @@ def main() -> None:
         page.wait_for_url("**/plan**", timeout=30000)
         page.wait_for_selector('[data-testid="plan-form"]')
 
-        # Issue 1: combo opens via toggle and via input focus
-        toggle = page.locator('[data-testid="plan-trip-type-toggle"]')
-        if not toggle.count():
-            issues.append("combo toggle missing")
-        else:
-            toggle.first.click(force=True)
-            page.wait_for_timeout(400)
-            opts = page.locator('[data-testid="plan-trip-type-option"]')
-            n = opts.count()
-            print("options after toggle click:", n)
-            if n == 0:
-                issues.append("combo list did not open on toggle click")
-            else:
-                # pick second option to prove selection works
-                opts.nth(1).click()
-                page.wait_for_timeout(300)
-                val = page.locator('[data-testid="plan-trip-type"]').input_value()
-                print("selected value:", val)
-            page.screenshot(path=str(SHOTS / "1-combo-open.png"))
-
-        # keyboard path: focus input, arrow down, enter
-        page.locator('[data-testid="plan-trip-type"]').click()
-        page.keyboard.press("Escape")
-        page.wait_for_timeout(200)
-
-        # Issue 2: run a real takeoff → takeover bubble styles
+        # Live takeoff → takeover + progress beads
         page.fill('[data-testid="plan-dest"]', "Lisbon")
         page.locator('[data-testid="plan-dest"]').blur()
         page.wait_for_selector('[data-testid="plan-dest-verified"]', timeout=15000)
@@ -71,6 +46,20 @@ def main() -> None:
         page.click('[data-testid="plan-submit-confirm-ok"]')
         page.wait_for_selector('[data-testid="plan-nav-takeover"]', timeout=30000)
         page.wait_for_timeout(500)
+
+        progress = page.locator('[data-testid="plan-nav-progress"]')
+        if progress.count():
+            beads = page.locator(".plan-progress__bead")
+            labels = page.locator(".plan-progress__label")
+            hints = page.locator(".plan-progress__hint")
+            if beads.count() < 1:
+                issues.append("plan-progress beads missing during framework generation")
+            if labels.count() < 1 or hints.count() < 1:
+                issues.append("plan-progress label/hint missing")
+            elif labels.first.inner_text().strip() == hints.first.inner_text().strip():
+                issues.append("plan-progress label equals hint (mashed copy)")
+        else:
+            issues.append("plan-nav-progress missing after takeover")
 
         cls = page.locator('[data-testid="plan-nav-takeover"]').get_attribute("class") or ""
         print("takeover class:", cls)

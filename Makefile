@@ -57,6 +57,13 @@ test-e2e-mvp2-live: up db-migrate ## MVP-2 live Plan + save journey
 test-e2e-mvp-t3: up db-migrate ## T3 Hangzhou 3d takeoff → skeleton (servers reused if up)
 	python3 e2e/e2e_t3_skeleton_hz.py
 
+test-e2e-assistant-thread: up db-migrate ## Assistant thread beads + notice bubbles (live takeoff)
+	python3 e2e/probe_t3_ui_verify.py
+
+test-e2e-draft-persist: up db-migrate ## ADR-073 Hangzhou 1d fill → saved → plan (AMAP)
+	@chmod +x e2e/e2e_draft_persist_hz.py
+	python3 e2e/run.py draft-persist-hz
+
 test-e2e-mvp3-live: up db-migrate ## MVP-3 live Mode H + transit + must-see probe
 	PLAN_SLOT_STAGE_MS=0 python3 e2e/run.py mvp3-live
 

@@ -5,6 +5,7 @@ import { skeletonDayHighlights } from "./itinerary-skeleton-map";
 import { t as catalogT } from "../i18n/catalog";
 import { normalizeLocale, type Locale } from "./locales";
 import { prisma } from "../db/client";
+import { itineraryHasFilledPlaceSlots } from "./plan-itinerary-draft";
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -147,6 +148,8 @@ function asSkeletonDays(raw: unknown): SkeletonDay[] {
   return Array.isArray(days) ? (days as SkeletonDay[]) : [];
 }
 
+export { itineraryHasFilledPlaceSlots } from "./plan-itinerary-draft";
+
 export function itineraryFromSkeletonFetch(
   criteria: PlanBoundaries,
   skeletonRaw: unknown,
@@ -187,7 +190,7 @@ export async function refreshItineraryFromTripLedger(opts: {
   criteria: PlanBoundaries;
   cached: ItineraryDto | null;
   locale: string;
-}): Promise<{ criteria: PlanBoundaries; itinerary: ItineraryDto } | null> {
+}): Promise<{ criteria: PlanBoundaries; itinerary: ItineraryDto; skeleton?: unknown } | null> {
   const tripId = opts.criteria.tripId;
   if (!tripId) return null;
 
@@ -204,6 +207,13 @@ export async function refreshItineraryFromTripLedger(opts: {
     tripId,
     revision: typeof revision === "number" ? revision : opts.criteria.revision,
   });
-  const itinerary = itineraryFromSkeletonFetch(criteria, slice.skeleton, opts.cached, opts.locale);
-  return { criteria, itinerary };
+  const skeleton = slice.skeleton;
+  const itinerary = itineraryHasFilledPlaceSlots(opts.cached)
+    ? opts.cached!
+    : itineraryFromSkeletonFetch(criteria, slice.skeleton, opts.cached, opts.locale);
+  return {
+    criteria,
+    itinerary,
+    ...(skeleton != null ? { skeleton } : {}),
+  };
 }

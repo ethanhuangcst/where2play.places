@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
 
   let criteria = row.criteriaJson as PlanBoundaries;
   let itinerary = row.itineraryJson as ItineraryDto;
+  let skeleton: unknown;
   const locale = normalizeLocale(criteria.locale ?? gate.user.locale);
 
   if (criteria.tripId) {
@@ -29,6 +30,7 @@ export async function GET(request: NextRequest) {
     if (refreshed) {
       criteria = refreshed.criteria;
       itinerary = refreshed.itinerary;
+      if (refreshed.skeleton != null) skeleton = refreshed.skeleton;
     }
   }
 
@@ -36,6 +38,7 @@ export async function GET(request: NextRequest) {
     ok: true,
     criteria,
     itinerary,
+    ...(skeleton != null ? { skeleton } : {}),
     updatedAt: row.updatedAt.toISOString(),
   });
 }

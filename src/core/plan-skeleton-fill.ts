@@ -265,6 +265,16 @@ type PlanNextStopData = StopDisplayPayload & {
   next_stop?: { name?: string; location?: { lat?: number; lng?: number } | null };
 };
 
+/** Skip redundant fetch `filled` when plan_next_stop envelope is already authoritative. */
+export function envelopeIsFillComplete(display: StopDisplayPayload | undefined): boolean {
+  if (!display?.stop?.name || !display?.slot) return false;
+  const card = display.stop.card;
+  if (card?.photos?.some((p) => typeof p === "string" && p.startsWith("http"))) return true;
+  if (card?.sources?.some((s) => s?.native_id?.trim())) return true;
+  if (display.stop.kind === "stay") return true;
+  return false;
+}
+
 export async function* planItinerarySkeletonFill(
   criteria: PlanBoundaries,
   opts: { locale: string; providers?: string[] },
@@ -672,7 +682,11 @@ export async function* planItinerarySkeletonFill(
         | Array<{ mode?: string; duration_min?: number; recommended?: boolean }>
         | undefined;
 
-      if (tripId) {
+      const envelopeDisplay = fill.display as StopDisplayPayload | undefined;
+      const skipFilledFetch =
+        !fill.skeletonPatched && envelopeIsFillComplete(envelopeDisplay);
+
+      if (tripId && !skipFilledFetch) {
         const fetchedFill = await fetchTripDetails({
           trip_id: tripId,
           fields: ["filled", "cursor"],
@@ -692,7 +706,7 @@ export async function* planItinerarySkeletonFill(
       // U2 SoT: prefer fetch filled; keep envelope card photos when filled omitted them.
       const displaySoT: StopDisplayPayload = coalesceStopDisplayWithPhotos(
         filledDisplay,
-        fill.display as StopDisplayPayload | undefined,
+        envelopeDisplay,
       );
       const legsSoT = filledLegs ?? fill.legs;
 
@@ -929,6 +943,7 @@ async function fillStop(input: {
     body.arrival_clock = endTime;
   }
 
+  const hopStartedMs = Date.now();
   let res = await planNextStop(body);
   if (!res.ok && res.outcome?.key === "errors.trip_revision_conflict" && input.tripId) {
     const details = await fetchTripDetails({
@@ -955,6 +970,16 @@ async function fillStop(input: {
     meal_skipped?: boolean;
     patched_day_stops?: SkeletonStop[];
   };
+  console.info(
+    "plan_fill_stop",
+    JSON.stringify({
+      stop: input.stop.name,
+      kind: input.stop.kind ?? "unknown",
+      day_index: input.dayIndex,
+      duration_ms: Date.now() - hopStartedMs,
+      providers: input.opts.providers ?? [],
+    }),
+  );
   return {
     ok: true,
     display: data,

@@ -1181,12 +1181,90 @@ html[lang^="zh"] .app-user__tools .btn {
   margin-top: 0.65rem;
 }
 
-.plan-nav__thread--complete [data-testid="plan-nav-takeover"],
-.plan-nav__thread--complete [data-testid="plan-nav-progress"],
-.plan-nav__thread--complete [data-testid="plan-thread-skeleton-intro"],
-.plan-nav__thread--complete [data-testid="plan-nav-status"],
-.plan-nav__thread--complete [data-testid="plan-make-progress"] {
-  display: none;
+/* MVP-T3: assistant friendly progress steps (phase → i18n; mockup 06-plan-assistant-t3) */
+.plan-progress {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.plan-progress__step {
+  display: grid;
+  grid-template-columns: 1.1rem 1fr;
+  gap: 0.55rem;
+  align-items: start;
+  margin: 0;
+}
+
+.plan-progress__bead {
+  width: 0.7rem;
+  height: 0.7rem;
+  margin-top: 0.28rem;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--glaze) 45%, var(--line));
+  background: var(--plate);
+  box-sizing: border-box;
+}
+
+.plan-progress__step.is-done .plan-progress__bead {
+  background: var(--glaze);
+  border-color: var(--glaze);
+}
+
+.plan-progress__step.is-current .plan-progress__bead {
+  border-color: var(--glaze);
+  background: var(--stub);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--glaze) 18%, transparent);
+  animation: plan-progress-pulse 1.4s ease-in-out infinite;
+}
+
+.plan-progress__copy {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+
+.plan-progress__step.is-done .plan-progress__copy {
+  color: var(--ink);
+}
+
+.plan-progress__step.is-pending .plan-progress__copy {
+  color: var(--mute, #5c726b);
+}
+
+.plan-progress__label {
+  display: block;
+  font-weight: 600;
+  font-size: 0.82rem;
+  letter-spacing: 0.01em;
+}
+
+.plan-progress__hint {
+  display: block;
+  margin-top: 0.12rem;
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--mute, #5c726b);
+}
+
+@keyframes plan-progress-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--glaze) 12%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--glaze) 22%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plan-progress__step.is-current .plan-progress__bead {
+    animation: none;
+  }
 }
 
 /* Bottom-right grip: height only — slim diagonal ticks */

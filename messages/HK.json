@@ -434,6 +434,7 @@
   "play.plan.phase_skeleton_ready": "框架就緒",
   "play.plan.phase_skeleton_ready_hint": "主區將顯示日程與停點",
   "play.plan.assistant_framework_ready": "{destination} {days} 天 {partySize} 人 {tripType}行程框架已經規劃完畢：",
+  "play.plan.assistant_fill_begin": "行程框架設計完畢，現在開始完善行程每一站的細節，並安排用餐。",
   "play.plan.deviations_heading": "places-agent 智能體規劃的行程未能完全匹配您的需求。",
   "play.plan.deviation_line": "{field}：{reason}",
   "play.plan.deviation_field.far_cluster": "遠距離景點同日",

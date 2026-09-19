@@ -79,6 +79,8 @@ type Props = {
   t3Mode?: boolean;
   t3ProgressSteps?: Array<{ id: string; state: "done" | "current" | "pending" }>;
   frameworkReadyLine?: string | null;
+  /** After skeleton spine: announce fill will append (soft two-step). */
+  fillBeginLine?: string | null;
   /** Soft boundary deviations after plan complete, before next-hint (2play-plan-103). */
   deviations?: SkeletonDeviation[];
   nextHintLine?: string | null;
@@ -150,6 +152,7 @@ export function PlanAssistantNav({
   t3Mode = false,
   t3ProgressSteps,
   frameworkReadyLine = null,
+  fillBeginLine = null,
   deviations = [],
   nextHintLine = null,
   onSoftReplan,
@@ -241,6 +244,7 @@ export function PlanAssistantNav({
         t3Mode,
         planCompleteLine,
         frameworkReadyLine,
+        fillBeginLine,
         t3ProgressSteps,
         statusLines,
         makeElapsedSeconds: makeElapsedSeconds ?? null,
@@ -255,6 +259,7 @@ export function PlanAssistantNav({
       t3Mode,
       planCompleteLine,
       frameworkReadyLine,
+      fillBeginLine,
       t3ProgressSteps,
       statusLines,
       makeElapsedSeconds,

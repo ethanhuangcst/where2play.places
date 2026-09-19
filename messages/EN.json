@@ -434,6 +434,7 @@
   "play.plan.phase_skeleton_ready": "Framework ready",
   "play.plan.phase_skeleton_ready_hint": "Days and stops will show in the main panel",
   "play.plan.assistant_framework_ready": "{destination} · {days} days · {partySize} travelers · {tripType} framework is ready:",
+  "play.plan.assistant_fill_begin": "The itinerary framework is ready. Next we’ll fill in each stop and arrange meals.",
   "play.plan.assistant_next_hint": "Not happy with the trip? Tap Replan to start over.",
   "play.plan.replan_soft": "Replan",
   "play.plan.composer_locked_ph": "Building the framework… please wait",

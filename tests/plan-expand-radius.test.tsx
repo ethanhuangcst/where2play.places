@@ -261,7 +261,7 @@ describe("plan-page expand-radius continue (TC-T3-104-02)", () => {
     fireEvent.click(getByTestId("plan-need-chip-no"));
 
     await waitFor(() => expect(getByTestId("plan-thread-skeleton")).toBeTruthy());
-    await waitFor(() => expect(getByTestId("plan-thread-complete")).toBeTruthy());
+    await waitFor(() => expect(getByTestId("plan-thread-complete")).toBeTruthy(), { timeout: 4000 });
     await waitFor(() => expect(getByTestId("plan-thread-deviations")).toBeTruthy());
     expect(getByTestId("plan-thread-deviations").textContent).toMatch(/Candidate attraction list|候选景点清单/i);
     const tripPosts = authJson.mock.calls.filter(

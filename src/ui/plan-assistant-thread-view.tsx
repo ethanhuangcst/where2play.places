@@ -48,11 +48,7 @@ function ThreadItemRenderer({
     case "takeover":
       return (
         <div
-          className={
-            fieldLogActive
-              ? "plan-nav__field-intro"
-              : "bubble bubble--agent bubble--agent-notice"
-          }
+          className="bubble bubble--agent bubble--agent-notice"
           data-testid="plan-nav-takeover"
         >
           {t("play.plan.assistant_takeover")}
@@ -86,18 +82,22 @@ function ThreadItemRenderer({
 
     case "skeleton_intro":
       return item.content ? (
-        fieldLogActive ? (
-          <p className="msg-group__line" data-testid="plan-thread-skeleton-intro">
-            {item.content}
-          </p>
-        ) : (
-          <div
-            className="bubble bubble--agent bubble--agent-notice"
-            data-testid="plan-thread-skeleton-intro"
-          >
-            {item.content}
-          </div>
-        )
+        <div
+          className="bubble bubble--agent bubble--agent-notice"
+          data-testid="plan-thread-skeleton-intro"
+        >
+          {item.content}
+        </div>
+      ) : null;
+
+    case "fill_begin":
+      return item.content ? (
+        <div
+          className="bubble bubble--agent bubble--agent-notice"
+          data-testid="plan-thread-fill-begin"
+        >
+          {item.content}
+        </div>
       ) : null;
 
     case "status":
