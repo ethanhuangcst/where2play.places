@@ -6,7 +6,8 @@ import { useT } from "@/src/i18n/use-t";
 import { budgetOptionLabel, normalizeBudgetKey } from "@/src/core/plan-budget";
 import { collapseSkeletonPreviewDays } from "@/src/core/plan-skeleton-preview";
 import { buildSkeletonRouteDays, type FillRouteDay } from "@/src/core/format-fill-timeline";
-import { PlanFillRoute } from "@/src/ui/plan-fill-route";
+import { buildAssistantThread } from "@/src/core/plan-assistant-thread";
+import { PlanAssistantThreadView } from "@/src/ui/plan-assistant-thread-view";
 import {
   INTAKE_DEFAULT_I18N,
   INTAKE_DEFAULT_VALUES,
@@ -25,13 +26,8 @@ import {
 } from "@/src/core/plan-intake";
 import { ORIGIN_RETRY_CHIP, originPickChipValue } from "@/src/core/plan-resolve-origin";
 import { PLAN_NAV_MIN_H, PLAN_NAV_MIN_W, nextPanelSizeRem } from "@/src/core/plan-nav-resize";
-import {
-  deviationFieldLabel,
-  deviationReasonLabel,
-  parseDeviationDetail,
-  DEVIATION_REASON_KEY_BY_FIELD,
-  type SkeletonDeviation,
-} from "@/src/core/plan-t3-hydrate";
+import { isNearScrollBottom, stickThreadBodyToEnd } from "@/src/core/plan-nav-scroll";
+import type { SkeletonDeviation } from "@/src/core/plan-t3-hydrate";
 
 export type SkeletonPreviewDay = {
   dayIndex: number;
@@ -83,16 +79,11 @@ type Props = {
   t3Mode?: boolean;
   t3ProgressSteps?: Array<{ id: string; state: "done" | "current" | "pending" }>;
   frameworkReadyLine?: string | null;
-  /** Soft boundary deviations under skeleton (2play-plan-103). */
+  /** Soft boundary deviations after plan complete, before next-hint (2play-plan-103). */
   deviations?: SkeletonDeviation[];
   nextHintLine?: string | null;
   onSoftReplan?: () => void;
   composerPlaceholder?: string;
-  /** MVP-T9: post-complete chat refine (forwards to agent via /api/chat). */
-  refineMessages?: Array<{ role: "user" | "assistant"; content: string }>;
-  onRefineSubmit?: (text: string) => void | Promise<void>;
-  refineSending?: boolean;
-  refineErrorKey?: string | null;
 };
 
 function catalogNeedPrompt(
@@ -162,16 +153,13 @@ export function PlanAssistantNav({
   deviations = [],
   nextHintLine = null,
   onSoftReplan,
-  refineMessages = [],
-  onRefineSubmit,
-  refineSending = false,
-  refineErrorKey = null,
   composerPlaceholder,
 }: Props) {
   const t = useT();
   const navRef = useRef<HTMLElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const threadEndRef = useRef<HTMLDivElement>(null);
+  const stickToEndRef = useRef(true);
   const [mounted, setMounted] = useState(false);
   const [panelSize, setPanelSize] = useState({ w: MIN_W, h: MIN_H });
   const [draft, setDraft] = useState("");
@@ -187,17 +175,9 @@ export function PlanAssistantNav({
     setMounted(true);
   }, []);
 
-  // Keep latest assistant output visible (tmp-ui bugs §行程助手 #1).
   useEffect(() => {
-    if (!open) return;
-    const end = threadEndRef.current;
-    const body = bodyRef.current;
-    if (end && typeof end.scrollIntoView === "function") {
-      end.scrollIntoView({ block: "end", behavior: "smooth" });
-    } else if (body) {
-      body.scrollTop = body.scrollHeight;
-    }
-  }, [open, statusLines, planCompleteLine, fillRouteDays, skeletonRouteDays, makeElapsedSeconds, answers, currentStep, agentNeedAnswers, agentNeedIndex, awaitingAgentNeeds]);
+    if (open) stickToEndRef.current = true;
+  }, [open]);
 
   useEffect(() => {
     if (currentStep && !intakeComplete) {
@@ -255,6 +235,43 @@ export function PlanAssistantNav({
     .filter(Boolean)
     .join(" ");
 
+  const threadItems = useMemo(
+    () =>
+      buildAssistantThread({
+        t3Mode,
+        planCompleteLine,
+        frameworkReadyLine,
+        t3ProgressSteps,
+        statusLines,
+        makeElapsedSeconds: makeElapsedSeconds ?? null,
+        skeletonRouteDays,
+        fillRouteDays,
+        deviations,
+        nextHintLine,
+        showSoftReplan: Boolean(onSoftReplan),
+        fieldLogActive,
+      }),
+    [
+      t3Mode,
+      planCompleteLine,
+      frameworkReadyLine,
+      t3ProgressSteps,
+      statusLines,
+      makeElapsedSeconds,
+      skeletonRouteDays,
+      fillRouteDays,
+      deviations,
+      nextHintLine,
+      onSoftReplan,
+      fieldLogActive,
+    ],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    stickThreadBodyToEnd(bodyRef.current, stickToEndRef.current);
+  }, [open, threadItems]);
+
   const onResizeStart = useCallback(
     (e: React.PointerEvent) => {
       e.preventDefault();
@@ -310,13 +327,6 @@ export function PlanAssistantNav({
   function submitAnswer(e: React.FormEvent) {
     e.preventDefault();
     if (fillingLocked) return;
-    if (planCompleteLine && onRefineSubmit) {
-      const text = draft.trim();
-      if (!text || refineSending) return;
-      setDraft("");
-      void onRefineSubmit(text);
-      return;
-    }
     if (useAgentNeeds && agentQ) {
       const qid = agentQ.id;
       const value =
@@ -480,64 +490,15 @@ export function PlanAssistantNav({
             </div>
           </header>
 
-          <div className="plan-nav__body" ref={bodyRef} data-testid="plan-nav-body">
+          <div
+            className="plan-nav__body"
+            ref={bodyRef}
+            data-testid="plan-nav-body"
+            onScroll={(e) => {
+              stickToEndRef.current = isNearScrollBottom(e.currentTarget);
+            }}
+          >
             <div className={threadClassName} data-testid="plan-nav-thread">
-              {t3Mode ? (
-                <>
-                  <div
-                    className={
-                      fieldLogActive
-                        ? "plan-nav__field-intro"
-                        : "bubble bubble--agent bubble--agent-notice"
-                    }
-                    data-testid="plan-nav-takeover"
-                  >
-                    {t("play.plan.assistant_takeover")}
-                  </div>
-                  {t3ProgressSteps?.length ? (
-                    <div
-                      className="msg-group msg-group--agent"
-                      data-testid="plan-nav-progress"
-                      aria-live="polite"
-                    >
-                      <ol className="plan-progress" data-testid="plan-progress" data-progress-list="">
-                        {t3ProgressSteps.map((step) => (
-                          <li
-                            key={step.id}
-                            className={`plan-progress__step is-${step.state}`}
-                            data-step={step.id}
-                          >
-                            <span className="plan-progress__bead" aria-hidden="true" />
-                            <p className="plan-progress__copy">
-                              <span className="plan-progress__label">
-                                {t(`play.plan.phase_${step.id}`)}
-                              </span>
-                              <span className="plan-progress__hint">
-                                {t(`play.plan.phase_${step.id}_hint`)}
-                              </span>
-                            </p>
-                          </li>
-                        ))}
-                      </ol>
-                    </div>
-                  ) : null}
-                  {frameworkReadyLine ? (
-                    fieldLogActive ? (
-                      <p className="msg-group__line" data-testid="plan-thread-skeleton-intro">
-                        {frameworkReadyLine}
-                      </p>
-                    ) : (
-                      <div
-                        className="bubble bubble--agent bubble--agent-notice"
-                        data-testid="plan-thread-skeleton-intro"
-                      >
-                        {frameworkReadyLine}
-                      </div>
-                    )
-                  ) : null}
-                </>
-              ) : null}
-
               {!t3Mode ? (
               <div className="msg-group msg-group--agent">
                 {useAgentNeeds ? (
@@ -799,142 +760,12 @@ export function PlanAssistantNav({
                 </div>
               ) : null}
 
-              {statusLines.length > 0 && !planCompleteLine ? (
-                fieldLogActive ? (
-                  <div className="plan-nav__field-status" data-testid="plan-nav-status">
-                    {statusLines.map((line, i) => (
-                      <p key={`status-${i}`} className="msg-group__line">
-                        {line}
-                      </p>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="bubble bubble--agent" data-testid="plan-nav-status">
-                    {statusLines.map((line, i) => (
-                      <p key={`status-${i}`} className="plan-nav__notice-line">
-                        {line}
-                      </p>
-                    ))}
-                  </div>
-                )
-              ) : null}
-
-              {makeElapsedSeconds != null ? (
-                <div
-                  className="plan-make-progress"
-                  data-testid="plan-make-progress"
-                  role="progressbar"
-                  aria-valuetext={t("play.plan.assistant_make_elapsed", {
-                    seconds: makeElapsedSeconds,
-                  })}
-                >
-                  <div className="plan-make-progress__track" aria-hidden="true">
-                    <span className="plan-make-progress__bar" />
-                  </div>
-                  <p className="msg-group__line" data-testid="plan-make-elapsed">
-                    {t("play.plan.assistant_make_elapsed", { seconds: makeElapsedSeconds })}
-                  </p>
-                </div>
-              ) : null}
-
-              {skeletonRouteDays.length > 0 && fillRouteDays.length === 0 ? (
-                <div className="plan-nav__spine plan-nav__skeleton">
-                  <PlanFillRoute
-                    days={skeletonRouteDays}
-                    variant="skeleton"
-                    data-testid="plan-thread-skeleton"
-                  />
-                </div>
-              ) : null}
-
-              {deviations.length > 0 ? (
-                <div
-                  className="bubble bubble--agent bubble--agent-notice plan-nav__deviations"
-                  data-testid="plan-thread-deviations"
-                >
-                  <p className="plan-nav__notice-line">{t("play.plan.deviations_heading")}</p>
-                  {deviations.map((d, i) => {
-                    const field = deviationFieldLabel(d.field, t);
-                    const parsed = parseDeviationDetail(d);
-                    const reasonKey = DEVIATION_REASON_KEY_BY_FIELD[d.field];
-                    let line: string;
-                    if (reasonKey && parsed) {
-                      line = t(reasonKey, parsed);
-                    } else {
-                      const raw = d.reason.trim() || d.actual.trim() || d.field;
-                      const reason = deviationReasonLabel(raw, t);
-                      line = field ? t("play.plan.deviation_line", { field, reason }) : reason;
-                    }
-                    return (
-                      <p
-                        key={`${d.field}-${i}`}
-                        className="plan-nav__notice-line"
-                        data-testid="plan-thread-deviation-item"
-                        data-field={d.field || undefined}
-                      >
-                        {line}
-                      </p>
-                    );
-                  })}
-                </div>
-              ) : null}
-
-              {fillRouteDays.length > 0 ? (
-                <div className="plan-nav__spine">
-                  <PlanFillRoute
-                    days={fillRouteDays}
-                    variant="fill"
-                    data-testid="plan-thread-fill-timeline"
-                  />
-                </div>
-              ) : null}
-
-              {planCompleteLine ? (
-                <div
-                  className="bubble bubble--agent bubble--agent-notice plan-nav__complete-bubble"
-                  data-testid="plan-thread-complete"
-                >
-                  {planCompleteLine}
-                </div>
-              ) : null}
-
-              {nextHintLine ? (
-                <div
-                  className="bubble bubble--agent bubble--agent-notice"
-                  data-testid="plan-nav-next-hint"
-                >
-                  {nextHintLine}
-                </div>
-              ) : null}
-
-              {onSoftReplan && planCompleteLine ? (
-                <div className="plan-nav__soft-cta">
-                  <button
-                    type="button"
-                    className="chip"
-                    data-testid="plan-nav-soft-replan"
-                    onClick={onSoftReplan}
-                  >
-                    {t("play.plan.replan_soft")}
-                  </button>
-                </div>
-              ) : null}
-
-              {refineMessages.map((msg, i) => (
-                <div
-                  key={`refine-${i}-${msg.role}`}
-                  className={`bubble ${msg.role === "user" ? "bubble--user" : "bubble--agent"}`}
-                  data-testid={msg.role === "user" ? "plan-nav-refine-user" : "plan-nav-refine-agent"}
-                >
-                  {msg.content}
-                </div>
-              ))}
-
-              {refineErrorKey ? (
-                <div className="bubble bubble--agent bubble--agent-notice" data-testid="plan-nav-refine-error">
-                  {t(refineErrorKey)}
-                </div>
-              ) : null}
+              <PlanAssistantThreadView
+                items={threadItems}
+                fieldLogActive={fieldLogActive}
+                t={t}
+                onSoftReplan={onSoftReplan}
+              />
 
               <div ref={threadEndRef} data-testid="plan-nav-thread-end" aria-hidden="true" />
             </div>
@@ -942,8 +773,8 @@ export function PlanAssistantNav({
 
           {(() => {
             const showComposer =
-              (!intakeComplete && (activeStep || useAgentNeeds || awaitingAgentNeeds)) ||
-              intakeComplete;
+              !planCompleteLine &&
+              ((!intakeComplete && activeStep) || useAgentNeeds || awaitingAgentNeeds);
 
             return (
               <div className="plan-nav__dock" data-testid="plan-nav-dock">
@@ -968,7 +799,6 @@ export function PlanAssistantNav({
                       disabled={
                         fillingLocked ||
                         sending ||
-                        refineSending ||
                         verifyingHotel ||
                         (awaitingAgentNeeds && !agentQ) ||
                         (activeStep === "g" && Boolean(mustSeeLoading))

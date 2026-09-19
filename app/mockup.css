@@ -3293,6 +3293,7 @@ html[lang^="zh"] .app-user__tools .btn {
   display: none;
   width: min(27rem, calc(100vw - 2rem));
   height: min(45rem, calc(100vh - 2rem));
+  min-height: 0;
 }
 
 .plan-nav.is-open {
@@ -3306,6 +3307,7 @@ html[lang^="zh"] .app-user__tools .btn {
   flex-direction: column;
   flex: 1;
   min-width: 27rem;
+  min-height: 0;
   max-width: min(40rem, calc(100vw - 2rem));
   max-height: min(64rem, calc(100vh - 2rem));
   width: 100%;
@@ -3395,8 +3397,12 @@ html[lang^="zh"] .app-user__tools .btn {
 }
 
 .plan-nav__body {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   padding: 0.85rem 1rem 0.5rem;
   display: flex;
   flex-direction: column;

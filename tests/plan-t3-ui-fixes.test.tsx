@@ -78,6 +78,7 @@ describe("T3 deviations notice bubble (issue 2+3)", () => {
       <PlanAssistantNav
         {...baseProps}
         skeletonDays={skeletonDays}
+        planCompleteLine="里斯本 · 4 天 · 2 人 · 情侣浪漫。行程已规划完毕。"
         deviations={[
           {
             field: "far_cluster",
@@ -131,6 +132,7 @@ describe("T3 deviations notice bubble (issue 2+3)", () => {
       <PlanAssistantNav
         {...baseProps}
         skeletonDays={skeletonDays}
+        planCompleteLine="里斯本 · 4 天 · 2 人 · 情侣浪漫。行程已规划完毕。"
         deviations={[
           {
             field: "far_cluster",
@@ -189,18 +191,33 @@ describe("T3 takeover heading bubble (issue 2)", () => {
         {...baseProps}
         planCompleteLine={completeLine}
         nextHintLine={CN["play.plan.assistant_next_hint"]}
+        deviations={[
+          {
+            field: "far_cluster",
+            expected: "",
+            actual: "day 2 co-schedules far cluster(s): 上海自然博物馆",
+            reason:
+              "geographically far attraction clusters share a day; validate-don't-repair left the LLM day layout unchanged (no silent day-add)",
+          },
+        ]}
         onSoftReplan={() => undefined}
       />,
+      "CN",
     );
     const complete = document.body.querySelector('[data-testid="plan-thread-complete"]');
+    const deviations = document.body.querySelector('[data-testid="plan-thread-deviations"]');
     const hint = document.body.querySelector('[data-testid="plan-nav-next-hint"]');
     const replan = document.body.querySelector('[data-testid="plan-nav-soft-replan"]');
     expect(complete).toBeTruthy();
+    expect(deviations).toBeTruthy();
     expect(hint).toBeTruthy();
     expect(replan).toBeTruthy();
     expect(hint!.className).toContain("bubble--agent-notice");
     expect(
-      complete!.compareDocumentPosition(hint!) & Node.DOCUMENT_POSITION_FOLLOWING,
+      complete!.compareDocumentPosition(deviations!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      deviations!.compareDocumentPosition(hint!) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(
       hint!.compareDocumentPosition(replan!) & Node.DOCUMENT_POSITION_FOLLOWING,
@@ -238,5 +255,27 @@ describe("T3 takeover heading bubble (issue 2)", () => {
     expect(complete!.className).toContain("bubble--agent-notice");
     expect(complete!.className).toContain("plan-nav__complete-bubble");
     expect(complete!.textContent).toContain("行程已规划完毕");
+  });
+});
+
+describe("T3 hydrate thread (ADR-071 replan-only)", () => {
+  it("should_not_show_retired_greeting_or_composer_when_planCompleteLine", () => {
+    applyTravorShell();
+    renderWithLocale(
+      <PlanAssistantNav
+        {...baseProps}
+        t3Mode
+        intakeComplete
+        planCompleteLine="上海 · 3 天 · 2 人 · 亲子。行程已规划完毕。"
+        nextHintLine="行程不满意可点「重新规划」从头生成。"
+        onSoftReplan={() => undefined}
+      />,
+      "CN",
+    );
+    expect(document.body.querySelector('[data-testid="plan-nav-greeting"]')).toBeNull();
+    expect(document.body.querySelector('[data-testid="plan-thread-complete"]')).toBeTruthy();
+    expect(document.body.querySelector('[data-testid="plan-nav-input"]')).toBeNull();
+    expect(document.body.querySelector('[data-testid="plan-nav-refine-user"]')).toBeNull();
+    expect(document.body.querySelector('[data-testid="plan-nav-soft-replan"]')).toBeTruthy();
   });
 });

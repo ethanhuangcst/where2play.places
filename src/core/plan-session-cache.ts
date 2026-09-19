@@ -16,8 +16,54 @@ export type PlanLedger = {
 type SkeletonDay = {
   day_index: number;
   day_theme?: string;
-  stops?: { name: string; kind?: string }[];
+  stops?: { name: string; kind?: string; meal_slot?: string }[];
 };
+
+function normPlaceName(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, "");
+}
+
+function skeletonAttractionNames(skDay: SkeletonDay): string[] {
+  return (skDay.stops ?? [])
+    .filter(
+      (s) =>
+        s.kind !== "stay" &&
+        s.kind !== "meal" &&
+        !s.meal_slot &&
+        s.name !== "lunch" &&
+        s.name !== "dinner" &&
+        s.name !== "afternoon_tea",
+    )
+    .map((s) => normPlaceName(s.name ?? ""));
+}
+
+function cachedAttractionNames(cachedDay: ItineraryDto["days"][number]): string[] {
+  return cachedDay.slots
+    .filter(
+      (s) =>
+        s.kind === "place" &&
+        s.placeKind !== "Meal" &&
+        !s.mealSlot &&
+        s.name !== "lunch" &&
+        s.name !== "dinner",
+    )
+    .map((s) => normPlaceName(s.name ?? ""));
+}
+
+/** Reuse filled slots only when attraction names still match the Trip Store skeleton. */
+export function cachedDayMatchesSkeletonAttractions(
+  cachedDay: ItineraryDto["days"][number] | undefined,
+  skDay: SkeletonDay,
+): boolean {
+  if (!cachedDay || cachedDay.slots.length === 0) return false;
+  const skNames = skeletonAttractionNames(skDay);
+  const caNames = cachedAttractionNames(cachedDay);
+  if (!skNames.length) return cachedDay.slots.length === 0;
+  if (!caNames.length) return false;
+  if (skNames.length !== caNames.length) return false;
+  const caSet = new Set(caNames);
+  return skNames.every((n) => caSet.has(n));
+}
 
 export function emptyPlanItinerary(criteria: PlanBoundaries): ItineraryDto {
   return emptyItinerary(criteria);
@@ -73,6 +119,9 @@ export function extractPlanLedgerFromEvent(event: {
   if (event.type === "skeleton_done" && event.tripId) {
     return { tripId: event.tripId, revision: event.revision };
   }
+  if (event.type === "done" && (event.tripId || typeof event.revision === "number")) {
+    return { tripId: event.tripId, revision: event.revision };
+  }
   return null;
 }
 
@@ -114,7 +163,7 @@ export function itineraryFromSkeletonFetch(
   const days = skeletonDays.map((skDay) => {
     const dayIndex = skDay.day_index;
     const cachedDay = cached?.days.find((d) => d.dayIndex === dayIndex);
-    if (cachedDay && cachedDay.slots.length > 0) {
+    if (cachedDay && cachedDayMatchesSkeletonAttractions(cachedDay, skDay)) {
       return cachedDay;
     }
     return {

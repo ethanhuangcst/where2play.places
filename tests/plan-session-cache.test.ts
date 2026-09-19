@@ -1,90 +1,99 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+/**
+ * Trip ledger refresh must not paint stale filled days after skeleton refine.
+ */
+import { describe, expect, it } from "vitest";
 import {
-  extractPlanLedgerFromEvent,
+  cachedDayMatchesSkeletonAttractions,
   itineraryFromSkeletonFetch,
-  mergePlanCriteria,
-  refreshItineraryFromTripLedger,
-  shouldPersistPlanCacheEvent,
-} from "../src/core/plan-session-cache";
-import * as client from "../src/places-agent/client";
+} from "@/src/core/plan-session-cache";
+import type { ItineraryDto } from "@/src/core/itinerary-types";
 
-describe("plan-session-cache (TC-M19-81-02)", () => {
-  beforeEach(() => {
-    vi.restoreAllMocks();
+const criteria = {
+  destination: "上海",
+  days: 3,
+  startDate: "2026-10-01",
+  partySize: 2,
+  budget: "mid",
+  locale: "CN",
+};
+
+const skeletonDay2 = {
+  day_index: 2,
+  day_theme: "亲子",
+  stops: [
+    { name: "酒店", kind: "stay" },
+    { name: "上海科技馆", kind: "attraction" },
+    { name: "lunch", kind: "meal", meal_slot: "lunch" },
+    { name: "上海自然博物馆", kind: "attraction" },
+  ],
+};
+
+const cachedDay2Haichang: ItineraryDto["days"][number] = {
+  dayIndex: 2,
+  highlights: { label: "D2", title: "亲子", tags: [] },
+  slots: [
+    {
+      kind: "place",
+      start: "09:00",
+      end: "11:30",
+      placeKind: "Attraction",
+      name: "上海海昌海洋公园",
+      summary: "",
+    },
+    {
+      kind: "place",
+      start: "12:00",
+      end: "13:00",
+      placeKind: "Meal",
+      name: "午餐",
+      summary: "",
+      mealSlot: "lunch",
+    },
+    {
+      kind: "place",
+      start: "13:30",
+      end: "15:00",
+      placeKind: "Attraction",
+      name: "上海自然博物馆",
+      summary: "",
+    },
+  ],
+};
+
+describe("plan-session-cache skeleton merge", () => {
+  it("should_reject_cached_day_when_skeleton_attraction_names_diverged", () => {
+    expect(cachedDayMatchesSkeletonAttractions(cachedDay2Haichang, skeletonDay2)).toBe(false);
   });
 
-  it("should_merge_trip_id_and_revision_into_criteria", () => {
-    const merged = mergePlanCriteria(
-      { destination: "Lisbon", days: 2, startDate: "2026-10-10" },
-      { tripId: "trip-1", revision: 4 },
+  it("should_not_reuse_stale_cached_slots_after_morning_refine", () => {
+    const cached: ItineraryDto = {
+      title: "上海",
+      destination: "上海",
+      daysCount: 3,
+      updatedAt: new Date().toISOString(),
+      days: [cachedDay2Haichang],
+    };
+    const merged = itineraryFromSkeletonFetch(
+      criteria,
+      { days: [skeletonDay2] },
+      cached,
+      "CN",
     );
-    expect(merged.tripId).toBe("trip-1");
-    expect(merged.revision).toBe(4);
-    expect(merged.destination).toBe("Lisbon");
+    const day2 = merged.days.find((d) => d.dayIndex === 2);
+    expect(day2?.slots.length).toBe(0);
+    expect(day2?.slots.some((s) => s.name.includes("海昌"))).toBe(false);
   });
 
-  it("should_persist_skeleton_pipeline_events", () => {
-    expect(shouldPersistPlanCacheEvent({ type: "skeleton_day" })).toBe(true);
-    expect(shouldPersistPlanCacheEvent({ type: "stop_filled" })).toBe(true);
-    expect(shouldPersistPlanCacheEvent({ type: "phase" })).toBe(false);
-    expect(shouldPersistPlanCacheEvent({ type: "ledger" })).toBe(false);
-  });
-
-  it("should_extract_ledger_from_skeleton_done_and_ledger_events", () => {
-    expect(
-      extractPlanLedgerFromEvent({ type: "ledger", tripId: "t1", revision: 2 }),
-    ).toEqual({ tripId: "t1", revision: 2 });
-    expect(
-      extractPlanLedgerFromEvent({ type: "skeleton_done", tripId: "t2", revision: 3 }),
-    ).toEqual({ tripId: "t2", revision: 3 });
-  });
-
-  it("should_build_itinerary_days_from_fetched_skeleton", () => {
-    const itinerary = itineraryFromSkeletonFetch(
-      { destination: "Lisbon", days: 2, startDate: "2026-10-10" },
-      {
-        days: [
-          { day_index: 1, day_theme: "Belém", stops: [{ name: "Tower", kind: "attraction" }] },
-          { day_index: 2, stops: [{ name: "Castle", kind: "attraction" }] },
-        ],
-      },
-      null,
-      "EN",
-    );
-    expect(itinerary.days).toHaveLength(2);
-    expect(itinerary.days[0]?.dayIndex).toBe(1);
-    expect(itinerary.days[0]?.highlights.title).toBe("Belém");
-  });
-
-  it("should_refresh_itinerary_from_trip_ledger_via_fetch", async () => {
-    vi.spyOn(client, "fetchTripDetails").mockResolvedValue({
-      agent: "places-agent",
-      ok: true,
-      data: {
-        trip_id: "trip-1",
-        revision: 5,
-        data: {
-          skeleton: {
-            days: [{ day_index: 1, stops: [{ name: "Tower", kind: "attraction" }] }],
-          },
-        },
-      },
-    });
-
-    const refreshed = await refreshItineraryFromTripLedger({
-      criteria: {
-        destination: "Lisbon",
-        days: 1,
-        startDate: "2026-10-10",
-        tripId: "trip-1",
-        revision: 4,
-      },
-      cached: null,
-      locale: "EN",
-    });
-
-    expect(refreshed?.criteria.tripId).toBe("trip-1");
-    expect(refreshed?.criteria.revision).toBe(5);
-    expect(refreshed?.itinerary.days).toHaveLength(1);
+  it("should_reuse_cached_day_when_skeleton_names_match", () => {
+    const matchingSkeleton = {
+      ...skeletonDay2,
+      stops: [
+        { name: "酒店", kind: "stay" },
+        { name: "上海海昌海洋公园", kind: "attraction" },
+        { name: "lunch", kind: "meal", meal_slot: "lunch" },
+        { name: "上海自然博物馆", kind: "attraction" },
+      ],
+    };
+    expect(cachedDayMatchesSkeletonAttractions(cachedDay2Haichang, matchingSkeleton)).toBe(true);
   });
 });

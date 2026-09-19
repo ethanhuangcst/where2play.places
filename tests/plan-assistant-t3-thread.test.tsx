@@ -72,6 +72,24 @@ describe("plan-assistant T3 thread (mockup 06)", () => {
     delete document.body.dataset.style;
   });
 
+  it("should_hide_composer_after_plan_complete", () => {
+    applyTravorShell();
+    renderWithLocale(
+      <PlanAssistantNav
+        {...baseProps}
+        t3Mode
+        intakeComplete
+        planCompleteLine="上海 · 3 天 · 2 人 · 亲子。行程已规划完毕。"
+        nextHintLine="行程不满意可点「重新规划」从头生成。"
+        onSoftReplan={() => undefined}
+      />,
+      "CN",
+    );
+    expect(document.body.querySelector('[data-testid="plan-thread-complete"]')).toBeTruthy();
+    expect(document.body.querySelector('[data-testid="plan-nav-input"]')).toBeNull();
+    expect(document.body.querySelector('[data-testid="plan-nav-soft-replan"]')).toBeTruthy();
+  });
+
   it("should_use_notice_bubbles_and_progress_group_without_skip_redo", () => {
     applyTravorShell();
     const { getByTestId, queryByTestId } = renderWithLocale(
@@ -128,7 +146,7 @@ describe("plan-assistant T3 thread (mockup 06)", () => {
       <PlanAssistantNav
         {...baseProps}
         planCompleteLine="Lisbon · 4 days · trip complete."
-        nextHintLine="Want to change the trip? Use the input below."
+        nextHintLine="Not happy with the trip? Tap Replan to start over."
         onSoftReplan={() => undefined}
       />,
     );

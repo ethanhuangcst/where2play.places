@@ -320,8 +320,6 @@ export type PlanTripData = {
   trip_id: string;
   revision: number;
   status: "needs_input" | "planning" | "ready" | "failed";
-  /** MVP-T9 refine natural-language reply. */
-  reply?: string;
   need_input?: {
     questions: Array<{
       id: string;

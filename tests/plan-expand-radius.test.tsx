@@ -147,7 +147,18 @@ describe("plan-page expand-radius continue (TC-T3-104-02)", () => {
   beforeEach(() => {
     applyTravorShell();
     vi.clearAllMocks();
-    authNdjsonEvents.mockResolvedValue(undefined);
+    authNdjsonEvents.mockImplementation(async (_url, _init, onEvent) => {
+      onEvent({
+        type: "done",
+        itinerary: {
+          title: "Lisbon",
+          destination: "Lisbon",
+          daysCount: 1,
+          updatedAt: new Date().toISOString(),
+          days: [],
+        },
+      });
+    });
     let tripCalls = 0;
     authJson.mockImplementation(async (url: string, init?: RequestInit) => {
       if (url === "/api/plan/current") {
@@ -250,6 +261,7 @@ describe("plan-page expand-radius continue (TC-T3-104-02)", () => {
     fireEvent.click(getByTestId("plan-need-chip-no"));
 
     await waitFor(() => expect(getByTestId("plan-thread-skeleton")).toBeTruthy());
+    await waitFor(() => expect(getByTestId("plan-thread-complete")).toBeTruthy());
     await waitFor(() => expect(getByTestId("plan-thread-deviations")).toBeTruthy());
     expect(getByTestId("plan-thread-deviations").textContent).toMatch(/Candidate attraction list|候选景点清单/i);
     const tripPosts = authJson.mock.calls.filter(

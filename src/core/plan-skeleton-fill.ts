@@ -56,7 +56,7 @@ export type SkeletonPlanProgressEvent =
   | ({ type: "slot_preview"; dayIndex: number } & SlotPreviewPayload)
   | { type: "stop_filled"; dayIndex: number; stopIndex: number; slot: ItinerarySlot; itinerary: ItineraryDto }
   | { type: "day_done"; dayIndex: number; daysTotal: number; itinerary: ItineraryDto }
-  | { type: "done"; itinerary: ItineraryDto }
+  | { type: "done"; itinerary: ItineraryDto; tripId?: string; revision?: number }
   | { type: "tips"; data: Record<string, unknown> }
   | { type: "error"; key: string; detail?: string };
 
@@ -806,7 +806,7 @@ export async function* planItinerarySkeletonFill(
     yield { type: "day_done", dayIndex, daysTotal, itinerary };
   }
 
-  yield { type: "done", itinerary };
+  yield { type: "done", itinerary, tripId, revision };
 }
 
 function sleep(ms: number): Promise<void> {

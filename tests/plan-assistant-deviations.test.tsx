@@ -11,6 +11,7 @@ import { cleanup } from "@testing-library/react";
 import { renderWithLocale } from "./render-with-locale";
 import { PlanAssistantNav } from "@/src/ui/plan-assistant-nav";
 import type { IntakeAnswers, TakeoffFields } from "@/src/core/plan-intake";
+import CN from "../messages/CN.json";
 
 function applyTravorShell() {
   document.body.className = "shell-app";
@@ -44,6 +45,23 @@ const skeletonDays = [
   },
 ];
 
+const sampleDeviations = [
+  {
+    field: "far_cluster",
+    expected: "own days",
+    actual: "day 1 co-schedules far cluster(s): Sintra",
+    reason: "far clusters share a day; layout left unchanged",
+  },
+  {
+    field: "day_count",
+    expected: "3",
+    actual: "2",
+    reason: "skeleton day count does not match requested numDays",
+  },
+];
+
+const completeLine = "Lisbon · 3 days · 2 people · couple romance. Your itinerary is ready.";
+
 const baseProps = {
   open: true,
   takeoff,
@@ -70,36 +88,41 @@ describe("plan-assistant deviations (TC-T3-103)", () => {
     cleanup();
   });
 
-  it("should_list_deviations_under_skeleton_without_warning_panel (TC-T3-103-01)", () => {
+  it("should_not_render_deviations_before_plan_complete (TC-T3-103-01a)", () => {
+    applyTravorShell();
+    const { queryByTestId } = renderWithLocale(
+      <PlanAssistantNav {...baseProps} deviations={sampleDeviations} />,
+    );
+    expect(queryByTestId("plan-thread-deviations")).toBeNull();
+  });
+
+  it("should_list_deviations_after_complete_before_next_hint_without_warning_panel (TC-T3-103-01)", () => {
     applyTravorShell();
     const { getByTestId, queryByTestId, getAllByTestId } = renderWithLocale(
       <PlanAssistantNav
         {...baseProps}
-        deviations={[
-          {
-            field: "far_cluster",
-            expected: "own days",
-            actual: "day 1 co-schedules far cluster(s): Sintra",
-            reason: "far clusters share a day; layout left unchanged",
-          },
-          {
-            field: "day_count",
-            expected: "3",
-            actual: "2",
-            reason: "skeleton day count does not match requested numDays",
-          },
-        ]}
+        planCompleteLine={completeLine}
+        nextHintLine={CN["play.plan.assistant_next_hint"]}
+        deviations={sampleDeviations}
       />,
     );
 
     expect(getByTestId("plan-thread-skeleton")).toBeTruthy();
+    const complete = getByTestId("plan-thread-complete");
     const block = getByTestId("plan-thread-deviations");
+    const hint = getByTestId("plan-nav-next-hint");
     expect(block).toBeTruthy();
     expect(block.textContent).toContain("The places-agent itinerary could not fully match your request");
     expect(block.textContent).toContain("Day 1 combines attractions that are far apart");
     expect(block.textContent).toContain("Sintra");
     expect(block.textContent).toContain("The framework day count differs");
     expect(getAllByTestId("plan-thread-deviation-item")).toHaveLength(2);
+    expect(
+      complete.compareDocumentPosition(block) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      block.compareDocumentPosition(hint) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(queryByTestId("plan-deviations-warning-panel")).toBeNull();
     expect(queryByTestId("plan-deviations-modal")).toBeNull();
     expect(block.closest('[role="dialog"]')).toBeNull();
@@ -109,14 +132,12 @@ describe("plan-assistant deviations (TC-T3-103)", () => {
   it("should_omit_deviations_block_when_empty (TC-T3-103-03)", () => {
     applyTravorShell();
     const { getByTestId, queryByTestId, rerender } = renderWithLocale(
-      <PlanAssistantNav {...baseProps} deviations={[]} />,
+      <PlanAssistantNav {...baseProps} planCompleteLine={completeLine} deviations={[]} />,
     );
     expect(getByTestId("plan-thread-skeleton")).toBeTruthy();
     expect(queryByTestId("plan-thread-deviations")).toBeNull();
 
-    rerender(
-      <PlanAssistantNav {...baseProps} />,
-    );
+    rerender(<PlanAssistantNav {...baseProps} planCompleteLine={completeLine} />);
     expect(queryByTestId("plan-thread-deviations")).toBeNull();
   });
 

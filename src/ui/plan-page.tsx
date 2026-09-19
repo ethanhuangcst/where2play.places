@@ -59,12 +59,6 @@ import { ReplanDialog } from "@/src/ui/replan-dialog";
 import { usePageTitle } from "@/src/ui/use-page-title";
 import type { ItineraryPlaceSlot } from "@/src/core/itinerary-types";
 import type { DiscoverPoolRow } from "@/src/core/plan-discover-pool";
-import {
-  loadChatDraft,
-  saveChatDraft,
-  type ChatDraftMessage,
-} from "@/src/chat/local-storage";
-
 type PagePhase = "idle" | "intake" | "progress" | "planning" | "done";
 type PlanSubPhase = "discovering" | "skeleton" | "filling" | "idle";
 
@@ -73,6 +67,10 @@ type PlanCurrentResponse = {
   criteria: PlanBoundaries | null;
   itinerary: ItineraryDto | null;
 };
+
+function itineraryHasFilledSlots(it: ItineraryDto): boolean {
+  return it.days.some((d) => d.slots.some((s) => s.kind === "place"));
+}
 
 function defaultStartDate(): string {
   const d = new Date();
@@ -177,13 +175,10 @@ export default function PlanPageClient() {
   const [discoverPool, setDiscoverPool] = useState<DiscoverPoolRow[]>([]);
   const [tripId, setTripId] = useState<string | undefined>();
   const [tripRevision, setTripRevision] = useState<number | undefined>();
-  const [refineMessages, setRefineMessages] = useState<ChatDraftMessage[]>([]);
-  const [refineSending, setRefineSending] = useState(false);
-  const [refineErrorKey, setRefineErrorKey] = useState<string | null>(null);
-  const refineDraftHydrated = useRef(false);
   const discoverJobRef = useRef<Promise<void>>(Promise.resolve());
   const tripIdRef = useRef<string | undefined>(undefined);
   const tripRevisionRef = useRef<number | undefined>(undefined);
+  const runFillFromSkeletonRef = useRef<((criteria: PlanBoundaries) => Promise<void>) | null>(null);
   const mustSeeSliceTriedRef = useRef(false);
   const [makeElapsedMs, setMakeElapsedMs] = useState<number | null>(null);
 
@@ -533,17 +528,6 @@ export default function PlanPageClient() {
   );
 
   useEffect(() => {
-    if (refineDraftHydrated.current) return;
-    refineDraftHydrated.current = true;
-    setRefineMessages(loadChatDraft().filter((m) => m.role === "user" || m.role === "assistant"));
-  }, []);
-
-  useEffect(() => {
-    if (!refineDraftHydrated.current) return;
-    saveChatDraft(refineMessages);
-  }, [refineMessages]);
-
-  useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
@@ -569,6 +553,7 @@ export default function PlanPageClient() {
           }
           const hotel = sanitizeDailyStartName(c.dailyStart);
           if (hotel) {
+            setOrigin(hotel);
             setIntakeAnswers((prev) => ({ ...prev, b: hotel }));
           }
           if (typeof c.originLat === "number") setOriginLat(c.originLat);
@@ -577,6 +562,26 @@ export default function PlanPageClient() {
         if (data.itinerary) {
           setItinerary(data.itinerary);
           setPagePhase("done");
+          if (itineraryHasFilledSlots(data.itinerary)) {
+            const c = data.criteria;
+            setT3Phases([{ phase: "skeleton_generating" }, { phase: "skeleton_ready" }]);
+            setIntakeComplete(true);
+            setIntakeStep(null);
+            setFillRouteDays(buildFillRouteDays(data.itinerary, t, { includeTransit: true }));
+            const tripTypeLabel =
+              formatTripTypeDisplay(c?.tripType ?? tripType, t) ||
+              c?.tripType?.trim() ||
+              t("play.plan.constraint_none");
+            setPlanCompleteLine(
+              t("play.plan.assistant_plan_complete", {
+                destination: c?.destination ?? data.itinerary.destination,
+                days: String(c?.days ?? data.itinerary.daysCount),
+                party: String(c?.partySize ?? (Number(partySize) || 2)),
+                tripType: tripTypeLabel,
+              }),
+            );
+            setNavOpen(true);
+          }
         }
       } catch {
         /* empty plan ok */
@@ -648,47 +653,6 @@ export default function PlanPageClient() {
     setNavOpen(false);
     void authJson("/api/plan/current", { method: "DELETE" }).catch(() => undefined);
   }, [resetPlanningState]);
-
-  const submitRefineChat = useCallback(
-    async (text: string) => {
-      if (!itinerary || !tripId) return;
-      setRefineErrorKey(null);
-      const userMsg: ChatDraftMessage = { role: "user", content: text };
-      const nextMessages = [...refineMessages, userMsg];
-      setRefineMessages(nextMessages);
-      setRefineSending(true);
-      try {
-        const data = await authJson<{
-          ok: boolean;
-          reply: string;
-          itinerary: ItineraryDto;
-          revision?: number;
-        }>("/api/chat", {
-          method: "POST",
-          body: JSON.stringify({
-            messages: nextMessages,
-            itinerary,
-            trip_id: tripId,
-            revision: tripRevision,
-            locale,
-          }),
-        });
-        setRefineMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);
-        setItinerary(data.itinerary);
-        if (typeof data.revision === "number") {
-          setTripRevision(data.revision);
-          tripRevisionRef.current = data.revision;
-        }
-      } catch (err) {
-        const key =
-          err instanceof AuthApiError ? resolveErrorKey(err.key) : "play.errors.chat_failed";
-        setRefineErrorKey(key);
-      } finally {
-        setRefineSending(false);
-      }
-    },
-    [itinerary, tripId, tripRevision, locale, refineMessages],
-  );
 
   const runPlan = useCallback(
     async (criteria: PlanBoundaries) => {
@@ -768,7 +732,17 @@ export default function PlanPageClient() {
               }
             };
 
-            if (event.type === "tips" && event.data) {
+            if (event.type === "ledger") {
+              const ledgerEv = event as { tripId?: string; revision?: number };
+              if (typeof ledgerEv.revision === "number") {
+                setTripRevision(ledgerEv.revision);
+                tripRevisionRef.current = ledgerEv.revision;
+              }
+              if (typeof ledgerEv.tripId === "string") {
+                setTripId(ledgerEv.tripId);
+                tripIdRef.current = ledgerEv.tripId;
+              }
+            } else if (event.type === "tips" && event.data) {
               setTravelTips(event.data);
               setTravelTipsLoading(false);
               setTravelTipsError(null);
@@ -818,6 +792,15 @@ export default function PlanPageClient() {
               applyNarrative(event);
             } else if (event.type === "skeleton_done") {
               if (event.itinerary) setItinerary(event.itinerary);
+              const skDone = event as { tripId?: string; revision?: number };
+              if (typeof skDone.revision === "number") {
+                setTripRevision(skDone.revision);
+                tripRevisionRef.current = skDone.revision;
+              }
+              if (typeof skDone.tripId === "string") {
+                setTripId(skDone.tripId);
+                tripIdRef.current = skDone.tripId;
+              }
               if (criteria.planMode === "skeleton") {
                 const ctx =
                   narrativeCtxRef.current ??
@@ -882,6 +865,15 @@ export default function PlanPageClient() {
               sawDone = true;
               setItinerary(event.itinerary);
               setFillRouteDays(buildFillRouteDays(event.itinerary, t, { includeTransit: true }));
+              const doneEv = event as { tripId?: string; revision?: number };
+              if (typeof doneEv.revision === "number") {
+                setTripRevision(doneEv.revision);
+                tripRevisionRef.current = doneEv.revision;
+              }
+              if (typeof doneEv.tripId === "string") {
+                setTripId(doneEv.tripId);
+                tripIdRef.current = doneEv.tripId;
+              }
               setPagePhase("done");
               setGenProgress(null);
               setPlanSubPhase(criteria.planMode === "skeleton" ? "skeleton" : "idle");
@@ -1027,7 +1019,17 @@ export default function PlanPageClient() {
               }
             };
 
-            if (event.type === "tips" && event.data) {
+            if (event.type === "ledger") {
+              const ledgerEv = event as { tripId?: string; revision?: number };
+              if (typeof ledgerEv.revision === "number") {
+                setTripRevision(ledgerEv.revision);
+                tripRevisionRef.current = ledgerEv.revision;
+              }
+              if (typeof ledgerEv.tripId === "string") {
+                setTripId(ledgerEv.tripId);
+                tripIdRef.current = ledgerEv.tripId;
+              }
+            } else if (event.type === "tips" && event.data) {
               setTravelTips(event.data);
               setTravelTipsLoading(false);
               setTravelTipsError(null);
@@ -1090,6 +1092,15 @@ export default function PlanPageClient() {
               sawDone = true;
               setItinerary(event.itinerary);
               setFillRouteDays(buildFillRouteDays(event.itinerary, t, { includeTransit: true }));
+              const doneEv = event as { tripId?: string; revision?: number };
+              if (typeof doneEv.revision === "number") {
+                setTripRevision(doneEv.revision);
+                tripRevisionRef.current = doneEv.revision;
+              }
+              if (typeof doneEv.tripId === "string") {
+                setTripId(doneEv.tripId);
+                tripIdRef.current = doneEv.tripId;
+              }
               setPagePhase("done");
               setGenProgress(null);
               setPlanSubPhase("idle");
@@ -1470,6 +1481,8 @@ export default function PlanPageClient() {
       window.clearTimeout(abortTimer);
     }
   }, [locale, takeoff, t, origin, startTime, other, originLat, originLng, originStay, runFillFromSkeleton]);
+
+  runFillFromSkeletonRef.current = runFillFromSkeleton;
 
   const runSilentDiscover = useCallback(async () => {
     const fields = takeoff;
@@ -2030,25 +2043,8 @@ export default function PlanPageClient() {
             planCompleteLine ? t("play.plan.assistant_next_hint") : null
           }
           onSoftReplan={planCompleteLine ? requestReplan : undefined}
-          refineMessages={
-            planCompleteLine
-              ? refineMessages.filter(
-                  (m): m is { role: "user" | "assistant"; content: string } =>
-                    m.role === "user" || m.role === "assistant",
-                )
-              : []
-          }
-          onRefineSubmit={planCompleteLine && tripId ? submitRefineChat : undefined}
-          refineSending={refineSending}
-          refineErrorKey={refineErrorKey}
           composerPlaceholder={
-            planCompleteLine
-              ? t("play.chat.placeholder")
-              : t3Mode
-                ? pagePhase === "progress" || loading
-                  ? t("play.plan.composer_locked_ph")
-                  : t("play.plan.composer_ready_ph")
-                : undefined
+            pagePhase === "progress" || loading ? t("play.plan.composer_locked_ph") : undefined
           }
           suggestedMustSee={suggestedMustSee.length ? suggestedMustSee : undefined}
           mustSeeLoading={mustSeeLoading}
