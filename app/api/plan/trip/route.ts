@@ -87,10 +87,18 @@ export async function POST(request: NextRequest) {
   }
 
   if (parsed.data.skeleton_only === true && data.status === "failed") {
+    const phaseFail = data.phases?.find((p) => p.phase === "failed");
+    let phaseKey: string | undefined;
+    if (phaseFail && "error" in phaseFail) {
+      const err = phaseFail.error;
+      if (err && typeof err === "object" && "key" in err && typeof err.key === "string") {
+        phaseKey = err.key;
+      }
+    }
     return NextResponse.json(
       {
         ok: false,
-        error: { key: "errors.provider_failed" },
+        error: { key: phaseKey ?? envelope.outcome?.key ?? "errors.make_itinerary_failed" },
         trip_id: data.trip_id,
         revision: data.revision,
         status: data.status,

@@ -342,6 +342,7 @@
   "play.plan.error.budget_required": "Choose a budget",
   "play.plan.error.time_order": "End time must be after start",
   "play.errors.invalid_input": "That request was not valid. Try again.",
+  "play.errors.make_itinerary_failed": "We could not build the trip outline. Please try again.",
   "play.errors.provider_failed": "Could not build an itinerary. Try again.",
   "play.errors.empty_results": "Not enough places found. Try another destination or try again later.",
   "play.errors.arrange_timeout": "Day planning timed out. Try again.",

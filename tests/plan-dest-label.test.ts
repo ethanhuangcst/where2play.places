@@ -22,4 +22,17 @@ describe("formatDestVerifiedLabel", () => {
     expect(formatDestVerifiedLabel({ country: "Portugal" })).toBeNull();
     expect(formatDestVerifiedLabel({ city: "Lisbon" })).toBeNull();
   });
+
+  it("should_collapse_city_state_when_country_equals_city", () => {
+    expect(
+      formatDestVerifiedLabel({ country: "香港", city: "香港" }),
+    ).toBe("香港");
+    expect(
+      formatDestVerifiedLabel({
+        country: "香港",
+        city: "香港",
+        city_en: "Hong Kong",
+      }),
+    ).toBe("香港(Hong Kong)");
+  });
 });

@@ -343,6 +343,7 @@
   "play.plan.error.time_order": "結束時間須晚於開始時間",
   "play.errors.invalid_input": "請求無效，請重試。",
   "play.errors.provider_failed": "無法生成行程，請重試。",
+  "play.errors.make_itinerary_failed": "行程框架生成失敗，請稍後再試。",
   "play.errors.empty_results": "找不到足夠景點，請換目的地或稍後再試。",
   "play.errors.arrange_timeout": "當天行程安排逾時，請重試。",
   "play.errors.geocode_origin_failed": "無法定位起點，出發段交通不可用。",

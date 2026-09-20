@@ -329,7 +329,12 @@ export type PlanTripData = {
     }>;
   };
   /** T3 phase stream (skeleton_generating / skeleton_ready / …). */
-  phases?: Array<{ phase: string; trip_id?: string; revision?: number }>;
+  phases?: Array<{
+    phase: string;
+    trip_id?: string;
+    revision?: number;
+    error?: { key?: string };
+  }>;
   /** Full-loop / skeleton payload when status is ready. */
   itinerary?: {
     skeleton: unknown;
