@@ -977,6 +977,7 @@ describe("make failure fetch recovery (TC-M19-78-02)", () => {
   it("MVP-T5 should_resume_fill_from_trip_skeleton_without_make", async () => {
     const makeSpy = vi.spyOn(client, "makeItinerary");
     const discoverSpy = vi.spyOn(client, "discoverPlaces");
+    const tipsSpy = vi.spyOn(client, "travelTips");
     vi.spyOn(client, "planNextStop").mockResolvedValue({
       agent: "places-agent",
       ok: true,
@@ -1002,6 +1003,28 @@ describe("make failure fetch recovery (TC-M19-78-02)", () => {
                 stop: { name: "Hotel", kind: "stay", card: null, deeplinks: {} },
                 slot: { start: "09:00", end: "09:00" },
                 legs: [],
+              },
+            },
+          },
+        };
+      }
+      if (fields.includes("artifacts")) {
+        return {
+          agent: "places-agent",
+          ok: true,
+          data: {
+            trip_id: "t-fill",
+            revision: 4,
+            data: {
+              artifacts: {
+                tips: {
+                  intro: "Hi",
+                  iconic_places: ["Tower"],
+                  transit: "tram",
+                  clothing: "light",
+                  safety: "careful",
+                  weather: null,
+                },
               },
             },
           },
@@ -1034,6 +1057,8 @@ describe("make failure fetch recovery (TC-M19-78-02)", () => {
     });
 
     const phases: string[] = [];
+    const eventTypes: string[] = [];
+    let tipsData: Record<string, unknown> | undefined;
     for await (const ev of planItinerarySkeletonFill(
       {
         destination: "Lisbon",
@@ -1046,15 +1071,112 @@ describe("make failure fetch recovery (TC-M19-78-02)", () => {
       },
       { locale: "EN", providers: ["GOOGLE_MAPS"] },
     )) {
+      eventTypes.push(ev.type);
       if (ev.type === "phase") phases.push(ev.phase ?? "");
+      if (ev.type === "tips") tipsData = ev.data;
       if (ev.type === "error") break;
     }
 
     expect(makeSpy).not.toHaveBeenCalled();
     expect(discoverSpy).not.toHaveBeenCalled();
+    expect(tipsSpy).not.toHaveBeenCalled();
     expect(phases[0]).toBe("filling");
     expect(phases).not.toContain("discovering");
     expect(phases).not.toContain("skeleton");
+    expect(eventTypes).toContain("tips");
+    expect(tipsData?.intro).toBe("Hi");
+    expect(tipsData).not.toHaveProperty("visa");
+  });
+
+  it("should_yield_tips_after_fill_when_artifacts_arrive_late", async () => {
+    vi.spyOn(client, "travelTips");
+    let fillStarted = false;
+    vi.spyOn(client, "planNextStop").mockImplementation(async () => {
+      fillStarted = true;
+      return {
+        agent: "places-agent",
+        ok: true,
+        data: {
+          stop: { name: "Hotel", kind: "stay", card: null, deeplinks: {} },
+          slot: { start: "09:00", end: "09:00" },
+          legs: [],
+          trip_id: "t-hangzhou",
+          revision: 5,
+        },
+      };
+    });
+    vi.spyOn(client, "fetchTripDetails").mockImplementation(async (body) => {
+      const fields = (body as { fields?: string[] }).fields ?? [];
+      if (fields.includes("artifacts")) {
+        const tips = fillStarted
+          ? {
+              intro: "西湖",
+              iconic_places: ["灵隐寺"],
+              transit: "地铁",
+              clothing: "薄外套",
+              safety: "防盗",
+              weather: null,
+            }
+          : null;
+        return {
+          agent: "places-agent",
+          ok: true,
+          data: {
+            trip_id: "t-hangzhou",
+            revision: 4,
+            data: tips ? { artifacts: { tips } } : { artifacts: {} },
+          },
+        };
+      }
+      return {
+        agent: "places-agent",
+        ok: true,
+        data: {
+          trip_id: "t-hangzhou",
+          revision: 4,
+          data: {
+            skeleton: {
+              days: [
+                {
+                  day_index: 1,
+                  day_theme: "Hangzhou",
+                  stops: [
+                    { name: "Hotel", kind: "stay" },
+                    { name: "西湖", kind: "attraction" },
+                  ],
+                },
+              ],
+            },
+            candidates: { places: [], restaurants: [] },
+            constraints: { origin: { name: "Hotel" } },
+          },
+        },
+      };
+    });
+
+    const eventTypes: string[] = [];
+    let tipsData: Record<string, unknown> | undefined;
+    for await (const ev of planItinerarySkeletonFill(
+      {
+        destination: "杭州",
+        days: 1,
+        startDate: "2026-10-10",
+        tripId: "t-hangzhou",
+        revision: 4,
+        planMode: "fill",
+        dailyStart: "Hotel",
+      },
+      { locale: "CN" },
+    )) {
+      eventTypes.push(ev.type);
+      if (ev.type === "tips") tipsData = ev.data;
+      if (ev.type === "error") break;
+    }
+
+    expect(client.travelTips).not.toHaveBeenCalled();
+    expect(eventTypes.indexOf("tips")).toBeGreaterThan(eventTypes.indexOf("day_done"));
+    expect(eventTypes.indexOf("tips")).toBeLessThan(eventTypes.indexOf("done"));
+    expect(tipsData?.intro).toBe("西湖");
   });
 
   it("should_seed_current_stop_from_day_origin_when_skeleton_has_no_stay", async () => {

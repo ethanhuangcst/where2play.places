@@ -121,16 +121,23 @@ function TravelTipsBody({
 
   const unavailable = t("play.plan.travel_tips_unavailable");
   const iconicPlaces = iconicPlacesFromTravelTips(data);
+  const weatherText =
+    (typeof data?.weather?.summary === "string" && data.weather.summary.trim()) || null;
+  const transitText = typeof data?.transit === "string" && data.transit.trim() ? data.transit : null;
+  const introText = typeof data?.intro === "string" && data.intro.trim() ? data.intro : null;
+  const clothingText =
+    typeof data?.clothing === "string" && data.clothing.trim() ? data.clothing : null;
+  const safetyText = typeof data?.safety === "string" && data.safety.trim() ? data.safety : null;
 
   return (
     <div className="panel__body plan-travel-tips__body" id="travel-tips-body">
       <div className="travel-tips-grid">
-        <article className="travel-tips-card">
+        <article className="travel-tips-card" data-testid="travel-tips-card-01">
           <header className="travel-tips-card__head">
             <span className="travel-tips-card__idx" aria-hidden="true">
               01
             </span>
-            <h3 className="travel-tips-card__title">{t("play.plan.travel_tips_visa")}</h3>
+            <h3 className="travel-tips-card__title">{t("play.plan.travel_tips_destination")}</h3>
           </header>
           {data?.visa_label ? (
             <p className="travel-tips-card__lead">
@@ -146,7 +153,7 @@ function TravelTipsBody({
               </span>
             </p>
           ) : null}
-          {data?.intro ? <p className="travel-tips-intro">{data.intro}</p> : null}
+          <p className="travel-tips-intro">{introText ?? unavailable}</p>
           {iconicPlaces.length ? (
             <ol className="travel-tips-must-see">
               {iconicPlaces.map((name, index) => (
@@ -156,37 +163,35 @@ function TravelTipsBody({
           ) : null}
         </article>
 
-        <article className="travel-tips-card">
+        <article className="travel-tips-card" data-testid="travel-tips-card-02">
           <header className="travel-tips-card__head">
             <span className="travel-tips-card__idx" aria-hidden="true">
               02
             </span>
             <h3 className="travel-tips-card__title">{t("play.plan.travel_tips_weather")}</h3>
           </header>
-          <p>{data?.weather?.summary ?? data?.transit ?? unavailable}</p>
-          {data?.transit && data?.weather?.summary ? (
-            <p className="travel-tips-sub">{data.transit}</p>
-          ) : null}
+          <p>{weatherText ?? transitText ?? unavailable}</p>
+          {transitText && weatherText ? <p className="travel-tips-sub">{transitText}</p> : null}
         </article>
 
-        <article className="travel-tips-card">
+        <article className="travel-tips-card" data-testid="travel-tips-card-03">
           <header className="travel-tips-card__head">
             <span className="travel-tips-card__idx" aria-hidden="true">
               03
             </span>
             <h3 className="travel-tips-card__title">{t("play.plan.travel_tips_clothing")}</h3>
           </header>
-          <p>{data?.clothing ?? unavailable}</p>
+          <p>{clothingText ?? unavailable}</p>
         </article>
 
-        <article className="travel-tips-card">
+        <article className="travel-tips-card" data-testid="travel-tips-card-04">
           <header className="travel-tips-card__head">
             <span className="travel-tips-card__idx" aria-hidden="true">
               04
             </span>
             <h3 className="travel-tips-card__title">{t("play.plan.travel_tips_safety")}</h3>
           </header>
-          <p>{data?.safety ?? unavailable}</p>
+          <p>{safetyText ?? unavailable}</p>
         </article>
       </div>
     </div>

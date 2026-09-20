@@ -988,6 +988,8 @@ export default function PlanPageClient() {
       setPlanCompleteLine(null);
       setSlotPreviewText(null);
       setMakeElapsedMs(0);
+      setTravelTipsLoading(true);
+      setTravelTipsError(null);
       const makeStartedAt = Date.now();
       const elapsedTimer = window.setInterval(() => {
         setMakeElapsedMs(Date.now() - makeStartedAt);
@@ -1193,6 +1195,8 @@ export default function PlanPageClient() {
         window.clearInterval(elapsedTimer);
         if (sawDone && !sawError) setMakeElapsedMs(null);
         else setMakeElapsedMs(Date.now() - makeStartedAt);
+        setTravelTips((prev) => prev ?? {});
+        setTravelTipsLoading(false);
         setLoading(false);
       }
     },
@@ -1960,13 +1964,15 @@ export default function PlanPageClient() {
 
         {showConstraints ? <PlanConstraintsPanel items={constraintItems} /> : null}
 
-        {(pagePhase === "planning" || pagePhase === "done") && travelTips && takeoffIsValid(takeoff) ? (
+        {(pagePhase === "planning" || pagePhase === "done") &&
+        takeoffIsValid(takeoff) &&
+        (travelTips || travelTipsLoading) ? (
             <PlanTravelTipsPanel
               destination={takeoff.destination}
               startDate={takeoff.startDate}
               days={takeoff.days}
               data={travelTips}
-              loading={travelTipsLoading}
+              loading={travelTipsLoading && !travelTips}
               errorKey={travelTipsError}
             />
         ) : null}

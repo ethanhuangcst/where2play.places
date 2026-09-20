@@ -1,5 +1,34 @@
 import { describe, expect, it } from "vitest";
-import { latestFilledStopFromSlice, skeletonIsFillable } from "../src/core/plan-fetch-trip";
+import {
+  artifactsTipsFromSlice,
+  latestFilledStopFromSlice,
+  skeletonIsFillable,
+} from "../src/core/plan-fetch-trip";
+
+describe("artifactsTipsFromSlice (2play-plan-90d)", () => {
+  it("should_return_tips_object_when_artifacts_tips_present", () => {
+    const tips = artifactsTipsFromSlice({
+      artifacts: {
+        tips: {
+          intro: "Hi",
+          iconic_places: ["Tower"],
+          transit: "",
+          clothing: "",
+          safety: "",
+          weather: null,
+        },
+      },
+    });
+    expect(tips?.intro).toBe("Hi");
+    expect(tips?.iconic_places).toEqual(["Tower"]);
+  });
+
+  it("should_return_null_when_tips_missing", () => {
+    expect(artifactsTipsFromSlice({})).toBeNull();
+    expect(artifactsTipsFromSlice({ artifacts: {} })).toBeNull();
+    expect(artifactsTipsFromSlice({ artifacts: { visa: {} } })).toBeNull();
+  });
+});
 
 describe("latestFilledStopFromSlice (MVP-T5 TD-6)", () => {
   it("should_read_latest_object_shape_from_http_plan_next_stop_write", () => {

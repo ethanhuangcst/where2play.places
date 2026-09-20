@@ -574,18 +574,24 @@ export async function* planItinerarySkeletonFill(
     if (tipsWrite.ok && tipsWrite.data) {
       tripId = (tipsWrite.data as { trip_id?: string }).trip_id ?? tripId;
       revision = (tipsWrite.data as { revision?: number }).revision ?? revision;
-      const fetchedTips = await fetchTripDetails({
-        trip_id: tripId,
-        fields: ["artifacts"],
-        locale: opts.locale,
-      });
-      if (fetchedTips.ok) {
-        const { slice, revision: r } = tripFetchSlice(fetchedTips);
-        if (typeof r === "number") revision = r;
-        const tips = artifactsTipsFromSlice(slice);
-        if (tips) yield { type: "tips", data: tips };
+    }
+  }
+
+  // Early fetch: show tips mid-fill when agent already dualWrote. Do not block on LLM.
+  if (tripId) {
+    let tips: Record<string, unknown> | null = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const fetched = await fetchArtifactsTips(tripId, opts.locale);
+      if (typeof fetched.revision === "number") revision = fetched.revision;
+      tips = fetched.tips;
+      if (tips) break;
+      if (fillOnly && attempt === 0) {
+        await sleep(120);
+      } else {
+        break;
       }
     }
+    if (tips) yield { type: "tips", data: tips };
   }
 
   yield { type: "phase", phase: "filling", dayIndex: 1, daysTotal };
@@ -820,12 +826,36 @@ export async function* planItinerarySkeletonFill(
     yield { type: "day_done", dayIndex, daysTotal, itinerary };
   }
 
+  // Hangzhou repro: tips LLM often finishes during fill, not in the 120ms start window.
+  if (tripId) {
+    const late = await fetchArtifactsTips(tripId, opts.locale);
+    if (typeof late.revision === "number") revision = late.revision;
+    if (late.tips) yield { type: "tips", data: late.tips };
+  }
+
   yield { type: "done", itinerary, tripId, revision };
 }
 
 function sleep(ms: number): Promise<void> {
   if (ms <= 0) return Promise.resolve();
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchArtifactsTips(
+  tripId: string,
+  locale: string,
+): Promise<{ tips: Record<string, unknown> | null; revision?: number }> {
+  const fetched = await fetchTripDetails({
+    trip_id: tripId,
+    fields: ["artifacts"],
+    locale,
+  });
+  if (!fetched.ok) return { tips: null };
+  const { slice, revision } = tripFetchSlice(fetched);
+  return {
+    tips: artifactsTipsFromSlice(slice),
+    revision: typeof revision === "number" ? revision : undefined,
+  };
 }
 
 /** Transient agent/BFF failures (e.g. tsx watch restart mid-fill). Do not retry validation errors. */
