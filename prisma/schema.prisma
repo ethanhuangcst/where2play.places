@@ -70,10 +70,12 @@ model SavedItinerary {
   daysCount   Int
   coverUrl    String?
   snapshot    Json
+  tripId      String?
   savedAt     DateTime               @default(now())
   messages    ItineraryChatMessage[]
 
   @@index([userId, savedAt])
+  @@index([userId, tripId])
 }
 
 model ItineraryChatMessage {

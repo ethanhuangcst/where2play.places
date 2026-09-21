@@ -895,6 +895,13 @@ body.shell-app[data-style="travor"] {
   padding-top: 0.25rem;
 }
 
+/* 已保存详情底栏沿用 .plan-actions，同样去掉 sticky 云色底 */
+[data-style="travor"] .saved-detail-actions {
+  position: static;
+  background: transparent;
+  padding-top: 0.25rem;
+}
+
 /* ============================================================
    账号 / 资料 / 我的行程（与 §12 同款 Travor 语言）
    ============================================================ */

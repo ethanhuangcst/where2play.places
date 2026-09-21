@@ -46,6 +46,7 @@ import {
 } from "@/src/core/plan-t3-hydrate";
 import { validatePlanBoundaries } from "@/src/core/plan-validate";
 import { itineraryHasFilledPlaceSlots as itineraryHasFilledSlots } from "@/src/core/plan-itinerary-draft";
+import { serializePlanSaveMessages } from "@/src/core/plan-save-snapshot";
 import { resolveErrorKey } from "@/src/i18n/error-key";
 import { useLocale, useT } from "@/src/i18n/use-t";
 import { authJson, authNdjsonEvents, AuthApiError } from "@/src/ui/auth-api";
@@ -1837,9 +1838,18 @@ export default function PlanPageClient() {
     setSaveNoticeKey(null);
     setSaving(true);
     try {
+      const messages = serializePlanSaveMessages({
+        intakeAnswers,
+        statusLines: navStatusLines,
+        completeLine: planCompleteLine,
+      });
       await authJson<{ id: string; savedAt: string }>("/api/saved", {
         method: "POST",
-        body: JSON.stringify({ itinerary, messages: [] }),
+        body: JSON.stringify({
+          itinerary,
+          messages,
+          ...(tripId ? { tripId } : {}),
+        }),
       });
       setSaveNoticeKey("play.plan.save_success");
     } catch (err) {

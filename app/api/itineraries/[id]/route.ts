@@ -34,26 +34,48 @@ export async function GET(request: NextRequest, context: RouteContext) {
   const session = await prisma.planSessionCache.findUnique({
     where: { userId: gate.user.id },
   });
-  if (session && session.expiresAt.getTime() > Date.now()) {
-    const criteria = session.criteriaJson as PlanBoundaries;
-    const destMatch =
-      typeof criteria.destination === "string" &&
-      criteria.destination.trim().toLowerCase() === row.destination.trim().toLowerCase();
-    if (destMatch && criteria.tripId) {
-      const locale = normalizeLocale(criteria.locale ?? gate.user.locale);
-      const fetched = await fetchTripDetails({
-        trip_id: criteria.tripId,
-        fields: ["artifacts"],
-        locale,
-        ...(typeof criteria.revision === "number" ? { revision: criteria.revision } : {}),
-      });
-      if (fetched.ok) {
-        const { slice } = tripFetchSlice(fetched);
-        const tips = travelTipsPayloadFromSlice(slice);
-        if (tips) {
-          travelTips = tips;
-          if (criteria.startDate) tipsStartDate = criteria.startDate;
-          if (typeof criteria.days === "number") tipsDays = criteria.days;
+  const sessionLive = session && session.expiresAt.getTime() > Date.now() ? session : null;
+  const criteria = sessionLive
+    ? (sessionLive.criteriaJson as PlanBoundaries)
+    : null;
+
+  const rowTripId =
+    typeof row.tripId === "string" && row.tripId.trim() ? row.tripId.trim() : undefined;
+  const sessionTripId =
+    criteria && typeof criteria.tripId === "string" && criteria.tripId.trim()
+      ? criteria.tripId.trim()
+      : undefined;
+  const destMatch =
+    !!criteria &&
+    typeof criteria.destination === "string" &&
+    criteria.destination.trim().toLowerCase() === row.destination.trim().toLowerCase();
+
+  // Prefer row.tripId (AC2); fallback to session dest-match tripId (106).
+  const fetchTripId = rowTripId ?? (destMatch ? sessionTripId : undefined);
+
+  if (fetchTripId) {
+    const locale = normalizeLocale(criteria?.locale ?? gate.user.locale);
+    const sameSessionTrip = sessionTripId === fetchTripId;
+    const revision =
+      sameSessionTrip && typeof criteria?.revision === "number"
+        ? criteria.revision
+        : undefined;
+    const fetched = await fetchTripDetails({
+      trip_id: fetchTripId,
+      fields: ["artifacts"],
+      locale,
+      ...(revision != null ? { revision } : {}),
+    });
+    if (fetched.ok) {
+      const { slice } = tripFetchSlice(fetched);
+      const tips = travelTipsPayloadFromSlice(slice);
+      if (tips) {
+        travelTips = tips;
+        if (criteria?.startDate && (sameSessionTrip || destMatch)) {
+          tipsStartDate = criteria.startDate;
+        }
+        if (typeof criteria?.days === "number" && (sameSessionTrip || destMatch)) {
+          tipsDays = criteria.days;
         }
       }
     }

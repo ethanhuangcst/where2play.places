@@ -4,7 +4,8 @@ import { z } from "zod";
 import { prisma } from "@/src/db/client";
 import { authError, requireUser } from "@/src/auth/user";
 import { coverUrlFromSnapshot, toSavedTripListItem } from "@/src/core/saved-itinerary";
-import type { ItineraryDto } from "@/src/core/itinerary-types";
+import type { PlanBoundaries } from "@/src/core/itinerary-types";
+import { stripItinerarySnapshot } from "@/src/core/plan-save-snapshot";
 
 const itinerarySchema = z.object({
   title: z.string().min(1),
@@ -23,6 +24,7 @@ const chatMessageSchema = z.object({
 const saveSchema = z.object({
   itinerary: itinerarySchema,
   messages: z.array(chatMessageSchema).default([]),
+  tripId: z.string().min(1).optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -43,8 +45,21 @@ export async function POST(request: NextRequest) {
   const parsed = saveSchema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) return authError("errors.validation", 400);
 
-  const itinerary = parsed.data.itinerary as ItineraryDto;
+  const itinerary = stripItinerarySnapshot(parsed.data.itinerary);
   const coverUrl = coverUrlFromSnapshot(itinerary);
+
+  let tripId = parsed.data.tripId?.trim() || undefined;
+  if (!tripId) {
+    const session = await prisma.planSessionCache.findUnique({
+      where: { userId: gate.user.id },
+    });
+    if (session && session.expiresAt.getTime() > Date.now()) {
+      const criteria = session.criteriaJson as PlanBoundaries;
+      if (typeof criteria.tripId === "string" && criteria.tripId.trim()) {
+        tripId = criteria.tripId.trim();
+      }
+    }
+  }
 
   const row = await prisma.$transaction(async (tx) => {
     const saved = await tx.savedItinerary.create({
@@ -55,6 +70,7 @@ export async function POST(request: NextRequest) {
         daysCount: itinerary.daysCount,
         coverUrl: coverUrl ?? null,
         snapshot: itinerary as unknown as Prisma.InputJsonValue,
+        tripId: tripId ?? null,
       },
     });
     if (parsed.data.messages.length > 0) {

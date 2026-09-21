@@ -211,6 +211,192 @@ describe("/api/saved", () => {
     expect(JSON.stringify(body.itinerary)).not.toContain("visa_required");
   });
 
+  it("should_persist_tripId_and_assistant_thread_messages", async () => {
+    await setupUser("saved-25-ac2@where2play.place");
+    const dirty = {
+      ...SAMPLE_ITINERARY,
+      visa: { requirement: "visa_required" },
+      tips: { intro: "leak" },
+    };
+    const messages = [
+      { role: "user" as const, content: "Hyatt" },
+      { role: "assistant" as const, content: "Skeleton ready" },
+      { role: "assistant" as const, content: "Plan complete" },
+    ];
+    const res = await invokeRoute(
+      postSaved,
+      authedRequest("/api/saved", {
+        method: "POST",
+        body: {
+          itinerary: dirty,
+          messages,
+          tripId: "trip-25-ac2",
+        },
+      }),
+    );
+    expect(res.status).toBe(201);
+    const body = await readJson<{ id: string }>(res);
+    const row = await prisma.savedItinerary.findUnique({
+      where: { id: body.id },
+      include: { messages: { orderBy: { ord: "asc" } } },
+    });
+    expect(row?.tripId).toBe("trip-25-ac2");
+    expect(row?.messages.map((m) => ({ role: m.role, content: m.content }))).toEqual(messages);
+    expect(JSON.stringify(row?.snapshot)).not.toContain("visa_required");
+    expect(JSON.stringify(row?.snapshot)).not.toContain("leak");
+  });
+
+  it("should_fill_tripId_from_session_when_body_omits_it", async () => {
+    await setupUser("saved-25-session@where2play.place");
+    const user = await prisma.user.findUnique({
+      where: { email: "saved-25-session@where2play.place" },
+    });
+    await upsertPlanSessionCache(
+      user!.id,
+      {
+        destination: "London",
+        days: 2,
+        startDate: "2026-09-20",
+        partySize: 2,
+        budget: "mid",
+        locale: "EN",
+        tripId: "trip-from-session",
+      },
+      SAMPLE_ITINERARY,
+    );
+
+    const res = await invokeRoute(
+      postSaved,
+      authedRequest("/api/saved", {
+        method: "POST",
+        body: { itinerary: SAMPLE_ITINERARY, messages: [] },
+      }),
+    );
+    expect(res.status).toBe(201);
+    const body = await readJson<{ id: string }>(res);
+    const row = await prisma.savedItinerary.findUnique({ where: { id: body.id } });
+    expect(row?.tripId).toBe("trip-from-session");
+  });
+
+  it("should_create_new_row_without_updating_previous", async () => {
+    await setupUser("saved-25-ac3@where2play.place");
+    const firstMessages = [{ role: "assistant" as const, content: "first-save" }];
+    const firstRes = await invokeRoute(
+      postSaved,
+      authedRequest("/api/saved", {
+        method: "POST",
+        body: {
+          itinerary: SAMPLE_ITINERARY,
+          messages: firstMessages,
+          tripId: "trip-ac3-v1",
+        },
+      }),
+    );
+    const first = await readJson<{ id: string }>(firstRes);
+
+    const secondItinerary: ItineraryDto = {
+      ...SAMPLE_ITINERARY,
+      title: "London 3 days",
+      daysCount: 3,
+    };
+    await invokeRoute(
+      postSaved,
+      authedRequest("/api/saved", {
+        method: "POST",
+        body: {
+          itinerary: secondItinerary,
+          messages: [{ role: "assistant", content: "second-save" }],
+          tripId: "trip-ac3-v2",
+        },
+      }),
+    );
+
+    const firstRow = await prisma.savedItinerary.findUnique({
+      where: { id: first.id },
+      include: { messages: { orderBy: { ord: "asc" } } },
+    });
+    expect(firstRow?.tripId).toBe("trip-ac3-v1");
+    expect(firstRow?.title).toBe("London 2 days");
+    expect(firstRow?.messages.map((m) => m.content)).toEqual(["first-save"]);
+    const count = await prisma.savedItinerary.count({
+      where: { userId: firstRow!.userId },
+    });
+    expect(count).toBe(2);
+  });
+
+  it("should_hydrate_travelTips_from_saved_row_tripId_when_session_dest_differs", async () => {
+    await setupUser("saved-25-row-tips@where2play.place");
+    const user = await prisma.user.findUnique({
+      where: { email: "saved-25-row-tips@where2play.place" },
+    });
+
+    await upsertPlanSessionCache(
+      user!.id,
+      {
+        destination: "Paris",
+        days: 3,
+        startDate: "2026-10-01",
+        partySize: 2,
+        budget: "mid",
+        locale: "EN",
+        tripId: "trip-paris-session",
+        revision: 1,
+      },
+      { ...SAMPLE_ITINERARY, destination: "Paris", title: "Paris 3 days", daysCount: 3 },
+    );
+
+    setPlacesAgentFetchForTests(async (input, init) => {
+      const body = init?.body ? JSON.parse(String(init.body)) : {};
+      if (String(input).includes("/v1/fetch_trip_details") && body.trip_id === "trip-london-saved") {
+        return new Response(
+          JSON.stringify({
+            agent: "places-agent",
+            ok: true,
+            data: {
+              trip_id: "trip-london-saved",
+              data: {
+                artifacts: {
+                  tips: {
+                    intro: "London from row tripId",
+                    iconic_places: ["British Museum"],
+                    transit: "Tube",
+                    clothing: "Layers",
+                    safety: "OK",
+                    weather: { summary: "Mild" },
+                  },
+                },
+              },
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return new Response(JSON.stringify({ agent: "places-agent", ok: false }), { status: 502 });
+    });
+
+    const saveRes = await invokeRoute(
+      postSaved,
+      authedRequest("/api/saved", {
+        method: "POST",
+        body: {
+          itinerary: SAMPLE_ITINERARY,
+          messages: [],
+          tripId: "trip-london-saved",
+        },
+      }),
+    );
+    const saved = await readJson<{ id: string }>(saveRes);
+
+    const res = await invokeWithParams(
+      getItinerary,
+      authedRequest(`/api/itineraries/${saved.id}`),
+      saved.id,
+    );
+    expect(res.status).toBe(200);
+    const body = await readJson<{ travelTips?: { intro?: string } }>(res);
+    expect(body.travelTips?.intro).toBe("London from row tripId");
+  });
+
   it("should_return_404_for_other_users_itinerary", async () => {
     await setupUser("owner-d@where2play.place");
     const saveRes = await invokeRoute(
