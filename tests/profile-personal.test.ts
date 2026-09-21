@@ -35,6 +35,7 @@ describe("/api/profile/personal", () => {
           name: "Updated Name",
           email: TEST_USER.email,
           defaultLocation: "Taipei",
+          nationality: "CHN",
           age: 28,
           interests: ["night_market", "restaurant"],
         },
@@ -58,6 +59,7 @@ describe("/api/profile/personal", () => {
           name: TEST_USER.name,
           email: TEST_USER.email,
           defaultLocation: "Central, Hong Kong",
+          nationality: "CHN",
           defaultLat: 22.3193,
           defaultLng: 114.1694,
         },
@@ -81,6 +83,7 @@ describe("/api/profile/personal", () => {
           name: TEST_USER.name,
           email: TEST_USER.email,
           defaultLocation: "London",
+          nationality: "CHN",
           photoUrl: huge,
         },
       }),
@@ -122,5 +125,25 @@ describe("/api/profile/personal", () => {
     expect(putRes.status).toBe(200);
     const updated = await readJson<{ nationality: string | null }>(putRes);
     expect(updated.nationality).toBe("USA");
+  });
+
+  it("should_reject_empty_nationality_on_profile", async () => {
+    await registerTestUser();
+    await loginTestUser();
+    const res = await invokeRoute(
+      putPersonal,
+      authedRequest("/api/profile/personal", {
+        method: "PUT",
+        body: {
+          name: TEST_USER.name,
+          email: TEST_USER.email,
+          defaultLocation: "Beijing",
+          nationality: "",
+        },
+      }),
+    );
+    expect(res.status).toBe(400);
+    const body = await readJson<{ error: { key: string } }>(res);
+    expect(body.error.key).toBe("errors.nationality_required");
   });
 });

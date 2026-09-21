@@ -1174,7 +1174,8 @@ describe("make failure fetch recovery (TC-M19-78-02)", () => {
     }
 
     expect(client.travelTips).not.toHaveBeenCalled();
-    expect(eventTypes.indexOf("tips")).toBeGreaterThan(eventTypes.indexOf("day_done"));
+    expect(eventTypes.indexOf("tips")).toBeGreaterThan(eventTypes.indexOf("stop_filled"));
+    expect(eventTypes.indexOf("tips")).toBeLessThan(eventTypes.indexOf("day_done"));
     expect(eventTypes.indexOf("tips")).toBeLessThan(eventTypes.indexOf("done"));
     expect(tipsData?.intro).toBe("西湖");
   });
@@ -1470,5 +1471,416 @@ describe("make failure fetch recovery (TC-M19-78-02)", () => {
       return fields?.includes("filled");
     });
     expect(filledFetches).toHaveLength(0);
+  });
+});
+
+describe("2play-plan-94a visa write", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.spyOn(client, "travelTips").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: { trip_id: "t1", revision: 3 },
+    });
+    vi.spyOn(client, "planNextStop").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: {
+        stop: { name: "Hotel", kind: "stay", card: null, deeplinks: {} },
+        slot: { start: "09:00", end: "09:00" },
+        legs: [],
+        trip_id: "t-visa",
+        revision: 5,
+      },
+    });
+    vi.spyOn(client, "fetchTripDetails").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: {
+        trip_id: "t-visa",
+        revision: 6,
+        data: {
+          skeleton: {
+            days: [
+              {
+                day_index: 1,
+                stops: [
+                  { name: "Hotel", kind: "stay" },
+                  { name: "Tower", kind: "attraction" },
+                ],
+              },
+            ],
+          },
+          candidates: { places: [], restaurants: [] },
+          artifacts: {
+            visa: {
+              passport: "CHN",
+              destination: "PRT",
+              requirement: "visa_free",
+              description: "Fetched visa text",
+            },
+          },
+        },
+      },
+    });
+  });
+
+  it("should_write_visa_when_passport_and_destination_country_known", async () => {
+    const visaSpy = vi.spyOn(client, "visaRequirement").mockImplementation(async () => {
+      expect(tipsBeforeVisa).toBe(true);
+      return {
+        agent: "places-agent",
+        ok: true,
+        data: { trip_id: "t-visa", revision: 6, requirement: "from_http_body" },
+      };
+    });
+    const fetchSpy = vi.spyOn(client, "fetchTripDetails");
+    let tipsBeforeVisa = false;
+
+    const events: SkeletonPlanProgressEvent[] = [];
+    for await (const ev of planItinerarySkeletonFill(
+      {
+        destination: "Lisbon",
+        days: 1,
+        startDate: "2026-10-10",
+        tripId: "t-visa",
+        planMode: "fill",
+        passportAlpha3: "CHN",
+        destinationCountryAlpha3: "PRT",
+      },
+      { locale: "EN" },
+    )) {
+      events.push(ev);
+      if (ev.type === "tips") tipsBeforeVisa = true;
+      if (ev.type === "error" || ev.type === "done") break;
+    }
+
+    expect(visaSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        passport: "CHN",
+        destination: "PRT",
+        trip_id: "t-visa",
+      }),
+    );
+    const artifactFetches = fetchSpy.mock.calls.filter((call) => {
+      const fields = (call[0] as { fields?: string[] })?.fields;
+      return fields?.includes("artifacts");
+    });
+    expect(artifactFetches.length).toBeGreaterThan(0);
+    const fetched = (await fetchSpy.mock.results[0]?.value) as {
+      data?: { data?: { artifacts?: { visa?: { requirement?: string } } } };
+    };
+    expect(fetched.data?.data?.artifacts?.visa?.requirement).toBe("visa_free");
+    expect(JSON.stringify(events)).not.toContain("from_http_body");
+    const tipsEv = events.find((e) => e.type === "tips") as
+      | { type: "tips"; data?: { visa?: { passport?: string; requirement?: string } } }
+      | undefined;
+    expect(tipsEv?.data?.visa?.passport).toBe("CHN");
+    expect(tipsEv?.data?.visa?.requirement).toBe("visa_free");
+  });
+
+  it("should_skip_visa_when_destination_country_missing", async () => {
+    const visaSpy = vi.spyOn(client, "visaRequirement").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: { trip_id: "t-visa", revision: 6 },
+    });
+    vi.spyOn(client, "fetchTripDetails").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: {
+        trip_id: "t-visa",
+        revision: 6,
+        data: {
+          skeleton: {
+            days: [
+              {
+                day_index: 1,
+                stops: [
+                  { name: "Hotel", kind: "stay" },
+                  { name: "Tower", kind: "attraction" },
+                ],
+              },
+            ],
+          },
+          candidates: { places: [], restaurants: [] },
+          artifacts: { tips: { intro: "Hi" } },
+        },
+      },
+    });
+
+    const events: SkeletonPlanProgressEvent[] = [];
+    for await (const ev of planItinerarySkeletonFill(
+      {
+        destination: "Lisbon",
+        days: 1,
+        startDate: "2026-10-10",
+        tripId: "t-visa",
+        planMode: "fill",
+        passportAlpha3: "CHN",
+      },
+      { locale: "EN" },
+    )) {
+      events.push(ev);
+      if (ev.type === "error" || ev.type === "done") break;
+    }
+
+    expect(visaSpy).not.toHaveBeenCalled();
+    const blob = JSON.stringify(events);
+    expect(blob).not.toContain("play.plan.travel_tips_visa_need_nationality");
+    expect(blob).not.toContain("visa_notice");
+    expect(blob).not.toContain("visa_free");
+  });
+
+  it("should_yield_nationality_notice_without_calling_visa_when_passport_missing", async () => {
+    const visaSpy = vi.spyOn(client, "visaRequirement").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: { trip_id: "t-visa", revision: 6, requirement: "visa_free" },
+    });
+    vi.spyOn(client, "fetchTripDetails").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: {
+        trip_id: "t-visa",
+        revision: 6,
+        data: {
+          skeleton: {
+            days: [
+              {
+                day_index: 1,
+                stops: [
+                  { name: "Hotel", kind: "stay" },
+                  { name: "Tower", kind: "attraction" },
+                ],
+              },
+            ],
+          },
+          candidates: { places: [], restaurants: [] },
+          artifacts: { tips: { intro: "Hi" } },
+        },
+      },
+    });
+
+    const events: SkeletonPlanProgressEvent[] = [];
+    for await (const ev of planItinerarySkeletonFill(
+      {
+        destination: "Lisbon",
+        days: 1,
+        startDate: "2026-10-10",
+        tripId: "t-visa",
+        planMode: "fill",
+        destinationCountryAlpha3: "PRT",
+      },
+      { locale: "EN" },
+    )) {
+      events.push(ev);
+      if (ev.type === "error" || ev.type === "done") break;
+    }
+
+    expect(visaSpy).not.toHaveBeenCalled();
+    const tipsEv = events.find((e) => e.type === "tips") as
+      | { type: "tips"; data?: { visa?: unknown; visa_notice?: { key?: string; href?: string } } }
+      | undefined;
+    expect(tipsEv?.data?.visa_notice).toEqual({
+      key: "play.plan.travel_tips_visa_need_nationality",
+      href: "/profile",
+    });
+    expect(tipsEv?.data?.visa).toBeUndefined();
+    expect(JSON.stringify(events)).not.toContain("visa_free");
+  });
+
+  it("should_yield_unavailable_notice_when_visa_quota_fails", async () => {
+    const visaSpy = vi.spyOn(client, "visaRequirement").mockResolvedValue({
+      agent: "places-agent",
+      ok: false,
+      outcome: { key: "errors.visa_quota_exceeded" },
+    });
+    vi.spyOn(client, "fetchTripDetails").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: {
+        trip_id: "t-visa",
+        revision: 6,
+        data: {
+          skeleton: {
+            days: [
+              {
+                day_index: 1,
+                stops: [
+                  { name: "Hotel", kind: "stay" },
+                  { name: "Tower", kind: "attraction" },
+                ],
+              },
+            ],
+          },
+          candidates: { places: [], restaurants: [] },
+          artifacts: {
+            tips: { intro: "Hi" },
+            visa: {
+              unavailable: true,
+              outcome: "errors.visa_quota_exceeded",
+              requirement: "visa_free",
+              visa_free_days: 90,
+              description: "Invented policy",
+            },
+          },
+        },
+      },
+    });
+
+    const events: SkeletonPlanProgressEvent[] = [];
+    for await (const ev of planItinerarySkeletonFill(
+      {
+        destination: "Lisbon",
+        days: 1,
+        startDate: "2026-10-10",
+        tripId: "t-visa",
+        planMode: "fill",
+        passportAlpha3: "CHN",
+        destinationCountryAlpha3: "PRT",
+      },
+      { locale: "EN" },
+    )) {
+      events.push(ev);
+      if (ev.type === "error" || ev.type === "done") break;
+    }
+
+    expect(visaSpy).toHaveBeenCalled();
+    expect(events.some((e) => e.type === "error")).toBe(false);
+    const tipsEv = events.find((e) => e.type === "tips") as
+      | { type: "tips"; data?: { visa?: unknown; visa_notice?: { key?: string } } }
+      | undefined;
+    expect(tipsEv?.data?.visa).toBeUndefined();
+    expect(tipsEv?.data?.visa_notice).toEqual({
+      key: "play.plan.travel_tips_visa_unavailable",
+    });
+    const blob = JSON.stringify(events);
+    expect(blob).not.toContain("visa_free");
+    expect(blob).not.toContain("Invented policy");
+    expect(blob).not.toContain("90");
+  });
+
+  it("should_skip_visa_when_passport_equals_destination_country", async () => {
+    const visaSpy = vi.spyOn(client, "visaRequirement").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: {
+        trip_id: "t-visa",
+        revision: 6,
+        requirement: "visa_free",
+        visa_free_days: 90,
+      },
+    });
+    vi.spyOn(client, "fetchTripDetails").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: {
+        trip_id: "t-visa",
+        revision: 6,
+        data: {
+          skeleton: {
+            days: [
+              {
+                day_index: 1,
+                stops: [
+                  { name: "Hotel", kind: "stay" },
+                  { name: "Tower", kind: "attraction" },
+                ],
+              },
+            ],
+          },
+          candidates: { places: [], restaurants: [] },
+          artifacts: { tips: { intro: "Hi" } },
+        },
+      },
+    });
+
+    const events: SkeletonPlanProgressEvent[] = [];
+    for await (const ev of planItinerarySkeletonFill(
+      {
+        destination: "Beijing",
+        days: 1,
+        startDate: "2026-10-10",
+        tripId: "t-visa",
+        planMode: "fill",
+        passportAlpha3: "CHN",
+        destinationCountryAlpha3: "CHN",
+      },
+      { locale: "EN" },
+    )) {
+      events.push(ev);
+      if (ev.type === "error" || ev.type === "done") break;
+    }
+
+    expect(visaSpy).not.toHaveBeenCalled();
+    const blob = JSON.stringify(events);
+    expect(blob).not.toContain("visa_free");
+    expect(blob).not.toContain("visa_notice");
+    expect(blob).not.toContain("play.plan.travel_tips_visa_need_nationality");
+  });
+
+  it("should_yield_visa_free_singapore_without_inventing_arrival_card", async () => {
+    vi.spyOn(client, "visaRequirement").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: { trip_id: "t-visa", revision: 6 },
+    });
+    vi.spyOn(client, "fetchTripDetails").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: {
+        trip_id: "t-visa",
+        revision: 6,
+        data: {
+          skeleton: {
+            days: [
+              {
+                day_index: 1,
+                stops: [
+                  { name: "Hotel", kind: "stay" },
+                  { name: "Marina Bay", kind: "attraction" },
+                ],
+              },
+            ],
+          },
+          candidates: { places: [], restaurants: [] },
+          artifacts: {
+            tips: { intro: "City state." },
+            visa: {
+              passport: "CHN",
+              destination: "SGP",
+              requirement: "visa_free",
+              visa_free_days: 30,
+              description: "Up to 30 days.",
+            },
+          },
+        },
+      },
+    });
+
+    const events: SkeletonPlanProgressEvent[] = [];
+    for await (const ev of planItinerarySkeletonFill(
+      {
+        destination: "Singapore",
+        days: 1,
+        startDate: "2026-10-10",
+        tripId: "t-visa",
+        planMode: "fill",
+        passportAlpha3: "CHN",
+        destinationCountryAlpha3: "SGP",
+      },
+      { locale: "EN" },
+    )) {
+      events.push(ev);
+      if (ev.type === "error" || ev.type === "done") break;
+    }
+
+    const tipsEv = events.find((e) => e.type === "tips") as
+      | { type: "tips"; data?: { visa?: { requirement?: string; visa_free_days?: number } } }
+      | undefined;
+    expect(tipsEv?.data?.visa?.requirement).toBe("visa_free");
+    expect(tipsEv?.data?.visa?.visa_free_days).toBe(30);
+    expect(JSON.stringify(events)).not.toMatch(/arrival.?card|SGAC|入境卡/i);
   });
 });

@@ -261,3 +261,17 @@ export function isValidNationality(code: string | null | undefined): boolean {
   if (code == null || code === "") return true;
   return ALPHA3.has(code.toUpperCase());
 }
+
+/** ISO alpha-2 → alpha-3 using the passport code table (not a city list). */
+export function alpha2ToAlpha3(alpha2: string | null | undefined): string | null {
+  const code = alpha2?.trim().toUpperCase() ?? "";
+  if (!/^[A-Z]{2}$/.test(code)) return null;
+  return PASSPORT_COUNTRIES.find((c) => c.alpha2 === code)?.alpha3 ?? null;
+}
+
+/** ISO alpha-3 → alpha-2 using the passport code table (not a city list). */
+export function alpha3ToAlpha2(alpha3: string | null | undefined): string | null {
+  const code = alpha3?.trim().toUpperCase() ?? "";
+  if (!/^[A-Z]{3}$/.test(code)) return null;
+  return PASSPORT_COUNTRIES.find((c) => c.alpha3 === code)?.alpha2 ?? null;
+}

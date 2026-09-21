@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser, authError } from "@/src/auth/user";
 import { prisma } from "@/src/db/client";
 import { normalizeLocale } from "@/src/core/locales";
+import { alpha2ToAlpha3 } from "@/src/core/country-codes";
 import { validatePlanBoundaries } from "@/src/core/plan-validate";
 import { sanitizeDailyStartName } from "@/src/core/plan-resolve-origin";
 import {
@@ -90,6 +91,14 @@ export async function POST(request: NextRequest) {
     originLng:
       typeof parsed.value.originLng === "number" ? parsed.value.originLng : prev.originLng,
   };
+  const passport = gate.user.nationality?.trim().toUpperCase() ?? "";
+  if (/^[A-Z]{3}$/.test(passport)) criteria.passportAlpha3 = passport;
+  const destAlpha3 =
+    (typeof raw.destinationCountryAlpha3 === "string" && /^[A-Z]{3}$/i.test(raw.destinationCountryAlpha3.trim())
+      ? raw.destinationCountryAlpha3.trim().toUpperCase()
+      : null) ??
+    alpha2ToAlpha3(typeof raw.country_code === "string" ? raw.country_code : undefined);
+  if (destAlpha3) criteria.destinationCountryAlpha3 = destAlpha3;
   const stream = request.headers.get("accept")?.includes("application/x-ndjson");
 
   let ledger: PlanLedger = {

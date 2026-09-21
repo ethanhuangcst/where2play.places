@@ -53,7 +53,8 @@ export function validateRegisterClient(input: RegisterClientInput): Partial<Reco
   else if (confirm.length < 8) errors.password_confirm = "play.errors.password_too_short";
   else if (password !== confirm) errors.password_confirm = "play.errors.password_mismatch";
   const nationality = input.nationality?.trim().toUpperCase() ?? "";
-  if (nationality && !isValidNationality(nationality)) {
+  if (!nationality) errors.nationality = "play.errors.nationality_required";
+  else if (!isValidNationality(nationality)) {
     errors.nationality = "play.errors.nationality_invalid";
   }
 
@@ -84,7 +85,12 @@ export function registerSchemaFailure(error: {
     return { key: "errors.password_too_short", field: "password_confirm" };
   }
   if (path === "age") return { key: "errors.age_out_of_range", field: "age" };
-  if (path === "nationality") return { key: "errors.nationality_invalid", field: "nationality" };
+  if (path === "nationality") {
+    if (issue.code === "too_small" || issue.code === "invalid_type") {
+      return { key: "errors.nationality_required", field: "nationality" };
+    }
+    return { key: "errors.nationality_invalid", field: "nationality" };
+  }
   if (path === "photoUrl") return { key: "errors.photo_too_large", field: "photo" };
   return { key: "errors.validation" };
 }
@@ -138,6 +144,8 @@ export function mapApiErrorToField(
       return { field: "photo", errorKey: "play.errors.photo_too_large", formLevel: false };
     case "errors.nationality_invalid":
       return { field: "nationality", errorKey: "play.errors.nationality_invalid", formLevel: false };
+    case "errors.nationality_required":
+      return { field: "nationality", errorKey: "play.errors.nationality_required", formLevel: false };
     case "errors.csrf":
       return { errorKey: "play.errors.csrf", formLevel: true };
     case "errors.session_expired":

@@ -44,6 +44,7 @@ export function NationalitySelect({
       options={options}
       placeholder={t("play.register.nationality_placeholder")}
       label={t(labelKey)}
+      required
       filterOptions={(opts, query) =>
         filterNationalityOptions(
           opts.map((o) => ({ code: o.value, label: o.label, pinned: false })),

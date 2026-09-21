@@ -19,12 +19,13 @@ export async function registerTestUser(
   const res = await registerRoute(
     bffRequest("/api/auth/register", {
       method: "POST",
-      body: {
+        body: {
         name: user.name,
         email: user.email,
         password: user.password,
         confirmPassword: user.password,
         defaultLocation: user.defaultLocation,
+        nationality: "CHN",
         interests: overrides.interests,
       },
     }),

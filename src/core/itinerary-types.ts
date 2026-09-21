@@ -39,6 +39,10 @@ export type PlanBoundaries = {
     native_id?: string;
     photos?: string[];
   };
+  /** ISO alpha-3 passport (session). Used by visa write (94a). */
+  passportAlpha3?: string;
+  /** ISO alpha-3 destination country. Used by visa write (94a). */
+  destinationCountryAlpha3?: string;
 };
 
 /** Progressive discover preview (isomorphic slot fields). */

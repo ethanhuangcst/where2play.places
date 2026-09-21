@@ -15,6 +15,7 @@ export type GeocodeResult = {
   crs: string;
   label?: string;
   country?: string;
+  country_code?: string;
   city?: string;
   city_en?: string;
 };
@@ -86,6 +87,7 @@ type AgentGeocodeData = {
   address?: string;
   label?: string;
   country?: string;
+  country_code?: string;
   city?: string;
   city_en?: string;
 };
@@ -112,6 +114,7 @@ export async function reverseGeocode(input: {
       crs: envelope.data.crs,
       label,
       ...(envelope.data.country ? { country: envelope.data.country } : {}),
+      ...(envelope.data.country_code ? { country_code: envelope.data.country_code } : {}),
       ...(envelope.data.city ? { city: envelope.data.city } : {}),
       ...(envelope.data.city_en ? { city_en: envelope.data.city_en } : {}),
     },
@@ -139,6 +142,7 @@ export async function geocode(input: {
       crs: envelope.data.crs,
       label,
       ...(envelope.data.country ? { country: envelope.data.country } : {}),
+      ...(envelope.data.country_code ? { country_code: envelope.data.country_code } : {}),
       ...(envelope.data.city ? { city: envelope.data.city } : {}),
       ...(envelope.data.city_en ? { city_en: envelope.data.city_en } : {}),
     },

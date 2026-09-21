@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 import { useLocale, useT } from "@/src/i18n/use-t";
-import { isCoordString, parseCoordString } from "@/src/core/location";
 
-type Status = "detecting" | "ok" | "failed";
+type Status = "idle" | "resolving" | "ok" | "failed";
 
 type Props = {
   id?: string;
@@ -12,6 +11,8 @@ type Props = {
   value: string;
   onChange: (value: string) => void;
   onResolved?: (label: string, lat: number, lng: number) => void;
+  /** Called when forward geocode fails — keeps typed text, clears coords at parent. */
+  onResolveFailed?: () => void;
   required?: boolean;
   testId?: string;
   showStatus?: boolean;
@@ -19,26 +20,36 @@ type Props = {
   action?: ReactNode;
 };
 
-const LOCATE_ICON = (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
-    <circle cx="12" cy="12" r="3" />
-    <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
-  </svg>
-);
+type ForwardGeocodeOk = {
+  ok?: boolean;
+  lat?: number;
+  lng?: number;
+  city?: string;
+  city_en?: string;
+  address?: string;
+  country?: string;
+};
 
-async function resolveCoords(
-  lat: number,
-  lng: number,
+function labelFromGeocode(data: ForwardGeocodeOk, query: string): string {
+  const city = data.city?.trim();
+  if (city) return city;
+  const address = data.address?.trim();
+  if (address) return address;
+  return query;
+}
+
+async function forwardGeocode(
+  query: string,
   locale: string,
-): Promise<{ label: string; lat: number; lng: number } | null> {
-  const res = await fetch("/api/geocode/reverse", {
+): Promise<ForwardGeocodeOk | null> {
+  const res = await fetch("/api/geocode", {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ lat, lng, locale }),
+    body: JSON.stringify({ query, locale }),
   });
   if (!res.ok) return null;
-  return (await res.json()) as { label: string; lat: number; lng: number };
+  return (await res.json()) as ForwardGeocodeOk;
 }
 
 export function LocationField({
@@ -47,6 +58,7 @@ export function LocationField({
   value,
   onChange,
   onResolved,
+  onResolveFailed,
   required,
   testId,
   showStatus = true,
@@ -56,76 +68,45 @@ export function LocationField({
   const t = useT();
   const locale = useLocale();
   const listId = useId();
-  const [status, setStatus] = useState<Status>(initialStatus ?? (value ? "ok" : "detecting"));
-  const [loading, setLoading] = useState(false);
-  const [labelFailed, setLabelFailed] = useState(false);
-  const backfillAttempted = useRef(false);
+  const [status, setStatus] = useState<Status>(
+    initialStatus ?? (value.trim() ? "ok" : "idle"),
+  );
+  const lastResolvedQuery = useRef<string>(value.trim() ? value.trim() : "");
 
   const suggestions = t("play.register.location_suggestions")
     .split("|")
     .map((s) => s.trim())
     .filter(Boolean);
 
-  async function applyCoords(lat: number, lng: number) {
-    setLabelFailed(false);
-    setStatus("detecting");
-    const resolved = await resolveCoords(lat, lng, locale);
-    if (resolved?.label) {
+  async function resolveQuery(raw: string) {
+    const q = raw.trim();
+    if (!q) {
+      setStatus("idle");
+      lastResolvedQuery.current = "";
+      onResolveFailed?.();
+      return;
+    }
+    if (q === lastResolvedQuery.current && status === "ok") return;
+
+    setStatus("resolving");
+    const data = await forwardGeocode(q, locale);
+    if (
+      data?.ok &&
+      typeof data.lat === "number" &&
+      typeof data.lng === "number" &&
+      Number.isFinite(data.lat) &&
+      Number.isFinite(data.lng)
+    ) {
+      const label = labelFromGeocode(data, q);
+      lastResolvedQuery.current = label;
       setStatus("ok");
-      onChange(resolved.label);
-      onResolved?.(resolved.label, resolved.lat, resolved.lng);
+      onChange(label);
+      onResolved?.(label, data.lat, data.lng);
       return;
     }
-    setStatus("ok");
-    setLabelFailed(true);
-    const fallback = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-    onChange(fallback);
-    onResolved?.(fallback, lat, lng);
-  }
-
-  useEffect(() => {
-    if (initialStatus || value) return;
-    if (!navigator.geolocation) {
-      setStatus("failed");
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        void applyCoords(pos.coords.latitude, pos.coords.longitude);
-      },
-      () => setStatus("failed"),
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-time detect only
-  }, [initialStatus, value]);
-
-  useEffect(() => {
-    if (!value || !isCoordString(value) || backfillAttempted.current) return;
-    backfillAttempted.current = true;
-    const coords = parseCoordString(value);
-    if (!coords) return;
-    void applyCoords(coords.lat, coords.lng);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot backfill
-  }, [value]);
-
-  function detect() {
-    if (!navigator.geolocation) {
-      setStatus("failed");
-      return;
-    }
-    setLoading(true);
-    setStatus("detecting");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLoading(false);
-        void applyCoords(pos.coords.latitude, pos.coords.longitude);
-      },
-      () => {
-        setLoading(false);
-        setStatus("failed");
-      },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
-    );
+    setStatus("failed");
+    lastResolvedQuery.current = "";
+    onResolveFailed?.();
   }
 
   const inputRow = (
@@ -138,9 +119,14 @@ export function LocationField({
         autoComplete="off"
         value={value}
         onChange={(e) => {
-          onChange(e.target.value);
-          setLabelFailed(false);
-          if (e.target.value.trim()) setStatus("ok");
+          const next = e.target.value;
+          onChange(next);
+          lastResolvedQuery.current = "";
+          if (next.trim()) setStatus("idle");
+          else setStatus("idle");
+        }}
+        onBlur={(e) => {
+          void resolveQuery(e.currentTarget.value);
         }}
         placeholder={t("play.register.location_placeholder")}
         required={required}
@@ -151,30 +137,20 @@ export function LocationField({
           <option key={s} value={s} />
         ))}
       </datalist>
-      <button
-        type="button"
-        className={`location-detect${loading ? " is-loading" : ""}`}
-        aria-label={t("play.register.location_use_current")}
-        onClick={detect}
-      >
-        {LOCATE_ICON}
-      </button>
     </div>
   );
 
   const sideHint = showStatus ? (
     <p
-      className={`location-hint${status === "ok" && !labelFailed ? "" : " location-hint--status"}`}
+      className={`location-hint${status === "ok" ? "" : " location-hint--status"}`}
       role="status"
       data-testid="location-hint"
     >
-      {status === "detecting"
+      {status === "resolving"
         ? t("play.register.location_detecting")
         : status === "failed"
-          ? t("play.register.location_failed")
-          : labelFailed
-            ? t("play.register.location_label_failed")
-            : t("play.register.location_source_hint")}
+          ? t("play.register.location_label_failed")
+          : t("play.register.location_source_hint")}
     </p>
   ) : null;
 

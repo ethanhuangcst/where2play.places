@@ -55,6 +55,7 @@ import { PlanConstraintsPanel } from "@/src/ui/plan-constraints-panel";
 import { PlanItineraryView } from "@/src/ui/plan-itinerary-view";
 import { PlanTakeoffForm, type TakeoffFieldErrors, type OriginOverlayState } from "@/src/ui/plan-takeoff-form";
 import { formatDestVerifiedLabel } from "@/src/core/plan-dest-label";
+import { alpha2ToAlpha3 } from "@/src/core/country-codes";
 import { PlanTravelTipsPanel, type TravelTipsData } from "@/src/ui/plan-travel-tips-panel";
 import { PlaceSheet } from "@/src/ui/place-sheet";
 import { ReplanDialog } from "@/src/ui/replan-dialog";
@@ -119,6 +120,7 @@ export default function PlanPageClient() {
   const [other, setOther] = useState("");
   const [destVerified, setDestVerified] = useState<{
     country: string;
+    country_code?: string;
     city: string;
     city_en?: string;
     lat: number;
@@ -269,6 +271,7 @@ export default function PlanPageClient() {
       const res = await authJson<{
         ok?: boolean;
         country?: string;
+        country_code?: string;
         city?: string;
         city_en?: string;
         lat?: number;
@@ -288,6 +291,7 @@ export default function PlanPageClient() {
       }
       setDestVerified({
         country: res.country,
+        ...(res.country_code ? { country_code: res.country_code } : {}),
         city: res.city,
         ...(res.city_en ? { city_en: res.city_en } : {}),
         lat: res.lat,
@@ -1447,6 +1451,9 @@ export default function PlanPageClient() {
         locale,
         tripId: res.trip_id,
         revision: res.revision,
+        ...(alpha2ToAlpha3(destVerified?.country_code)
+          ? { destinationCountryAlpha3: alpha2ToAlpha3(destVerified?.country_code)! }
+          : {}),
       };
       const hydrated = hydrateFromAgentSkeleton(criteria, res.skeleton, t);
       if (!hydrated) {
@@ -1476,6 +1483,7 @@ export default function PlanPageClient() {
         }),
       );
       setLoading(false);
+      setTravelTipsLoading(true);
 
       // Soft two-step: show skeleton + fill-begin copy, then append fill (do not replace skeleton).
       setFillBeginLine(t("play.plan.assistant_fill_begin"));

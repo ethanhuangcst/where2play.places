@@ -22,6 +22,7 @@ export default function ProfilePageClient() {
 
   const [loaded, setLoaded] = useState(false);
   const [savedMsg, setSavedMsg] = useState(false);
+  const [nationalityError, setNationalityError] = useState<string | null>(null);
   const [photoFieldError, setPhotoFieldError] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<string | undefined>();
   const [personal, setPersonal] = useState({
@@ -83,6 +84,11 @@ export default function ProfilePageClient() {
   async function savePersonal(e: React.FormEvent) {
     e.preventDefault();
     setPhotoFieldError(null);
+    if (!personal.nationality.trim()) {
+      setNationalityError("play.errors.nationality_required");
+      return;
+    }
+    setNationalityError(null);
     const updated = await authJson<{ updatedAt?: string; interests?: string[]; photoUrl?: string | null }>(
       "/api/profile/personal",
       {
@@ -91,7 +97,7 @@ export default function ProfilePageClient() {
           name: personal.name,
           email: personal.email,
           gender: personal.gender || undefined,
-          nationality: personal.nationality || null,
+          nationality: personal.nationality,
           age: personal.age ? Number(personal.age) : undefined,
           defaultLocation: personal.defaultLocation,
           defaultLat: personal.defaultLat,
@@ -187,9 +193,17 @@ export default function ProfilePageClient() {
                   id="profile-nationality"
                   testId="profile-nationality"
                   value={personal.nationality}
-                  onChange={(v) => setPersonal({ ...personal, nationality: v })}
+                  onChange={(v) => {
+                    setPersonal({ ...personal, nationality: v });
+                    setNationalityError(null);
+                  }}
                   labelKey="play.profile.nationality"
                 />
+                {nationalityError ? (
+                  <p className="error" role="alert" data-testid="profile-nationality-error">
+                    {t(nationalityError)}
+                  </p>
+                ) : null}
                 <div className="field">
                   <label htmlFor="location" className="is-required">
                     {t("play.register.location")}
@@ -211,6 +225,13 @@ export default function ProfilePageClient() {
                         defaultLat: lat,
                         defaultLng: lng,
                       })
+                    }
+                    onResolveFailed={() =>
+                      setPersonal((prev) => ({
+                        ...prev,
+                        defaultLat: null,
+                        defaultLng: null,
+                      }))
                     }
                     required
                     testId="field-location"

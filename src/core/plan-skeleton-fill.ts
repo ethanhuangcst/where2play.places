@@ -18,6 +18,7 @@ import {
   planNextStop,
   fetchTripDetails,
   travelTips,
+  visaRequirement,
   geocode,
   type AgentEnvelope,
 } from "../places-agent/client";
@@ -35,8 +36,8 @@ import {
   candidatesFromSlice,
   skeletonStopCount,
   skeletonIsFillable,
-  artifactsTipsFromSlice,
   latestFilledStopFromSlice,
+  travelTipsPayloadFromSlice,
 } from "./plan-fetch-trip";
 import { t as catalogT } from "../i18n/catalog";
 
@@ -534,6 +535,17 @@ export async function* planItinerarySkeletonFill(
   yield { type: "skeleton_done", itinerary, tripId, revision };
   } // end !fillOnly discover/make branch
 
+  if (!fillOnly && tripId) {
+    const visaRev = await writeArtifactsVisa({
+      tripId,
+      revision,
+      locale: opts.locale,
+      passport: criteria.passportAlpha3,
+      destination: criteria.destinationCountryAlpha3,
+    });
+    if (typeof visaRev === "number") revision = visaRev;
+  }
+
   if (!skeleton?.days?.length) {
     yield { type: "error", key: "play.plan.assistant_fetch_failed" };
     return;
@@ -559,6 +571,27 @@ export async function* planItinerarySkeletonFill(
   });
   stampStayCoords(skeleton, origin);
 
+  let lastTipsSig = "";
+  let visaWrite: Promise<void> | undefined;
+
+  async function pullNewTips(): Promise<Record<string, unknown> | null> {
+    let payload: Record<string, unknown> | null = null;
+    if (tripId) {
+      const fetched = await fetchArtifactsTips(tripId, opts.locale);
+      if (typeof fetched.revision === "number") revision = fetched.revision;
+      payload = fetched.tips;
+    }
+    const notice = missingPassportVisaNotice(criteria);
+    if (notice && payload?.visa == null && payload?.visa_notice == null) {
+      payload = { ...(payload ?? {}), visa_notice: notice };
+    }
+    if (!payload) return null;
+    const sig = JSON.stringify(payload);
+    if (sig === lastTipsSig) return null;
+    lastTipsSig = sig;
+    return payload;
+  }
+
   if (tripId && !fillOnly) {
     const tipsWrite = await travelTips({
       destination: criteria.destination.trim(),
@@ -577,21 +610,28 @@ export async function* planItinerarySkeletonFill(
     }
   }
 
-  // Early fetch: show tips mid-fill when agent already dualWrote. Do not block on LLM.
+  // Early fetch: show tips as soon as artifacts exist. Do not wait for visa or the fill loop.
   if (tripId) {
-    let tips: Record<string, unknown> | null = null;
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const fetched = await fetchArtifactsTips(tripId, opts.locale);
-      if (typeof fetched.revision === "number") revision = fetched.revision;
-      tips = fetched.tips;
-      if (tips) break;
-      if (fillOnly && attempt === 0) {
-        await sleep(120);
-      } else {
-        break;
-      }
+    let tips = await pullNewTips();
+    if (!tips && fillOnly) {
+      await sleep(120);
+      tips = await pullNewTips();
     }
     if (tips) yield { type: "tips", data: tips };
+  }
+
+  if (fillOnly && tripId) {
+    visaWrite = writeArtifactsVisa({
+      tripId,
+      revision,
+      locale: opts.locale,
+      passport: criteria.passportAlpha3,
+      destination: criteria.destinationCountryAlpha3,
+    })
+      .then((rev) => {
+        if (typeof rev === "number") revision = rev;
+      })
+      .catch(() => undefined);
   }
 
   yield { type: "phase", phase: "filling", dayIndex: 1, daysTotal };
@@ -819,6 +859,8 @@ export async function* planItinerarySkeletonFill(
         meta: { window: dates[dayIndex - 1] },
       });
       yield { type: "stop_filled", dayIndex, stopIndex, slot: placeSlot, itinerary };
+      const midTips = await pullNewTips();
+      if (midTips) yield { type: "tips", data: midTips };
       patchAttempts = 0;
       stopIndex += 1;
     }
@@ -826,14 +868,49 @@ export async function* planItinerarySkeletonFill(
     yield { type: "day_done", dayIndex, daysTotal, itinerary };
   }
 
-  // Hangzhou repro: tips LLM often finishes during fill, not in the 120ms start window.
+  if (visaWrite) await visaWrite;
   if (tripId) {
-    const late = await fetchArtifactsTips(tripId, opts.locale);
-    if (typeof late.revision === "number") revision = late.revision;
-    if (late.tips) yield { type: "tips", data: late.tips };
+    const late = await pullNewTips();
+    if (late) yield { type: "tips", data: late };
   }
 
   yield { type: "done", itinerary, tripId, revision };
+}
+
+const VISA_NOTICE_NEED_NATIONALITY = "play.plan.travel_tips_visa_need_nationality";
+
+/** 94c: dest known, passport missing — do not call Orizn; ask for profile nationality. */
+function missingPassportVisaNotice(
+  criteria: PlanBoundaries,
+): { key: string; href: string } | null {
+  const destination = criteria.destinationCountryAlpha3?.trim().toUpperCase() ?? "";
+  const passport = criteria.passportAlpha3?.trim().toUpperCase() ?? "";
+  if (!/^[A-Z]{3}$/.test(destination)) return null;
+  if (/^[A-Z]{3}$/.test(passport)) return null;
+  return { key: VISA_NOTICE_NEED_NATIONALITY, href: "/profile" };
+}
+
+async function writeArtifactsVisa(input: {
+  tripId: string;
+  revision?: number;
+  locale: string;
+  passport?: string;
+  destination?: string;
+}): Promise<number | undefined> {
+  const passport = input.passport?.trim().toUpperCase() ?? "";
+  const destination = input.destination?.trim().toUpperCase() ?? "";
+  if (!/^[A-Z]{3}$/.test(passport) || !/^[A-Z]{3}$/.test(destination)) return input.revision;
+  // 107: home-country travel — skip Orizn; do not invent visa-free days.
+  if (passport === destination) return input.revision;
+  const visa = await visaRequirement({
+    passport,
+    destination,
+    trip_id: input.tripId,
+    ...(typeof input.revision === "number" ? { revision: input.revision } : {}),
+    locale: input.locale,
+  });
+  const rev = (visa.data as { revision?: number } | undefined)?.revision;
+  return typeof rev === "number" ? rev : input.revision;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -853,7 +930,7 @@ async function fetchArtifactsTips(
   if (!fetched.ok) return { tips: null };
   const { slice, revision } = tripFetchSlice(fetched);
   return {
-    tips: artifactsTipsFromSlice(slice),
+    tips: travelTipsPayloadFromSlice(slice),
     revision: typeof revision === "number" ? revision : undefined,
   };
 }

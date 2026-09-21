@@ -18,14 +18,10 @@ const personalSchema = z.object({
   gender: z.string().optional(),
   nationality: z
     .string()
-    .optional()
-    .nullable()
-    .transform((v) => {
-      if (v == null) return null;
-      const trimmed = v.trim().toUpperCase();
-      return trimmed ? trimmed : null;
-    })
-    .refine((v) => isValidNationality(v ?? ""), { message: "invalid nationality" }),
+    .trim()
+    .min(1)
+    .transform((v) => v.toUpperCase())
+    .refine((v) => isValidNationality(v), { message: "invalid nationality" }),
   age: z.coerce.number().int().min(1).max(120).optional(),
   defaultLocation: z.string().min(1),
   defaultLat: z.number().min(-90).max(90).optional().nullable(),
@@ -66,7 +62,14 @@ export async function PUT(request: NextRequest) {
   const gate = await requireUser(request);
   if ("error" in gate) return gate.error;
   const parsed = personalSchema.safeParse(await request.json().catch(() => ({})));
-  if (!parsed.success) return authError("errors.validation", 400);
+  if (!parsed.success) {
+    const nat = parsed.error.issues.find((i) => i.path[0] === "nationality");
+    if (nat && (nat.code === "too_small" || nat.code === "invalid_type")) {
+      return authError("errors.nationality_required", 400, "nationality");
+    }
+    if (nat) return authError("errors.nationality_invalid", 400, "nationality");
+    return authError("errors.validation", 400);
+  }
   if (photoUrlTooLarge(parsed.data.photoUrl || undefined)) {
     return authError("errors.photo_too_large", 400);
   }
@@ -86,7 +89,7 @@ export async function PUT(request: NextRequest) {
       name: parsed.data.name.trim(),
       email,
       gender: parsed.data.gender || null,
-      nationality: parsed.data.nationality ?? null,
+      nationality: parsed.data.nationality,
       age: parsed.data.age,
       defaultLocation: parsed.data.defaultLocation.trim(),
       defaultLat: latProvided ? parsed.data.defaultLat : null,

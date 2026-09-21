@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PASSPORT_COUNTRY_CODES, isValidNationality } from "@/src/core/country-codes";
+import { PASSPORT_COUNTRY_CODES, alpha2ToAlpha3, alpha3ToAlpha2, isValidNationality } from "@/src/core/country-codes";
 
 describe("country-codes", () => {
   it("should_expose_non_empty_passport_code_list", () => {
@@ -17,7 +17,16 @@ describe("country-codes", () => {
     expect(isValidNationality(undefined)).toBe(true);
   });
 
-  it("should_reject_unknown_alpha3", () => {
-    expect(isValidNationality("ZZZ")).toBe(false);
+  it("should_map_alpha2_to_alpha3", () => {
+    expect(alpha2ToAlpha3("PT")).toBe("PRT");
+    expect(alpha2ToAlpha3("cn")).toBe("CHN");
+    expect(alpha2ToAlpha3("")).toBeNull();
+    expect(alpha2ToAlpha3("ZZ")).toBeNull();
+  });
+
+  it("should_map_alpha3_to_alpha2", () => {
+    expect(alpha3ToAlpha2("PRT")).toBe("PT");
+    expect(alpha3ToAlpha2("chn")).toBe("CN");
+    expect(alpha3ToAlpha2("")).toBeNull();
   });
 });

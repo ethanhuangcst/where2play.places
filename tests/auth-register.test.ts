@@ -14,6 +14,7 @@ describe("POST /api/auth/register", () => {
           email: "new.user@where2play.place",
           password: "testpass123",
           confirmPassword: "testpass123",
+          nationality: "CHN",
           defaultLocation: "Tokyo",
         },
       }),
@@ -32,6 +33,7 @@ describe("POST /api/auth/register", () => {
           email: "interests@where2play.place",
           password: "testpass123",
           confirmPassword: "testpass123",
+          nationality: "CHN",
           interests: ["museum", "park", "bogus"],
         },
       }),
@@ -86,6 +88,7 @@ describe("POST /api/auth/register", () => {
           name: "Age Test",
           email: "age.test@where2play.place",
           age: 5,
+          nationality: "CHN",
           password: "testpass123",
           confirmPassword: "testpass123",
         },
@@ -105,6 +108,7 @@ describe("POST /api/auth/register", () => {
           email: "mismatch@where2play.place",
           password: "testpass123",
           confirmPassword: "testpass999",
+          nationality: "CHN",
         },
       }),
     );
@@ -120,6 +124,7 @@ describe("POST /api/auth/register", () => {
       email: "dup@where2play.place",
       password: "testpass123",
       confirmPassword: "testpass123",
+      nationality: "CHN",
     };
     await registerRoute(bffRequest("/api/auth/register", { method: "POST", body }));
     const res = await registerRoute(bffRequest("/api/auth/register", { method: "POST", body }));
@@ -142,6 +147,23 @@ describe("POST /api/auth/register", () => {
     expect(res.status).toBe(200);
     const user = await prisma.user.findUnique({ where: { email: "nationality@where2play.place" } });
     expect(user?.nationality).toBe("CHN");
+  });
+
+  it("should_reject_missing_nationality_on_register", async () => {
+    const res = await registerRoute(
+      bffRequest("/api/auth/register", {
+        method: "POST",
+        body: {
+          name: "No Nat",
+          email: "no.nat@where2play.place",
+          password: "testpass123",
+          confirmPassword: "testpass123",
+        },
+      }),
+    );
+    expect(res.status).toBe(400);
+    const body = await readJson<{ error: { key: string } }>(res);
+    expect(body.error.key).toBe("errors.nationality_required");
   });
 
   it("should_reject_invalid_nationality_on_register", async () => {

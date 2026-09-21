@@ -24,6 +24,7 @@ type ComboFieldProps = {
   options: ComboOption[];
   placeholder: string;
   label: ReactNode;
+  required?: boolean;
   filterOptions?: (options: ComboOption[], query: string) => ComboOption[];
   listAriaLabel: string;
   toggleAriaLabel: string;
@@ -37,6 +38,7 @@ export function ComboField({
   options,
   placeholder,
   label,
+  required,
   filterOptions,
   listAriaLabel,
   toggleAriaLabel,
@@ -44,11 +46,20 @@ export function ComboField({
   const listId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  /** Latest query for blur timeout — avoids stale empty wipe after option click. */
+  const queryRef = useRef("");
+  /** Set when an option is committed so blur does not clear the value. */
+  const commitGuardRef = useRef(false);
   const [open, setOpen] = useState(false);
   const [focused, setFocused] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
+
+  function writeQuery(next: string) {
+    queryRef.current = next;
+    setQuery(next);
+  }
 
   useEffect(() => {
     setMounted(true);
@@ -70,7 +81,7 @@ export function ComboField({
 
   useEffect(() => {
     if (!mounted || focused) return;
-    setQuery(selected?.label ?? "");
+    writeQuery(selected?.label ?? "");
   }, [mounted, focused, selected?.label]);
 
   useEffect(() => {
@@ -93,8 +104,9 @@ export function ComboField({
   const commitSelection = useCallback(
     (option: ComboOption | undefined) => {
       if (!option) return;
+      commitGuardRef.current = true;
       onChange(option.value);
-      setQuery(option.label);
+      writeQuery(option.label);
       setOpen(false);
       setFocused(false);
       inputRef.current?.blur();
@@ -108,7 +120,7 @@ export function ComboField({
   }
 
   function onInputChange(next: string) {
-    setQuery(next);
+    writeQuery(next);
     setOpen(true);
     if (!next.trim()) onChange("");
   }
@@ -123,19 +135,23 @@ export function ComboField({
     window.setTimeout(() => {
       if (rootRef.current?.contains(document.activeElement)) return;
       setOpen(false);
-      const trimmed = query.trim();
+      if (commitGuardRef.current) {
+        commitGuardRef.current = false;
+        return;
+      }
+      const trimmed = queryRef.current.trim();
       if (!trimmed) {
         onChange("");
-        setQuery("");
+        writeQuery("");
         return;
       }
       const exact = options.find((o) => o.label === trimmed || o.value === trimmed.toUpperCase());
       if (exact) {
         onChange(exact.value);
-        setQuery(exact.label);
+        writeQuery(exact.label);
         return;
       }
-      setQuery(selected?.label ?? "");
+      writeQuery(selected?.label ?? "");
     }, 0);
   }
 
@@ -162,7 +178,7 @@ export function ComboField({
     if (e.key === "Escape") {
       e.preventDefault();
       setOpen(false);
-      setQuery(selected?.label ?? "");
+      writeQuery(selected?.label ?? "");
       inputRef.current?.blur();
     }
   }
@@ -176,7 +192,9 @@ export function ComboField({
 
   return (
     <div className="field">
-      <label htmlFor={id}>{label}</label>
+      <label htmlFor={id} className={required ? "is-required" : undefined}>
+        {label}
+      </label>
       <div
         ref={rootRef}
         className={`combo${open ? " is-open" : ""}`}

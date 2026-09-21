@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireUser } from "@/src/auth/user";
+import { csrfOk } from "@/src/auth/csrf";
+import { authError } from "@/src/auth/user";
 import { normalizeLocale } from "@/src/core/locales";
 import { geocode } from "@/src/places-agent/client";
 
@@ -9,17 +10,20 @@ const schema = z.object({
   locale: z.string().optional(),
 });
 
-/** Forward geocode for takeoff destination blur (2play-plan-100). */
+/**
+ * Forward geocode (name → coords).
+ * CSRF-protected; no session required so register can resolve default departure
+ * the same way takeoff destination blur does.
+ */
 export async function POST(request: NextRequest) {
-  const gate = await requireUser(request);
-  if ("error" in gate) return gate.error;
+  if (!csrfOk(request)) return authError("errors.csrf", 403);
 
   const parsed = schema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) {
     return NextResponse.json({ error: { key: "errors.validation" } }, { status: 400 });
   }
 
-  const locale = normalizeLocale(parsed.data.locale ?? gate.user.locale);
+  const locale = normalizeLocale(parsed.data.locale);
   const geo = await geocode({ query: parsed.data.query, locale });
   if (!geo.ok || !geo.data) {
     return NextResponse.json(
@@ -35,6 +39,7 @@ export async function POST(request: NextRequest) {
     crs: geo.data.crs,
     address: geo.data.label,
     country: geo.data.country,
+    country_code: geo.data.country_code,
     city: geo.data.city,
     city_en: geo.data.city_en,
   });

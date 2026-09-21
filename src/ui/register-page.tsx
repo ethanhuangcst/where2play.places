@@ -245,11 +245,19 @@ export default function RegisterPageClient() {
                     <label htmlFor="location">{t("play.register.location")}</label>
                     <LocationField
                       value={location}
-                      onChange={setLocation}
+                      onChange={(v) => {
+                        setLocation(v);
+                        setLocationLat(null);
+                        setLocationLng(null);
+                      }}
                       onResolved={(label, lat, lng) => {
                         setLocation(label);
                         setLocationLat(lat);
                         setLocationLng(lng);
+                      }}
+                      onResolveFailed={() => {
+                        setLocationLat(null);
+                        setLocationLng(null);
                       }}
                       testId="field-location"
                     />

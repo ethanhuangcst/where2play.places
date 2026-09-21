@@ -43,6 +43,7 @@ describe("POST /api/auth/login", () => {
           email,
           password: TEST_USER.password,
           confirmPassword: TEST_USER.password,
+          nationality: "CHN",
           locale: "CN",
         },
       }),

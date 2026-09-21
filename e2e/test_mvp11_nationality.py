@@ -57,13 +57,9 @@ def test_mvp11_nationality_e2e():
         page.fill('[data-testid="field-password"]', PASSWORD)
         page.fill('[data-testid="field-confirm-password"]', PASSWORD)
         page.click('[data-testid="register-submit"]')
-        page.wait_for_url("**/plan")
-        page.goto(f"{BASE}/profile")
-        page.wait_for_selector('[data-testid="profile-nationality"]')
-        assert page.locator('[data-testid="profile-nationality"]').get_attribute("data-value") in (
-            None,
-            "",
-        )
+        page.wait_for_selector('[data-testid="field-nationality-error"]')
+        assert "/register" in page.url
+        assert page.locator('[data-testid="field-nationality-error"]').is_visible()
 
         browser.close()
 

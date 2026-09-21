@@ -1,8 +1,25 @@
 "use client";
 
-import { useT } from "@/src/i18n/use-t";
+import { useLocale, useT } from "@/src/i18n/use-t";
 import { ymdPlusDays } from "@/src/core/plan-agent-body";
 import { iconicPlacesFromTravelTips } from "@/src/core/plan-iconic-parse";
+import { visaTipsDisplay } from "@/src/core/plan-visa-display";
+import { visaPopoverPlacement } from "@/src/core/plan-visa-popover-place";
+import type { ArtifactsVisa } from "@/src/core/plan-fetch-trip";
+
+function placeVisaPopover(wrap: HTMLElement) {
+  const link = wrap.querySelector(".travel-tips-visa-link");
+  const pop = wrap.querySelector(".travel-tips-popover");
+  if (!(link instanceof HTMLElement) || !(pop instanceof HTMLElement)) return;
+  const rect = link.getBoundingClientRect();
+  const place = visaPopoverPlacement({
+    anchorTop: rect.top,
+    anchorBottom: rect.bottom,
+    viewportHeight: window.innerHeight,
+  });
+  pop.classList.toggle("is-above", place.side === "above");
+  pop.style.maxHeight = `${place.maxHeightPx}px`;
+}
 
 export type TravelTipsData = {
   intro?: string;
@@ -11,6 +28,10 @@ export type TravelTipsData = {
   weather?: { summary?: string } | null;
   clothing?: string;
   safety?: string;
+  visa?: ArtifactsVisa | null;
+  /** 94c: i18n key when policy is absent. Not a visa result. */
+  visa_notice?: { key: string; href?: string };
+  /** @deprecated 94b reads `visa`; kept so old events do not crash. */
   visa_label?: string;
   visa_detail?: string;
 };
@@ -102,6 +123,7 @@ function TravelTipsBody({
   errorKey: string | null;
 }) {
   const t = useT();
+  const locale = useLocale();
 
   if (loading) {
     return (
@@ -128,6 +150,7 @@ function TravelTipsBody({
   const clothingText =
     typeof data?.clothing === "string" && data.clothing.trim() ? data.clothing : null;
   const safetyText = typeof data?.safety === "string" && data.safety.trim() ? data.safety : null;
+  const visaUi = visaTipsDisplay(data?.visa ?? null, locale);
 
   return (
     <div className="panel__body plan-travel-tips__body" id="travel-tips-body">
@@ -137,20 +160,95 @@ function TravelTipsBody({
             <span className="travel-tips-card__idx" aria-hidden="true">
               01
             </span>
-            <h3 className="travel-tips-card__title">{t("play.plan.travel_tips_destination")}</h3>
+            <h3 className="travel-tips-card__title">{t("play.plan.travel_tips_visa")}</h3>
           </header>
-          {data?.visa_label ? (
-            <p className="travel-tips-card__lead">
-              <span className="travel-tips-visa-wrap">
-                <span className="travel-tips-visa-link" data-testid="plan-visa-link">
-                  {data.visa_label}
-                </span>
-                {data.visa_detail ? (
-                  <span className="travel-tips-popover" role="tooltip">
-                    {data.visa_detail}
+          {visaUi ? (
+            <div className="travel-tips-card__lead">
+              <span
+                className="travel-tips-visa-wrap"
+                onMouseEnter={(e) => placeVisaPopover(e.currentTarget)}
+                onFocus={(e) => placeVisaPopover(e.currentTarget)}
+              >
+                <a
+                  href="#"
+                  className="travel-tips-visa-link"
+                  data-testid="plan-visa-link"
+                  onClick={(e) => e.preventDefault()}
+                >
+                  {visaUi.label}
+                </a>
+                <span
+                  className="travel-tips-popover travel-tips-popover--roomy"
+                  role="tooltip"
+                  data-testid="plan-visa-popover"
+                >
+                  <span className="travel-tips-popover__head">
+                    <strong>{visaUi.title}</strong>
+                    {visaUi.body ? (
+                      <span className="travel-tips-popover__desc">{visaUi.body}</span>
+                    ) : null}
                   </span>
-                ) : null}
+                  <span className="travel-tips-popover__scroll">
+                  {visaUi.facts.length ? (
+                    <dl className="travel-tips-popover__facts">
+                      {visaUi.facts.map((fact) => (
+                        <div key={fact.key} className="travel-tips-popover__row">
+                          <dt>{fact.label}</dt>
+                          <dd>{fact.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  ) : null}
+                  {visaUi.lists.map((list) => (
+                    <div key={list.key} className="travel-tips-popover__block">
+                      <p className="travel-tips-popover__h">{list.label}</p>
+                      {list.key === "process" ? (
+                        <ol>
+                          {list.items.map((item) => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ol>
+                      ) : (
+                        <ul>
+                          {list.items.map((item) => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
+                  <span className="travel-tips-popover__src">
+                    {visaUi.source}
+                    {visaUi.sourceHref ? (
+                      <>
+                        {" · "}
+                        <a
+                          className="travel-tips-popover__src-link"
+                          href={visaUi.sourceHref}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {visaUi.sourceHost ?? visaUi.sourceHref}
+                        </a>
+                      </>
+                    ) : null}
+                    {visaUi.verified ? ` · ${visaUi.verified}` : null}
+                  </span>
+                  </span>
+                </span>
               </span>
+            </div>
+          ) : data?.visa_notice?.key ? (
+            <p className="travel-tips-card__lead" data-testid="plan-visa-notice">
+              {t(data.visa_notice.key)}
+              {data.visa_notice.href === "/profile" ? (
+                <>
+                  {" "}
+                  <a href="/profile" data-testid="plan-visa-nationality-link">
+                    {t("play.plan.travel_tips_visa_need_nationality_cta")}
+                  </a>
+                </>
+              ) : null}
             </p>
           ) : null}
           <p className="travel-tips-intro">{introText ?? unavailable}</p>

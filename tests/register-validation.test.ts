@@ -12,6 +12,7 @@ describe("validateRegisterClient", () => {
     age: "28",
     password: "testpass123",
     confirmPassword: "testpass123",
+    nationality: "CHN",
   };
 
   it("should_pass_when_all_fields_valid", () => {
@@ -57,8 +58,13 @@ describe("validateRegisterClient", () => {
     expect(errors.nationality).toBe("play.errors.nationality_invalid");
   });
 
-  it("TC-M11-38-02: should_pass_valid_nationality_chn", () => {
-    expect(validateRegisterClient({ ...valid, nationality: "CHN" })).toEqual({});
+  it("should_flag_nationality_required_when_empty", () => {
+    expect(validateRegisterClient({ ...valid, nationality: "" }).nationality).toBe(
+      "play.errors.nationality_required",
+    );
+    expect(validateRegisterClient({ ...valid, nationality: undefined }).nationality).toBe(
+      "play.errors.nationality_required",
+    );
   });
 
   it("should_map_api_errors_to_fields", () => {

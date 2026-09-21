@@ -15,13 +15,11 @@ const registerSchema = z.object({
   email: z.string().email(),
   gender: z.string().optional(),
   nationality: z
-    .string()
-    .optional()
-    .transform((v) => {
-      const trimmed = v?.trim().toUpperCase();
-      return trimmed ? trimmed : undefined;
-    })
-    .refine((v) => isValidNationality(v), { message: "invalid nationality" }),
+    .string({ error: "required" })
+    .trim()
+    .min(1)
+    .transform((v) => v.toUpperCase())
+    .refine((v) => isValidNationality(v) && v.length > 0, { message: "invalid nationality" }),
   age: z.preprocess(
     (v) => {
       if (v === undefined || v === null || v === "") return undefined;
@@ -82,7 +80,7 @@ export async function POST(request: NextRequest) {
       email,
       name: data.name.trim(),
       gender: data.gender || null,
-      nationality: data.nationality ?? null,
+      nationality: data.nationality,
       age: data.age,
       defaultLocation: data.defaultLocation?.trim() ?? null,
       photoUrl: data.photoUrl || null,

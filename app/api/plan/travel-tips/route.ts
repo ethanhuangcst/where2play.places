@@ -3,7 +3,8 @@ import { requireUser } from "@/src/auth/user";
 import { normalizeLocale } from "@/src/core/locales";
 import { ymdPlusDays } from "@/src/core/plan-agent-body";
 import { iconicPlacesFromTravelTips } from "@/src/core/plan-iconic-parse";
-import { artifactsTipsFromSlice, tripFetchSlice } from "@/src/core/plan-fetch-trip";
+import { alpha2ToAlpha3 } from "@/src/core/country-codes";
+import { travelTipsPayloadFromSlice, tripFetchSlice } from "@/src/core/plan-fetch-trip";
 import { fetchTripDetails, travelTips, visaRequirement } from "@/src/places-agent/client";
 
 function alpha3(raw: string | null | undefined): string | null {
@@ -69,7 +70,9 @@ export async function POST(request: NextRequest) {
     let revision = typeof writeData.revision === "number" ? writeData.revision : revisionIn;
 
     const passport = alpha3(gate.user.nationality);
-    const destCountry = alpha3(typeof raw.destinationCountry === "string" ? raw.destinationCountry : undefined);
+    const destCountry =
+      alpha3(typeof raw.destinationCountry === "string" ? raw.destinationCountry : undefined) ??
+      alpha2ToAlpha3(typeof raw.country_code === "string" ? raw.country_code : undefined);
     if (passport && destCountry && tripId) {
       const visa = await visaRequirement({
         passport,
@@ -92,21 +95,20 @@ export async function POST(request: NextRequest) {
       if (fetched.ok) {
         const { slice, revision: rev } = tripFetchSlice(fetched);
         if (typeof rev === "number") revision = rev;
-        const tips = artifactsTipsFromSlice(slice) ?? slice;
-        const artifacts = slice.artifacts as { visa?: { requirement?: string; description?: string } } | undefined;
+        const payload = travelTipsPayloadFromSlice(slice) ?? {};
+        const visa = payload.visa;
         return NextResponse.json({
           ok: true,
           trip_id: tripId,
           revision,
           data: {
-            intro: typeof tips.intro === "string" ? tips.intro : undefined,
-            iconic_places: iconicPlacesFromTravelTips(tips),
-            transit: typeof tips.transit === "string" ? tips.transit : undefined,
-            weather: (tips.weather as { summary?: string } | null) ?? null,
-            clothing: typeof tips.clothing === "string" ? tips.clothing : undefined,
-            safety: typeof tips.safety === "string" ? tips.safety : undefined,
-            visa_label: artifacts?.visa?.requirement,
-            visa_detail: artifacts?.visa?.description,
+            intro: typeof payload.intro === "string" ? payload.intro : undefined,
+            iconic_places: iconicPlacesFromTravelTips(payload),
+            transit: typeof payload.transit === "string" ? payload.transit : undefined,
+            weather: (payload.weather as { summary?: string } | null) ?? null,
+            clothing: typeof payload.clothing === "string" ? payload.clothing : undefined,
+            safety: typeof payload.safety === "string" ? payload.safety : undefined,
+            ...(visa ? { visa } : {}),
           },
         });
       }
