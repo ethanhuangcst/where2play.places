@@ -1,6 +1,6 @@
 import type { ItineraryDto, PlanBoundaries } from "./itinerary-types";
 import { fetchTripDetails } from "../places-agent/client";
-import { tripFetchSlice } from "./plan-fetch-trip";
+import { travelTipsPayloadFromSlice, tripFetchSlice } from "./plan-fetch-trip";
 import { skeletonDayHighlights } from "./itinerary-skeleton-map";
 import { t as catalogT } from "../i18n/catalog";
 import { normalizeLocale, type Locale } from "./locales";
@@ -190,13 +190,18 @@ export async function refreshItineraryFromTripLedger(opts: {
   criteria: PlanBoundaries;
   cached: ItineraryDto | null;
   locale: string;
-}): Promise<{ criteria: PlanBoundaries; itinerary: ItineraryDto; skeleton?: unknown } | null> {
+}): Promise<{
+  criteria: PlanBoundaries;
+  itinerary: ItineraryDto;
+  skeleton?: unknown;
+  travelTips?: Record<string, unknown>;
+} | null> {
   const tripId = opts.criteria.tripId;
   if (!tripId) return null;
 
   const fetched = await fetchTripDetails({
     trip_id: tripId,
-    fields: ["skeleton", "filled"],
+    fields: ["skeleton", "filled", "artifacts"],
     locale: opts.locale,
     ...(typeof opts.criteria.revision === "number" ? { revision: opts.criteria.revision } : {}),
   });
@@ -211,9 +216,11 @@ export async function refreshItineraryFromTripLedger(opts: {
   const itinerary = itineraryHasFilledPlaceSlots(opts.cached)
     ? opts.cached!
     : itineraryFromSkeletonFetch(criteria, slice.skeleton, opts.cached, opts.locale);
+  const travelTips = travelTipsPayloadFromSlice(slice) ?? undefined;
   return {
     criteria,
     itinerary,
     ...(skeleton != null ? { skeleton } : {}),
+    ...(travelTips ? { travelTips } : {}),
   };
 }

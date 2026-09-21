@@ -166,3 +166,130 @@ describe("plan-session-cache skeleton merge", () => {
     expect(cachedDayMatchesSkeletonAttractions(cachedDay2Haichang, matchingSkeleton)).toBe(true);
   });
 });
+
+describe("refreshItineraryFromTripLedger artifacts hydrate (2play-plan-106)", () => {
+  it("should_request_artifacts_and_return_travelTips_without_writing_visa_into_itinerary", async () => {
+    let requestedFields: unknown;
+    setPlacesAgentFetchForTests(async (input, init) => {
+      if (String(input).includes("/v1/fetch_trip_details")) {
+        const body = JSON.parse(String(init?.body ?? "{}")) as { fields?: string[] };
+        requestedFields = body.fields;
+        return new Response(
+          JSON.stringify({
+            agent: "places-agent",
+            ok: true,
+            data: {
+              trip_id: "trip-106-1",
+              revision: 4,
+              data: {
+                skeleton: {
+                  days: [
+                    {
+                      day_index: 1,
+                      stops: [
+                        { name: "Hotel", kind: "stay" },
+                        { name: "Marina Bay", kind: "attraction" },
+                      ],
+                    },
+                  ],
+                },
+                artifacts: {
+                  tips: {
+                    intro: "Singapore tips",
+                    iconic_places: ["Marina Bay Sands"],
+                    transit: "MRT",
+                    clothing: "Light",
+                    safety: "Safe",
+                    weather: { summary: "Hot" },
+                  },
+                  visa: {
+                    passport: "CHN",
+                    destination: "SGP",
+                    requirement: "visa_free",
+                    description: "30 days visa-free.",
+                    max_stay: "30 days",
+                  },
+                },
+              },
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return new Response(JSON.stringify({ agent: "places-agent", ok: false }), { status: 502 });
+    });
+
+    const cached: ItineraryDto = {
+      title: "新加坡",
+      destination: "新加坡",
+      daysCount: 1,
+      updatedAt: new Date().toISOString(),
+      days: [
+        {
+          dayIndex: 1,
+          highlights: { label: "D1", title: "Day 1", tags: [] },
+          slots: [
+            {
+              kind: "place",
+              start: "09:00",
+              end: "11:00",
+              placeKind: "Attraction",
+              name: "Marina Bay",
+              summary: "",
+            },
+          ],
+        },
+      ],
+    };
+
+    const refreshed = await refreshItineraryFromTripLedger({
+      criteria: { ...criteria, destination: "新加坡", days: 1, tripId: "trip-106-1", revision: 3 },
+      cached,
+      locale: "CN",
+    });
+    setPlacesAgentFetchForTests(null);
+
+    expect(requestedFields).toEqual(expect.arrayContaining(["skeleton", "filled", "artifacts"]));
+    expect(refreshed?.travelTips?.intro).toBe("Singapore tips");
+    expect(refreshed?.travelTips?.visa).toMatchObject({
+      passport: "CHN",
+      destination: "SGP",
+      requirement: "visa_free",
+    });
+    expect(JSON.stringify(refreshed?.itinerary)).not.toContain("visa_free");
+    expect((refreshed?.itinerary as { visa?: unknown }).visa).toBeUndefined();
+  });
+
+  it("should_omit_travelTips_when_artifacts_absent", async () => {
+    setPlacesAgentFetchForTests(async (input) => {
+      if (String(input).includes("/v1/fetch_trip_details")) {
+        return new Response(
+          JSON.stringify({
+            agent: "places-agent",
+            ok: true,
+            data: {
+              trip_id: "trip-106-empty",
+              revision: 2,
+              data: {
+                skeleton: {
+                  days: [{ day_index: 1, stops: [{ name: "Hotel", kind: "stay" }] }],
+                },
+              },
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return new Response(JSON.stringify({ agent: "places-agent", ok: false }), { status: 502 });
+    });
+
+    const refreshed = await refreshItineraryFromTripLedger({
+      criteria: { ...criteria, days: 1, tripId: "trip-106-empty", revision: 1 },
+      cached: null,
+      locale: "CN",
+    });
+    setPlacesAgentFetchForTests(null);
+
+    expect(refreshed?.travelTips).toBeUndefined();
+  });
+});

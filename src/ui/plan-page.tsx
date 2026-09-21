@@ -70,6 +70,7 @@ type PlanCurrentResponse = {
   criteria: PlanBoundaries | null;
   itinerary: ItineraryDto | null;
   skeleton?: unknown;
+  travelTips?: TravelTipsData | null;
 };
 
 function defaultStartDate(): string {
@@ -586,6 +587,11 @@ export default function PlanPageClient() {
                 tripType: tripTypeLabel,
               }),
             );
+            if (data.travelTips) {
+              setTravelTips(data.travelTips);
+              setTravelTipsLoading(false);
+              setTravelTipsError(null);
+            }
             if (data.skeleton && c) {
               const hydrated = hydrateFromAgentSkeleton(c, data.skeleton, t);
               if (hydrated) {
@@ -596,8 +602,7 @@ export default function PlanPageClient() {
                     destination: c.destination,
                     days: String(c.days),
                     partySize: String(c.partySize ?? 2),
-                    tripType: tripTypeLabel,
-                  }),
+                    tripType: tripTypeLabel,                  }),
                 );
                 setFillBeginLine(t("play.plan.assistant_fill_begin"));
               }

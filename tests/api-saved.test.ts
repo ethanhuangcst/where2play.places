@@ -1,8 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { GET as getSaved, POST as postSaved } from "../app/api/saved/route";
 import { DELETE as deleteSaved } from "../app/api/saved/[id]/route";
 import { GET as getItinerary } from "../app/api/itineraries/[id]/route";
 import { prisma } from "../src/db/client";
+import { upsertPlanSessionCache } from "../src/core/plan-session-cache";
+import { setPlacesAgentFetchForTests } from "../src/places-agent/client";
 import { bffRequest, invokeRoute, readJson } from "./helpers/http-bff";
 import {
   authedRequest,
@@ -12,6 +14,10 @@ import {
 } from "./helpers/test-user";
 import { NextRequest } from "next/server";
 import type { ItineraryDto } from "../src/core/itinerary-types";
+
+afterEach(() => {
+  setPlacesAgentFetchForTests(null);
+});
 
 const SAMPLE_ITINERARY: ItineraryDto = {
   title: "London 2 days",
@@ -120,9 +126,89 @@ describe("/api/saved", () => {
       saved.id,
     );
     expect(res.status).toBe(200);
-    const body = await readJson<{ itinerary: ItineraryDto; messages: unknown[] }>(res);
+    const body = await readJson<{ itinerary: ItineraryDto; messages: unknown[]; travelTips?: unknown }>(res);
     expect(body.itinerary.destination).toBe("London");
     expect(body.messages).toEqual([]);
+    expect(body.travelTips).toBeUndefined();
+  });
+
+  it("should_hydrate_travelTips_from_session_trip_artifacts_when_destination_matches", async () => {
+    await setupUser("saved-tips-106@where2play.place");
+    const user = await prisma.user.findUnique({ where: { email: "saved-tips-106@where2play.place" } });
+    expect(user).toBeTruthy();
+
+    await upsertPlanSessionCache(
+      user!.id,
+      {
+        destination: "London",
+        days: 2,
+        startDate: "2026-09-20",
+        partySize: 2,
+        budget: "mid",
+        locale: "EN",
+        tripId: "trip-saved-106",
+        revision: 5,
+      },
+      SAMPLE_ITINERARY,
+    );
+
+    setPlacesAgentFetchForTests(async (input) => {
+      if (String(input).includes("/v1/fetch_trip_details")) {
+        return new Response(
+          JSON.stringify({
+            agent: "places-agent",
+            ok: true,
+            data: {
+              trip_id: "trip-saved-106",
+              revision: 5,
+              data: {
+                artifacts: {
+                  tips: {
+                    intro: "London tips",
+                    iconic_places: ["British Museum"],
+                    transit: "Tube",
+                    clothing: "Layers",
+                    safety: "Mind the gap",
+                    weather: { summary: "Mild" },
+                  },
+                  visa: {
+                    passport: "CHN",
+                    destination: "GBR",
+                    requirement: "visa_required",
+                    description: "Visitor visa required.",
+                  },
+                },
+              },
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return new Response(JSON.stringify({ agent: "places-agent", ok: false }), { status: 502 });
+    });
+
+    const saveRes = await invokeRoute(
+      postSaved,
+      authedRequest("/api/saved", {
+        method: "POST",
+        body: { itinerary: SAMPLE_ITINERARY, messages: [] },
+      }),
+    );
+    const saved = await readJson<{ id: string }>(saveRes);
+
+    const res = await invokeWithParams(
+      getItinerary,
+      authedRequest(`/api/itineraries/${saved.id}`),
+      saved.id,
+    );
+    expect(res.status).toBe(200);
+    const body = await readJson<{
+      itinerary: ItineraryDto;
+      travelTips?: { intro?: string; visa?: { destination?: string } };
+    }>(res);
+    expect(body.travelTips?.intro).toBe("London tips");
+    expect(body.travelTips?.visa?.destination).toBe("GBR");
+    expect(JSON.stringify(body.itinerary)).not.toContain("visa_required");
   });
 
   it("should_return_404_for_other_users_itinerary", async () => {

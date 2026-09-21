@@ -92,6 +92,21 @@ describe("plan-page T3 hydrate after refresh", () => {
               },
             ],
           },
+          travelTips: {
+            intro: "上海小贴士",
+            iconic_places: ["乐高探索中心"],
+            transit: "地铁",
+            clothing: "轻便",
+            safety: "注意财物",
+            weather: { summary: "晴" },
+            visa: {
+              passport: "CHN",
+              destination: "SGP",
+              requirement: "visa_free",
+              description: "30 days visa-free.",
+              max_stay: "30 days",
+            },
+          },
         };
       }
       return { ok: true };
@@ -120,5 +135,14 @@ describe("plan-page T3 hydrate after refresh", () => {
     expect(document.body.querySelector('[data-testid="plan-thread-fill-begin"]')).toBeTruthy();
     expect(document.body.querySelector('[data-testid="plan-nav-takeover"]')).toBeTruthy();
     expect(document.body.textContent).toContain("乐高探索中心");
+  });
+
+  it("should_hydrate_travel_tips_and_visa_from_plan_current_payload", async () => {
+    renderWithLocale(<PlanPageClient />, "CN");
+    await waitFor(() => {
+      expect(document.body.querySelector('[data-testid="plan-travel-tips"]')).toBeTruthy();
+    });
+    expect(document.body.querySelector('[data-testid="plan-visa-link"]')).toBeTruthy();
+    expect(document.body.textContent).toContain("上海小贴士");
   });
 });

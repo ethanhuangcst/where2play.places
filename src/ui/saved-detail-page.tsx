@@ -8,6 +8,7 @@ import { resolveErrorKey } from "@/src/i18n/error-key";
 import { useLocale, useT } from "@/src/i18n/use-t";
 import { authJson, AuthApiError } from "@/src/ui/auth-api";
 import { PlanItineraryView } from "@/src/ui/plan-itinerary-view";
+import { PlanTravelTipsPanel, type TravelTipsData } from "@/src/ui/plan-travel-tips-panel";
 import { PlaceSheet } from "@/src/ui/place-sheet";
 import { usePageTitle } from "@/src/ui/use-page-title";
 import type { ItineraryPlaceSlot } from "@/src/core/itinerary-types";
@@ -16,6 +17,11 @@ type DetailResponse = {
   itinerary: ItineraryDto;
   title: string;
   savedAt: string;
+  destination?: string;
+  daysCount?: number;
+  startDate?: string;
+  days?: number;
+  travelTips?: TravelTipsData | null;
 };
 
 function formatSavedDate(iso: string, locale: string): string {
@@ -104,6 +110,16 @@ export default function SavedDetailPage() {
               date: formatSavedDate(detail.savedAt, locale),
             })}
           </p>
+          {detail.travelTips ? (
+            <PlanTravelTipsPanel
+              destination={detail.destination ?? detail.itinerary.destination}
+              startDate={detail.startDate ?? ""}
+              days={detail.days ?? detail.daysCount ?? detail.itinerary.daysCount}
+              data={detail.travelTips}
+              loading={false}
+              errorKey={null}
+            />
+          ) : null}
           <PlanItineraryView
             itinerary={detail.itinerary}
             generating={false}
