@@ -397,10 +397,77 @@ describe("TC-M10-46-11 plan-page head actions", () => {
     expect(container.querySelector(".panel__head-actions")).toBeTruthy();
   });
 
-  it("should_restore_blank_takeoff_when_replan_confirmed", async () => {
+  it("should_keep_takeoff_and_rerun_plan_trip_when_replan_confirmed", async () => {
+    authJson.mockImplementation(async (url: string) => {
+      if (url === "/api/plan/current") {
+        return {
+          ok: true,
+          criteria: {
+            destination: "Lisbon",
+            days: 2,
+            startDate: "2026-09-20",
+            partySize: 2,
+            budget: "mid",
+            tripType: "city",
+            pace: "medium",
+            transport: "transit_walk",
+          },
+          itinerary: {
+            title: "Lisbon",
+            destination: "Lisbon",
+            daysCount: 2,
+            updatedAt: new Date().toISOString(),
+            days: [
+              {
+                dayIndex: 1,
+                highlights: { label: "Highlights", title: "Day 1", tags: [] },
+                slots: [
+                  {
+                    kind: "place",
+                    start: "10:00",
+                    end: "12:00",
+                    placeKind: "Attraction",
+                    name: "Old Town",
+                    summary: "Walk",
+                  },
+                ],
+              },
+            ],
+          },
+        };
+      }
+      if (url === "/api/plan/trip") {
+        return {
+          ok: true,
+          status: "ok",
+          trip_id: "trip-replan-1",
+          revision: 1,
+          phases: [{ phase: "skeleton_ready" }],
+          skeleton: T3_SKELETON,
+        };
+      }
+      if (url === "/api/plan/travel-tips") {
+        return { ok: true, data: { intro: "Tips" } };
+      }
+      if (url === "/api/geocode") {
+        return {
+          ok: true,
+          country: "Portugal",
+          city: "Lisbon",
+          lat: 38.72,
+          lng: -9.14,
+          crs: "WGS84",
+          country_code: "PT",
+        };
+      }
+      return { ok: true };
+    });
+
     const { getByTestId, container } = renderWithLocale(<PlanPageClient />);
 
     await waitFor(() => expect(container.querySelector('[data-testid="plan-itinerary"]')).toBeTruthy());
+    expect(container.textContent).toContain("Old Town");
+
     const replanBtn = container.querySelector(
       '[data-testid="plan-itinerary"] [data-testid="replan-open"]',
     );
@@ -409,13 +476,43 @@ describe("TC-M10-46-11 plan-page head actions", () => {
     await waitFor(() => expect(getByTestId("replan-confirm")).toBeTruthy());
     fireEvent.click(getByTestId("replan-confirm"));
 
-    await waitFor(() => expect(container.querySelector(".plan-takeoff")).toBeTruthy());
-    expect((getByTestId("plan-dest") as HTMLInputElement).value).toBe("");
-    expect((getByTestId("plan-budget") as HTMLSelectElement).value).toBe("mid");
-    expect(getByTestId("plan-days")).toBeTruthy();
-    expect(container.querySelector('[data-testid="plan-itinerary"]')).toBeNull();
-    expect(document.body.querySelector('[data-testid="plan-nav-terminate"]')).toBeNull();
-    expect(authJson.mock.calls.some((c) => c[0] === "/api/plan/current" && (c[1] as { method?: string })?.method === "DELETE")).toBe(true);
+    // Middle itinerary cleared then regenerates via plan_trip; takeoff destination kept.
+    await waitFor(() =>
+      expect(authJson.mock.calls.some((c) => c[0] === "/api/plan/trip")).toBe(true),
+    );
+    const tripCall = authJson.mock.calls.find((c) => c[0] === "/api/plan/trip");
+    const tripBody = JSON.parse(String((tripCall?.[1] as { body?: string })?.body ?? "{}"));
+    expect(tripBody.city).toBe("Lisbon");
+    expect(
+      authJson.mock.calls.some(
+        (c) => c[0] === "/api/plan/current" && (c[1] as { method?: string })?.method === "DELETE",
+      ),
+    ).toBe(false);
+    // Takeoff form stays hidden (not reset to blank idle); constraints still show Lisbon.
+    expect(container.querySelector(".plan-takeoff")).toBeNull();
+    await waitFor(() => {
+      expect(container.querySelector('[data-testid="plan-constraints"]')?.textContent).toContain(
+        "Lisbon",
+      );
+    });
+  });
+
+  it("should_leave_itinerary_unchanged_when_replan_cancelled", async () => {
+    const { getByTestId, container } = renderWithLocale(<PlanPageClient />);
+
+    await waitFor(() => expect(container.querySelector('[data-testid="plan-itinerary"]')).toBeTruthy());
+    const replanBtn = container.querySelector(
+      '[data-testid="plan-itinerary"] [data-testid="replan-open"]',
+    );
+    fireEvent.click(replanBtn!);
+    await waitFor(() => expect(getByTestId("replan-cancel")).toBeTruthy());
+    fireEvent.click(getByTestId("replan-cancel"));
+
+    await waitFor(() => expect(getByTestId("plan-itinerary")).toBeTruthy());
+    expect(container.querySelector('[data-testid="replan-dialog"]')).toBeNull();
+    expect(
+      authJson.mock.calls.some((c) => c[0] === "/api/plan/trip"),
+    ).toBe(false);
   });
 });
 

@@ -128,6 +128,9 @@
   "play.saved.unsave_body": "This saved trip will be removed from your list. You cannot undo this.",
   "play.saved.unsave_confirm": "Remove",
   "play.saved.unsaving": "Removing…",
+  "play.saved.chat_title": "Saved conversation",
+  "play.saved.chat_snapshot_note": "This conversation is a database snapshot from when you saved the trip.",
+  "play.saved.chat_continue_note": "To continue chatting, go back to Plan, then save again.",
   "play.plan.save": "Save trip",
   "play.plan.saving": "Saving…",
   "play.plan.save_success": "Trip saved. Open Saved trips to review it.",
@@ -197,7 +200,7 @@
   "play.plan.error.trip_timeout": "Planning timed out. Try again.",
   "play.plan.error.need_input_invalid": "The planner returned an incomplete question list.",
   "play.plan.confirm_replan_title": "Start a new trip?",
-  "play.plan.confirm_replan_body": "This will stop the current planning and start over. Continue?",
+  "play.plan.confirm_replan_body": "This discards the unsaved itinerary and generates a new one. Your local chat stays and a divider is added. Continue?",
   "play.plan.confirm_replan_confirm": "Start over",
   "play.plan.confirm_replan_cancel": "Keep planning",
   "play.plan.assistant_greeting": "Hi! I'll ask a few quick questions to tailor your trip.",
@@ -490,5 +493,6 @@
   "play.plan.need_option.expand_radius.yes": "Yes, expand search",
   "play.plan.need_option.expand_radius.no": "No, keep current range",
   "play.plan.deviation_reason.far_cluster_shared_day": "Day {day} combines attractions that are far apart (e.g. {places}), so that day involves more travel; the agent's layout was kept as-is",
-  "play.plan.deviation_reason.day_count_mismatch": "The framework day count differs from your request (requested {expected}, produced {actual})"
+  "play.plan.deviation_reason.day_count_mismatch": "The framework day count differs from your request (requested {expected}, produced {actual})",
+  "play.plan.replan_divider": "— Replanned from here —"
 }

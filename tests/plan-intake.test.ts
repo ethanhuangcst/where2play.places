@@ -8,6 +8,7 @@ import {
   intakeQuickChips,
   intakeQuestionText,
   buildConstraintItems,
+  constraintItemsFromSavedSnapshot,
   joinMustIncludeSelection,
   mergeIntakeToBoundaries,
   nextIntakeStep,
@@ -256,5 +257,27 @@ describe("TC-M10-46-08 plan intake", () => {
   it("should_map_intake_step_to_trip_constraint_patch", () => {
     expect(tripConstraintsFromIntakeStep("c", "10:00", tt)).toEqual({ timeFrom: "10:00" });
     expect(tripConstraintsFromIntakeStep("g", "A、B", tt)).toEqual({ must_include: ["A", "B"] });
+  });
+
+  it("should_map_saved_snapshot_to_constraint_items_without_inventing_fields", () => {
+    const items = constraintItemsFromSavedSnapshot({
+      destination: "London",
+      daysCount: 2,
+      startDate: "2026-11-08",
+    });
+    expect(items.find((i) => i.key === "destination")).toMatchObject({
+      value: "London",
+      pending: false,
+    });
+    expect(items.find((i) => i.key === "days")).toMatchObject({ value: "2", pending: false });
+    expect(items.find((i) => i.key === "startDate")).toMatchObject({
+      value: "2026-11-08",
+      pending: false,
+    });
+    expect(items.find((i) => i.key === "partySize")).toMatchObject({
+      value: null,
+      pending: true,
+    });
+    expect(items.find((i) => i.key === "hotel")).toMatchObject({ value: null, pending: true });
   });
 });

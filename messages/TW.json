@@ -128,6 +128,9 @@
   "play.saved.unsave_body": "該行程將從列表中移除，此操作無法撤銷。",
   "play.saved.unsave_confirm": "取消收藏",
   "play.saved.unsaving": "正在移除…",
+  "play.saved.chat_title": "儲存時的對話",
+  "play.saved.chat_snapshot_note": "以下對話來自儲存時的資料庫快照。",
+  "play.saved.chat_continue_note": "若要繼續對話，請回到行程規劃頁，再儲存一次。",
   "play.plan.save": "儲存行程",
   "play.plan.saving": "儲存中…",
   "play.plan.save_success": "行程已儲存。可在「我的行程」中查看。",
@@ -197,7 +200,7 @@
   "play.plan.error.trip_timeout": "規劃逾時，請再試。",
   "play.plan.error.need_input_invalid": "規劃器回傳的問題不完整。",
   "play.plan.confirm_replan_title": "開始新的行程規劃？",
-  "play.plan.confirm_replan_body": "這將停止當前規劃並重新開始。繼續嗎？",
+  "play.plan.confirm_replan_body": "將丟棄未儲存的行程並產生新行程。本機對話會保留並加入分隔提示。繼續嗎？",
   "play.plan.confirm_replan_confirm": "重新開始",
   "play.plan.confirm_replan_cancel": "繼續規劃",
   "play.plan.assistant_greeting": "你好！我會問幾個簡短問題，幫你定制行程。",
@@ -490,5 +493,6 @@
   "play.plan.need_option.expand_radius.yes": "好，擴大搜尋",
   "play.plan.need_option.expand_radius.no": "不用，維持目前範圍",
   "play.plan.deviation_reason.far_cluster_shared_day": "第{day}天把相距較遠的景點安排在同一天（如 {places}），當天往返路程會較長；已保留智能體的原始安排，未擅自更動",
-  "play.plan.deviation_reason.day_count_mismatch": "行程框架的天數與您要求的不一致（要求 {expected} 天，實際 {actual} 天）"
+  "play.plan.deviation_reason.day_count_mismatch": "行程框架的天數與您要求的不一致（要求 {expected} 天，實際 {actual} 天）",
+  "play.plan.replan_divider": "— 已從此處重新規劃 —"
 }

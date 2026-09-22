@@ -75,7 +75,7 @@ model SavedItinerary {
   messages    ItineraryChatMessage[]
 
   @@index([userId, savedAt])
-  @@index([userId, tripId])
+  @@unique([userId, tripId])
 }
 
 model ItineraryChatMessage {

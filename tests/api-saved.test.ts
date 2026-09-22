@@ -235,7 +235,8 @@ describe("/api/saved", () => {
       }),
     );
     expect(res.status).toBe(201);
-    const body = await readJson<{ id: string }>(res);
+    const body = await readJson<{ id: string; updated?: boolean }>(res);
+    expect(body.updated).toBe(false);
     const row = await prisma.savedItinerary.findUnique({
       where: { id: body.id },
       include: { messages: { orderBy: { ord: "asc" } } },
@@ -244,6 +245,121 @@ describe("/api/saved", () => {
     expect(row?.messages.map((m) => ({ role: m.role, content: m.content }))).toEqual(messages);
     expect(JSON.stringify(row?.snapshot)).not.toContain("visa_required");
     expect(JSON.stringify(row?.snapshot)).not.toContain("leak");
+  });
+
+  it("should_upsert_same_tripId_to_one_row_on_second_save", async () => {
+    await setupUser("saved-upsert@where2play.place");
+    const user = await prisma.user.findUnique({
+      where: { email: "saved-upsert@where2play.place" },
+    });
+    const firstRes = await invokeRoute(
+      postSaved,
+      authedRequest("/api/saved", {
+        method: "POST",
+        body: {
+          itinerary: SAMPLE_ITINERARY,
+          messages: [{ role: "assistant", content: "first" }],
+          tripId: "trip-upsert-same",
+        },
+      }),
+    );
+    expect(firstRes.status).toBe(201);
+    const first = await readJson<{ id: string; savedAt: string; updated?: boolean }>(firstRes);
+    expect(first.updated).toBe(false);
+
+    const secondItinerary: ItineraryDto = {
+      ...SAMPLE_ITINERARY,
+      title: "London revised",
+      daysCount: 3,
+    };
+    const secondRes = await invokeRoute(
+      postSaved,
+      authedRequest("/api/saved", {
+        method: "POST",
+        body: {
+          itinerary: secondItinerary,
+          messages: [
+            { role: "user", content: "West End" },
+            { role: "assistant", content: "second" },
+          ],
+          tripId: "trip-upsert-same",
+        },
+      }),
+    );
+    expect(secondRes.status).toBe(200);
+    const second = await readJson<{ id: string; savedAt: string; updated?: boolean }>(secondRes);
+    expect(second.id).toBe(first.id);
+    expect(second.updated).toBe(true);
+    expect(new Date(second.savedAt).getTime()).toBeGreaterThanOrEqual(
+      new Date(first.savedAt).getTime(),
+    );
+
+    const count = await prisma.savedItinerary.count({ where: { userId: user!.id } });
+    expect(count).toBe(1);
+    const row = await prisma.savedItinerary.findUnique({
+      where: { id: first.id },
+      include: { messages: { orderBy: { ord: "asc" } } },
+    });
+    expect(row?.title).toBe("London revised");
+    expect(row?.daysCount).toBe(3);
+    expect(row?.messages.map((m) => m.content)).toEqual(["West End", "second"]);
+  });
+
+  it("should_create_two_rows_when_tripId_differs", async () => {
+    await setupUser("saved-upsert-diff@where2play.place");
+    const user = await prisma.user.findUnique({
+      where: { email: "saved-upsert-diff@where2play.place" },
+    });
+    await invokeRoute(
+      postSaved,
+      authedRequest("/api/saved", {
+        method: "POST",
+        body: {
+          itinerary: SAMPLE_ITINERARY,
+          messages: [],
+          tripId: "trip-a",
+        },
+      }),
+    );
+    await invokeRoute(
+      postSaved,
+      authedRequest("/api/saved", {
+        method: "POST",
+        body: {
+          itinerary: { ...SAMPLE_ITINERARY, title: "Other" },
+          messages: [],
+          tripId: "trip-b",
+        },
+      }),
+    );
+    const count = await prisma.savedItinerary.count({ where: { userId: user!.id } });
+    expect(count).toBe(2);
+  });
+
+  it("should_create_two_rows_when_tripId_absent_twice", async () => {
+    await setupUser("saved-upsert-null@where2play.place");
+    const user = await prisma.user.findUnique({
+      where: { email: "saved-upsert-null@where2play.place" },
+    });
+    await invokeRoute(
+      postSaved,
+      authedRequest("/api/saved", {
+        method: "POST",
+        body: { itinerary: SAMPLE_ITINERARY, messages: [] },
+      }),
+    );
+    await invokeRoute(
+      postSaved,
+      authedRequest("/api/saved", {
+        method: "POST",
+        body: {
+          itinerary: { ...SAMPLE_ITINERARY, title: "Again" },
+          messages: [],
+        },
+      }),
+    );
+    const count = await prisma.savedItinerary.count({ where: { userId: user!.id } });
+    expect(count).toBe(2);
   });
 
   it("should_fill_tripId_from_session_when_body_omits_it", async () => {
@@ -278,7 +394,7 @@ describe("/api/saved", () => {
     expect(row?.tripId).toBe("trip-from-session");
   });
 
-  it("should_create_new_row_without_updating_previous", async () => {
+  it("should_keep_previous_row_when_different_tripId_saved", async () => {
     await setupUser("saved-25-ac3@where2play.place");
     const firstMessages = [{ role: "assistant" as const, content: "first-save" }];
     const firstRes = await invokeRoute(

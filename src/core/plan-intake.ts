@@ -373,6 +373,53 @@ export function takeoffIsValid(takeoff: TakeoffFields): boolean {
   );
 }
 
+/** Fields known from a SavedItinerary GET (no invented POIs / criteria). */
+export type SavedConstraintSnapshot = {
+  destination?: string | null;
+  startDate?: string | null;
+  daysCount?: number | null;
+  partySize?: number | null;
+  tripType?: string | null;
+  budget?: string | null;
+  pace?: string | null;
+  transport?: string | null;
+  hotel?: string | null;
+  dayStart?: string | null;
+  other?: string | null;
+};
+
+/**
+ * Map saved-detail GET fields → constraint panel rows.
+ * Missing snapshot fields stay pending (UI shows constraint_pending); never invent POIs.
+ */
+export function constraintItemsFromSavedSnapshot(
+  snap: SavedConstraintSnapshot,
+): ConstraintDisplayItem[] {
+  const field = (
+    key: string,
+    labelKey: string,
+    raw: string | number | null | undefined,
+  ): ConstraintDisplayItem => {
+    const value =
+      raw == null ? null : typeof raw === "number" ? String(raw) : raw.trim() || null;
+    return { key, labelKey, value, pending: value == null };
+  };
+
+  return [
+    field("destination", "play.plan.destination", snap.destination),
+    field("startDate", "play.plan.start_date", snap.startDate),
+    field("days", "play.plan.constraint_days", snap.daysCount),
+    field("partySize", "play.plan.constraint_party", snap.partySize),
+    field("tripType", "play.plan.constraint_trip_type", snap.tripType),
+    field("budget", "play.plan.budget", snap.budget),
+    field("pace", "play.plan.constraint_pace", snap.pace),
+    field("transport", "play.plan.constraint_transport", snap.transport),
+    field("hotel", "play.plan.constraint_hotel", snap.hotel),
+    field("dayStart", "play.plan.constraint_day_start", snap.dayStart),
+    field("other", "play.plan.constraint_other", snap.other),
+  ];
+}
+
 export type IntakeQuickChip = {
   labelKey?: string;
   /** Domain place name from travel tips — not an i18n key. */

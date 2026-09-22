@@ -63,6 +63,8 @@ import { ReplanDialog } from "@/src/ui/replan-dialog";
 import { usePageTitle } from "@/src/ui/use-page-title";
 import type { ItineraryPlaceSlot } from "@/src/core/itinerary-types";
 import type { DiscoverPoolRow } from "@/src/core/plan-discover-pool";
+import { itineraryPdfFilename, itineraryToPdfBytes } from "@/src/core/itinerary-pdf";
+import { downloadPdfBytes } from "@/src/ui/download-pdf";
 type PagePhase = "idle" | "intake" | "progress" | "planning" | "done";
 type PlanSubPhase = "discovering" | "skeleton" | "filling" | "idle";
 
@@ -1538,6 +1540,74 @@ export default function PlanPageClient() {
     }
   }, [locale, takeoff, t, origin, startTime, other, originLat, originLng, originStay, runFillFromSkeleton, clearFillHoldTimer]);
 
+  /**
+   * Story 27: discard unsaved middle itinerary, keep takeoff/intake + local chat,
+   * append a divider line, then re-run the same T3 full loop (plan_trip → fill).
+   * Does not DELETE SavedItinerary rows.
+   */
+  const executeReplan = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    clearFillHoldTimer();
+
+    const divider = t("play.plan.replan_divider");
+    const withDivider = appendAssistantLine(navLinesRef.current, divider);
+    navLinesRef.current = withDivider;
+    setNavStatusLines(withDivider);
+
+    setItinerary(null);
+    setLoading(false);
+    setPlanSubPhase("idle");
+    setGenProgress(null);
+    setLiveSlots([]);
+    setFocusDayIndex(null);
+    setDayPending(false);
+    setSkeletonDays([]);
+    setSkeletonDeviations([]);
+    setFillRouteDays([]);
+    setPlanCompleteLine(null);
+    setT3Phases([]);
+    setFrameworkReadyLine(null);
+    setFillBeginLine(null);
+    setSlotPreviewText(null);
+    setTravelTips(null);
+    setTravelTipsError(null);
+    setTravelTipsLoading(false);
+    setSuggestedMustSee([]);
+    setDiscoverLoading(false);
+    setDiscoverSettled(false);
+    setGCandidatesReady(false);
+    setDiscoverPool([]);
+    setTripId(undefined);
+    tripIdRef.current = undefined;
+    setTripRevision(undefined);
+    tripRevisionRef.current = undefined;
+    setMakeElapsedMs(null);
+    setErrorKey(null);
+    setFieldErrors({});
+    setNeedQuestions([]);
+    setNeedIndex(0);
+    setNeedAnswers({});
+
+    setIntakeAnswers((prev) =>
+      Object.keys(prev).length
+        ? prev
+        : {
+            b: origin.trim(),
+            c: startTime.trim() || "09:00",
+            h: other.trim(),
+          },
+    );
+    setIntakeStep(null);
+    setIntakeComplete(true);
+    setPagePhase("progress");
+    setNavOpen(true);
+    setT3Phases([{ phase: "skeleton_generating" }]);
+    setLoading(true);
+    setPlanSubPhase("skeleton");
+    discoverJobRef.current = runT3SkeletonPlan();
+  }, [clearFillHoldTimer, t, origin, startTime, other, runT3SkeletonPlan]);
+
   runFillFromSkeletonRef.current = runFillFromSkeleton;
 
   const runSilentDiscover = useCallback(async () => {
@@ -1829,7 +1899,7 @@ export default function PlanPageClient() {
 
   function requestReplan() {
     setReplanDialogVariant("replan");
-    setPendingReplanAction(() => () => resetToBlankTakeoff());
+    setPendingReplanAction(() => () => executeReplan());
     setReplanDialogOpen(true);
   }
 
@@ -2052,6 +2122,16 @@ export default function PlanPageClient() {
                 : undefined
             }
             onSave={pagePhase === "done" ? () => void onSaveItinerary() : undefined}
+            onExportPdf={
+              pagePhase === "done" && itinerary
+                ? () => {
+                    void (async () => {
+                      const bytes = await itineraryToPdfBytes(itinerary);
+                      downloadPdfBytes(bytes, itineraryPdfFilename(itinerary));
+                    })();
+                  }
+                : undefined
+            }
             onOpenPlaceSheet={(slot, dayIndex) => void openPlaceSheet(slot, dayIndex)}
           />
         ) : null}

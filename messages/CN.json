@@ -128,6 +128,9 @@
   "play.saved.unsave_body": "该行程将从列表中移除，此操作无法撤销。",
   "play.saved.unsave_confirm": "取消收藏",
   "play.saved.unsaving": "正在移除…",
+  "play.saved.chat_title": "保存时的对话",
+  "play.saved.chat_snapshot_note": "以下对话来自保存时的数据库快照。",
+  "play.saved.chat_continue_note": "若要续聊，请回到行程规划页，再保存一次。",
   "play.plan.save": "保存行程",
   "play.plan.saving": "保存中…",
   "play.plan.save_success": "行程已保存。可在「我的行程」中查看。",
@@ -197,7 +200,7 @@
   "play.plan.error.trip_timeout": "规划超时，请重试。",
   "play.plan.error.need_input_invalid": "规划器返回的问题不完整。",
   "play.plan.confirm_replan_title": "开始新的行程规划？",
-  "play.plan.confirm_replan_body": "这将停止当前规划并重新开始。继续吗？",
+  "play.plan.confirm_replan_body": "将丢弃未保存的行程并生成新行程。本机对话会保留并加入分隔提示。继续吗？",
   "play.plan.confirm_replan_confirm": "重新开始",
   "play.plan.confirm_replan_cancel": "继续规划",
   "play.plan.assistant_greeting": "你好！我会问几个简短问题，帮你定制行程。",
@@ -490,5 +493,6 @@
   "play.plan.need_option.expand_radius.yes": "好，扩大搜索",
   "play.plan.need_option.expand_radius.no": "不用，维持目前范围",
   "play.plan.deviation_reason.far_cluster_shared_day": "第{day}天把相距较远的景点安排在了同一天（如 {places}），当天往返路程会较长；已保留智能体的原始排布，未擅自改动",
-  "play.plan.deviation_reason.day_count_mismatch": "行程框架的天数与您要求的不一致（要求 {expected} 天，实际 {actual} 天）"
+  "play.plan.deviation_reason.day_count_mismatch": "行程框架的天数与您要求的不一致（要求 {expected} 天，实际 {actual} 天）",
+  "play.plan.replan_divider": "— 已从此处重新规划 —"
 }

@@ -61,7 +61,46 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const row = await prisma.$transaction(async (tx) => {
+  const messageRows = parsed.data.messages.map((m, ord) => ({
+    role: m.role,
+    content: m.content,
+    ord,
+    createdAt: m.createdAt ? new Date(m.createdAt) : undefined,
+  }));
+
+  const result = await prisma.$transaction(async (tx) => {
+    if (tripId) {
+      const existing = await tx.savedItinerary.findFirst({
+        where: { userId: gate.user.id, tripId },
+      });
+      if (existing) {
+        await tx.itineraryChatMessage.deleteMany({ where: { itineraryId: existing.id } });
+        const saved = await tx.savedItinerary.update({
+          where: { id: existing.id },
+          data: {
+            title: itinerary.title,
+            destination: itinerary.destination,
+            daysCount: itinerary.daysCount,
+            coverUrl: coverUrl ?? null,
+            snapshot: itinerary as unknown as Prisma.InputJsonValue,
+            savedAt: new Date(),
+          },
+        });
+        if (messageRows.length > 0) {
+          await tx.itineraryChatMessage.createMany({
+            data: messageRows.map((m) => ({
+              itineraryId: saved.id,
+              role: m.role,
+              content: m.content,
+              ord: m.ord,
+              ...(m.createdAt ? { createdAt: m.createdAt } : {}),
+            })),
+          });
+        }
+        return { row: saved, updated: true as const };
+      }
+    }
+
     const saved = await tx.savedItinerary.create({
       data: {
         userId: gate.user.id,
@@ -73,19 +112,26 @@ export async function POST(request: NextRequest) {
         tripId: tripId ?? null,
       },
     });
-    if (parsed.data.messages.length > 0) {
+    if (messageRows.length > 0) {
       await tx.itineraryChatMessage.createMany({
-        data: parsed.data.messages.map((m, ord) => ({
+        data: messageRows.map((m) => ({
           itineraryId: saved.id,
           role: m.role,
           content: m.content,
-          ord,
-          createdAt: m.createdAt ? new Date(m.createdAt) : undefined,
+          ord: m.ord,
+          ...(m.createdAt ? { createdAt: m.createdAt } : {}),
         })),
       });
     }
-    return saved;
+    return { row: saved, updated: false as const };
   });
 
-  return NextResponse.json({ id: row.id, savedAt: row.savedAt.toISOString() }, { status: 201 });
+  return NextResponse.json(
+    {
+      id: result.row.id,
+      savedAt: result.row.savedAt.toISOString(),
+      updated: result.updated,
+    },
+    { status: result.updated ? 200 : 201 },
+  );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useLocale, useT } from "@/src/i18n/use-t";
 import type { ItineraryDto, ItinerarySlot } from "@/src/core/itinerary-types";
 import { mealSlotLabelKey, skeletonStopLabel, transitEndpointLabel } from "@/src/core/meal-slot-label";
@@ -40,8 +40,16 @@ type Props = {
   saving?: boolean;
   onReplan?: () => void;
   onSave?: () => void;
+  /**
+   * When set, replaces the default replan/save/export header actions
+   * (saved-detail mode: back / export / unsave).
+   */
+  headerActions?: ReactNode;
   /** Open in-page place sheet (plan-46). Map stays external. */
   onOpenPlaceSheet?: (slot: Extract<ItinerarySlot, { kind: "place" }>, dayIndex: number) => void;
+  /** Optional export handler; when absent, export stays disabled (Story 28 enables). */
+  onExportPdf?: () => void;
+  exportDisabled?: boolean;
 };
 
 function formatUpdated(iso: string, locale: string): string {
@@ -73,7 +81,10 @@ export function PlanItineraryView({
   saving = false,
   onReplan,
   onSave,
+  headerActions,
   onOpenPlaceSheet,
+  onExportPdf,
+  exportDisabled,
 }: Props) {
   const lockFutureDays = queueFutureDays ?? generating;
   const t = useT();
@@ -86,6 +97,7 @@ export function PlanItineraryView({
   );
   const tabIndexes = Array.from({ length: maxDay }, (_, i) => i + 1);
   const [day, setDay] = useState(focusDayIndex ?? itinerary.days[0]?.dayIndex ?? 1);
+  const exportIsDisabled = exportDisabled ?? !onExportPdf;
 
   useEffect(() => {
     if (focusDayIndex != null) setDay(focusDayIndex);
@@ -113,25 +125,38 @@ export function PlanItineraryView({
       <div className="panel__head panel__head--itin">
         <h2 id="itin-title">{itinerary.title}</h2>
         <div className="panel__head-actions">
-          {onReplan ? (
-            <button type="button" className="btn btn-danger" data-testid="replan-open" onClick={onReplan}>
-              {t("play.plan.replan")}
-            </button>
-          ) : null}
-          {onSave ? (
-            <button
-              type="button"
-              className="btn btn-quiet"
-              data-testid="plan-save"
-              disabled={saving || generating}
-              onClick={onSave}
-            >
-              {saving ? t("play.plan.saving") : t("play.plan.save")}
-            </button>
-          ) : null}
-          <button type="button" className="btn" data-testid="plan-export" disabled title={t("play.plan.export_pdf_soon")}>
-            {t("play.plan.export_pdf")}
-          </button>
+          {headerActions != null ? (
+            headerActions
+          ) : (
+            <>
+              {onReplan ? (
+                <button type="button" className="btn btn-danger" data-testid="replan-open" onClick={onReplan}>
+                  {t("play.plan.replan")}
+                </button>
+              ) : null}
+              {onSave ? (
+                <button
+                  type="button"
+                  className="btn btn-quiet"
+                  data-testid="plan-save"
+                  disabled={saving || generating}
+                  onClick={onSave}
+                >
+                  {saving ? t("play.plan.saving") : t("play.plan.save")}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="btn"
+                data-testid="plan-export"
+                disabled={exportIsDisabled}
+                title={exportIsDisabled ? t("play.plan.export_pdf_soon") : undefined}
+                onClick={onExportPdf}
+              >
+                {t("play.plan.export_pdf")}
+              </button>
+            </>
+          )}
         </div>
       </div>
       <div className="panel__body">
