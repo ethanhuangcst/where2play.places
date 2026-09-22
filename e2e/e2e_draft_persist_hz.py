@@ -10,6 +10,7 @@ from pathlib import Path
 
 from db_helpers import BASE, delete_user
 from playwright.sync_api import sync_playwright
+from register_helpers import pick_nationality
 
 EMAIL = "e2e.draft.persist.hz@where2play.place"
 PASSWORD = "testpass123"
@@ -58,6 +59,7 @@ def main() -> int:
         click_locale_cn(page)
         page.fill('[data-testid="field-name"]', "Draft Persist HZ")
         page.fill('[data-testid="field-email"]', EMAIL)
+        pick_nationality(page)
         page.fill('[data-testid="field-password"]', PASSWORD)
         page.fill('[data-testid="field-confirm-password"]', PASSWORD)
         page.click('[data-testid="register-submit"]')

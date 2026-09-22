@@ -7,6 +7,7 @@ import time
 from playwright.sync_api import sync_playwright
 
 from db_helpers import BASE, delete_user
+from register_helpers import pick_nationality
 from takeoff_helpers import fill_takeoff_and_confirm
 
 EMAIL = "mvp3.live@where2play.place"
@@ -21,6 +22,7 @@ def ensure_user(page):
     page.wait_for_selector('[data-testid="auth-form-register"]')
     page.fill('[data-testid="field-name"]', "MVP Three")
     page.fill('[data-testid="field-email"]', EMAIL)
+    pick_nationality(page)
     page.fill('[data-testid="field-location"]', "Clerkenwell, London")
     page.fill('[data-testid="field-password"]', PASSWORD)
     page.fill('[data-testid="field-confirm-password"]', PASSWORD)

@@ -10,16 +10,10 @@ if os.environ.get("W2P_E2E_NATIONALITY") != "1":
 from playwright.sync_api import sync_playwright
 
 from db_helpers import BASE, delete_user
+from register_helpers import pick_nationality
 
 EMAIL = "mvp11.nationality@where2play.place"
 PASSWORD = "testpass123"
-
-
-def pick_nationality(page, test_id: str, code: str) -> None:
-    root = page.locator(f'[data-testid="{test_id}"]')
-    root.locator(f'[data-testid="{test_id}-input"]').click()
-    page.locator(f'[data-testid="{test_id}-option"][data-value="{code}"]').click()
-    assert root.get_attribute("data-value") == code
 
 
 def test_mvp11_nationality_e2e():
@@ -33,6 +27,7 @@ def test_mvp11_nationality_e2e():
         page.fill('[data-testid="field-name"]', "Nat User")
         page.fill('[data-testid="field-email"]', EMAIL)
         pick_nationality(page, "register-nationality", "CHN")
+        page.fill('[data-testid="field-location"]', "Clerkenwell, London")
         page.fill('[data-testid="field-password"]', PASSWORD)
         page.fill('[data-testid="field-confirm-password"]', PASSWORD)
         page.click('[data-testid="register-submit"]')

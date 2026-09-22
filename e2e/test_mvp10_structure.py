@@ -10,6 +10,7 @@ import sys
 from playwright.sync_api import sync_playwright
 
 from takeoff_helpers import fill_takeoff_and_confirm
+from register_helpers import pick_nationality
 
 BASE = os.environ.get("W2P_BASE_URL", "http://localhost:3030")
 
@@ -24,6 +25,7 @@ def main() -> int:
         page.fill('[data-testid="field-name"]', "Structure Test")
         page.fill('[data-testid="field-email"]', email)
         page.fill('[data-testid="field-age"]', "30")
+        pick_nationality(page)
         page.fill('[data-testid="field-password"]', "password123")
         page.fill('[data-testid="field-confirm-password"]', "password123")
         page.click('[data-testid="register-submit"]')

@@ -71,13 +71,16 @@ export function ComboField({
   );
 
   const filtered = useMemo(() => {
-    if (filterOptions) return filterOptions(options, query);
-    const q = query.trim().toLowerCase();
+    // U-09 / BUG-005: idle query mirrors selected label — do not treat that as a filter.
+    const filterQuery =
+      selected?.label != null && query === selected.label ? "" : query;
+    if (filterOptions) return filterOptions(options, filterQuery);
+    const q = filterQuery.trim().toLowerCase();
     if (!q) return options;
     return options.filter(
       (o) => o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q),
     );
-  }, [filterOptions, options, query]);
+  }, [filterOptions, options, query, selected?.label]);
 
   useEffect(() => {
     if (!mounted || focused) return;

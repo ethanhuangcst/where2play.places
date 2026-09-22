@@ -2,6 +2,7 @@
 from playwright.sync_api import sync_playwright
 
 from db_helpers import BASE, delete_user, seed_reset_token
+from register_helpers import pick_nationality
 
 EMAIL = "reset.flow@where2play.place"
 OLD_PASSWORD = "testpass123"
@@ -15,6 +16,7 @@ def register_user(page):
     page.wait_for_selector('[data-testid="auth-form-register"]')
     page.fill('[data-testid="field-name"]', "Reset Flow")
     page.fill('[data-testid="field-email"]', EMAIL)
+    pick_nationality(page)
     page.fill('[data-testid="field-location"]', "Clerkenwell, London")
     page.fill('[data-testid="field-password"]', OLD_PASSWORD)
     page.fill('[data-testid="field-confirm-password"]', OLD_PASSWORD)

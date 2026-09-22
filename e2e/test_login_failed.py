@@ -2,6 +2,7 @@
 from playwright.sync_api import sync_playwright
 
 from db_helpers import BASE, delete_user
+from register_helpers import pick_nationality
 
 EMAIL = "login.failed@where2play.place"
 PASSWORD = "testpass123"
@@ -16,6 +17,7 @@ def ensure_user():
         page.wait_for_selector('[data-testid="auth-form-register"]')
         page.fill('[data-testid="field-name"]', "Login Fail Test")
         page.fill('[data-testid="field-email"]', EMAIL)
+        pick_nationality(page)
         page.fill('[data-testid="field-location"]', "Clerkenwell, London")
         page.fill('[data-testid="field-password"]', PASSWORD)
         page.fill('[data-testid="field-confirm-password"]', PASSWORD)

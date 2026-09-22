@@ -2,6 +2,7 @@
 from playwright.sync_api import sync_playwright
 
 from db_helpers import BASE, delete_user
+from register_helpers import pick_nationality
 
 EMAIL = "register.errors@where2play.place"
 PASSWORD = "testpass123"
@@ -13,6 +14,7 @@ def fill_register_form(page, password=PASSWORD, confirm=None):
     page.fill('[data-testid="field-password"]', password)
     page.fill('[data-testid="field-confirm-password"]', confirm if confirm is not None else password)
     page.locator("#age").fill("30")
+    pick_nationality(page)
 
 
 def test_register_password_short_shows_field_error():

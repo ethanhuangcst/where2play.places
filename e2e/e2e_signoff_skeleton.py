@@ -8,6 +8,7 @@ from pathlib import Path
 
 from db_helpers import BASE, delete_user
 from playwright.sync_api import sync_playwright
+from register_helpers import pick_nationality
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -39,6 +40,7 @@ def main() -> None:
         click_locale_cn(page)
         page.fill('[data-testid="field-name"]', "E2E Signoff")
         page.fill('[data-testid="field-email"]', EMAIL)
+        pick_nationality(page)
         loc = page.locator('[data-testid="field-location"]')
         if loc.count():
             loc.fill("Lisbon")

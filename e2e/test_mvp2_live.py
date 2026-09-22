@@ -4,6 +4,7 @@
 from playwright.sync_api import sync_playwright
 
 from db_helpers import BASE, delete_user
+from register_helpers import pick_nationality
 
 EMAIL = "mvp2.live@where2play.place"
 PASSWORD = "testpass123"
@@ -15,6 +16,7 @@ def ensure_user(page):
     page.wait_for_selector('[data-testid="auth-form-register"]')
     page.fill('[data-testid="field-name"]', "MVP Two")
     page.fill('[data-testid="field-email"]', EMAIL)
+    pick_nationality(page)
     loc = page.locator('[data-testid="field-location"]')
     if loc.count():
         loc.fill("Clerkenwell, London")

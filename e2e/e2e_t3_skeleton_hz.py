@@ -11,6 +11,7 @@ from pathlib import Path
 
 from db_helpers import BASE, delete_user
 from playwright.sync_api import sync_playwright
+from register_helpers import pick_nationality
 
 EMAIL = "e2e.t3.skeleton.hz@where2play.place"
 PASSWORD = "testpass123"
@@ -58,6 +59,7 @@ def main() -> None:
         click_locale_cn(page)
         page.fill('[data-testid="field-name"]', "T3 Hangzhou")
         page.fill('[data-testid="field-email"]', EMAIL)
+        pick_nationality(page)
         loc = page.locator('[data-testid="field-location"]')
         if loc.count():
             loc.fill("Hangzhou")

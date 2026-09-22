@@ -7,6 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from db_helpers import BASE, delete_user
+from register_helpers import pick_nationality
 
 from playwright.sync_api import sync_playwright
 
@@ -29,6 +30,7 @@ def main() -> None:
         page.wait_for_selector('[data-testid="auth-form-register"]')
         page.fill('[data-testid="field-name"]', "T3 Verify")
         page.fill('[data-testid="field-email"]', EMAIL)
+        pick_nationality(page)
         page.fill('[data-testid="field-password"]', PASSWORD)
         page.fill('[data-testid="field-confirm-password"]', PASSWORD)
         page.click('[data-testid="register-submit"]')
