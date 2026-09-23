@@ -397,7 +397,7 @@ describe("TC-M10-46-11 plan-page head actions", () => {
     expect(container.querySelector(".panel__head-actions")).toBeTruthy();
   });
 
-  it("should_keep_takeoff_and_rerun_plan_trip_when_replan_confirmed", async () => {
+  it("should_reset_to_blank_takeoff_without_plan_trip_when_replan_confirmed", async () => {
     authJson.mockImplementation(async (url: string) => {
       if (url === "/api/plan/current") {
         return {
@@ -476,25 +476,18 @@ describe("TC-M10-46-11 plan-page head actions", () => {
     await waitFor(() => expect(getByTestId("replan-confirm")).toBeTruthy());
     fireEvent.click(getByTestId("replan-confirm"));
 
-    // Middle itinerary cleared then regenerates via plan_trip; takeoff destination kept.
-    await waitFor(() =>
-      expect(authJson.mock.calls.some((c) => c[0] === "/api/plan/trip")).toBe(true),
-    );
-    const tripCall = authJson.mock.calls.find((c) => c[0] === "/api/plan/trip");
-    const tripBody = JSON.parse(String((tripCall?.[1] as { body?: string })?.body ?? "{}"));
-    expect(tripBody.city).toBe("Lisbon");
+    await waitFor(() => {
+      expect(container.querySelector(".plan-takeoff")).toBeTruthy();
+      expect(getByTestId("plan-dest")).toBeTruthy();
+    });
+    expect((getByTestId("plan-dest") as HTMLInputElement).value).toBe("");
+    expect(container.querySelector('[data-testid="plan-itinerary"]')).toBeNull();
+    expect(authJson.mock.calls.some((c) => c[0] === "/api/plan/trip")).toBe(false);
     expect(
       authJson.mock.calls.some(
         (c) => c[0] === "/api/plan/current" && (c[1] as { method?: string })?.method === "DELETE",
       ),
-    ).toBe(false);
-    // Takeoff form stays hidden (not reset to blank idle); constraints still show Lisbon.
-    expect(container.querySelector(".plan-takeoff")).toBeNull();
-    await waitFor(() => {
-      expect(container.querySelector('[data-testid="plan-constraints"]')?.textContent).toContain(
-        "Lisbon",
-      );
-    });
+    ).toBe(true);
   });
 
   it("should_leave_itinerary_unchanged_when_replan_cancelled", async () => {
@@ -513,6 +506,136 @@ describe("TC-M10-46-11 plan-page head actions", () => {
     expect(
       authJson.mock.calls.some((c) => c[0] === "/api/plan/trip"),
     ).toBe(false);
+  });
+
+  it("should_plan_bordeaux_without_lisbon_trip_id_after_terminate_mid_skeleton", async () => {
+    let releaseLisbon: (value: unknown) => void = () => undefined;
+    const lisbonHold = new Promise((resolve) => {
+      releaseLisbon = resolve;
+    });
+    let tripPostCount = 0;
+
+    authJson.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url === "/api/plan/current") {
+        if ((init as { method?: string } | undefined)?.method === "DELETE") {
+          return { ok: true };
+        }
+        return { ok: true, criteria: null, itinerary: null };
+      }
+      if (url === "/api/geocode") {
+        const body = JSON.parse(String((init as { body?: string } | undefined)?.body ?? "{}")) as {
+          query?: string;
+        };
+        if ((body.query ?? "").includes("波尔多") || (body.query ?? "").toLowerCase().includes("bordeaux")) {
+          return {
+            ok: true,
+            country: "France",
+            city: "Bordeaux",
+            lat: 44.84,
+            lng: -0.58,
+            crs: "WGS84",
+            country_code: "FR",
+          };
+        }
+        return {
+          ok: true,
+          country: "Portugal",
+          city: "Lisbon",
+          lat: 38.72,
+          lng: -9.14,
+          crs: "WGS84",
+          country_code: "PT",
+        };
+      }
+      if (url === "/api/plan/resolve-origin") {
+        return { ok: true, kind: "skip" };
+      }
+      if (url === "/api/plan/trip" && init?.method === "POST") {
+        tripPostCount += 1;
+        const body = JSON.parse(String(init.body ?? "{}")) as { city?: string; trip_id?: string };
+        if (tripPostCount === 1) {
+          await lisbonHold;
+          return {
+            ok: true,
+            trip_id: "trip-lisbon-stale",
+            revision: 1,
+            status: "ready",
+            phases: [{ phase: "skeleton_ready", trip_id: "trip-lisbon-stale", revision: 1 }],
+            skeleton: T3_SKELETON,
+          };
+        }
+        return {
+          ok: true,
+          trip_id: "trip-bordeaux-1",
+          revision: 1,
+          status: "ready",
+          phases: [{ phase: "skeleton_ready", trip_id: "trip-bordeaux-1", revision: 1 }],
+          skeleton: {
+            days: [
+              {
+                day_index: 1,
+                day_theme: "Wine",
+                stops: [
+                  { name: "Hotel", kind: "stay" },
+                  { name: "Place de la Bourse", kind: "place" },
+                ],
+              },
+            ],
+          },
+          _echoCity: body.city,
+          _echoTripId: body.trip_id,
+        };
+      }
+      if (url === "/api/plan/travel-tips") {
+        return { ok: true, data: { intro: "Tips" } };
+      }
+      return { ok: true };
+    });
+
+    const { getByTestId, container } = renderWithLocale(<PlanPageClient />);
+    await waitFor(() => expect(getByTestId("plan-dest")).toBeTruthy());
+
+    fireEvent.change(getByTestId("plan-dest"), { target: { value: "里斯本" } });
+    fireEvent.blur(getByTestId("plan-dest"));
+    await waitFor(() => expect(getByTestId("plan-dest-verified")).toBeTruthy());
+    fireEvent.change(getByTestId("plan-days"), { target: { value: "2" } });
+    fireEvent.change(getByTestId("plan-party"), { target: { value: "2" } });
+    fireEvent.change(getByTestId("plan-budget"), { target: { value: "mid" } });
+    fireEvent.click(getByTestId("plan-submit"));
+    await waitFor(() => expect(getByTestId("plan-submit-confirm-ok")).toBeTruthy());
+    fireEvent.click(getByTestId("plan-submit-confirm-ok"));
+
+    await waitFor(() =>
+      expect(document.body.querySelector('[data-testid="plan-nav-terminate"]')).toBeTruthy(),
+    );
+    fireEvent.click(document.body.querySelector('[data-testid="plan-nav-terminate"]')!);
+    await waitFor(() => expect(getByTestId("replan-confirm")).toBeTruthy());
+    fireEvent.click(getByTestId("replan-confirm"));
+
+    await waitFor(() => expect(container.querySelector(".plan-takeoff")).toBeTruthy());
+    expect((getByTestId("plan-dest") as HTMLInputElement).value).toBe("");
+
+    // Late Lisbon response must not steal the blank takeoff session.
+    releaseLisbon({});
+    await new Promise((r) => setTimeout(r, 30));
+    expect(container.querySelector(".plan-takeoff")).toBeTruthy();
+    expect((getByTestId("plan-dest") as HTMLInputElement).value).toBe("");
+
+    fireEvent.change(getByTestId("plan-dest"), { target: { value: "波尔多" } });
+    fireEvent.blur(getByTestId("plan-dest"));
+    await waitFor(() => expect(getByTestId("plan-dest-verified")).toBeTruthy());
+    fireEvent.click(getByTestId("plan-submit"));
+    await waitFor(() => expect(getByTestId("plan-submit-confirm-ok")).toBeTruthy());
+    fireEvent.click(getByTestId("plan-submit-confirm-ok"));
+
+    await waitFor(() => expect(tripPostCount).toBeGreaterThanOrEqual(2));
+    const tripCalls = authJson.mock.calls.filter(
+      (c) => c[0] === "/api/plan/trip" && (c[1] as { method?: string })?.method === "POST",
+    );
+    expect(tripCalls.length).toBeGreaterThanOrEqual(2);
+    const bordeauxBody = JSON.parse(String((tripCalls[tripCalls.length - 1][1] as { body?: string }).body ?? "{}"));
+    expect(bordeauxBody.city).toBe("波尔多");
+    expect(bordeauxBody.trip_id).toBeUndefined();
   });
 });
 

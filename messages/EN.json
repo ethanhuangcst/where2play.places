@@ -200,7 +200,7 @@
   "play.plan.error.trip_timeout": "Planning timed out. Try again.",
   "play.plan.error.need_input_invalid": "The planner returned an incomplete question list.",
   "play.plan.confirm_replan_title": "Start a new trip?",
-  "play.plan.confirm_replan_body": "This discards the unsaved itinerary and generates a new one. Your local chat stays and a divider is added. Continue?",
+  "play.plan.confirm_replan_body": "This discards the unsaved itinerary and returns you to takeoff so you can enter a destination again. Continue?",
   "play.plan.confirm_replan_confirm": "Start over",
   "play.plan.confirm_replan_cancel": "Keep planning",
   "play.plan.assistant_greeting": "Hi! I'll ask a few quick questions to tailor your trip.",

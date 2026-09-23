@@ -209,6 +209,8 @@ export default function PlanPageClient() {
   const [placeDetailsError, setPlaceDetailsError] = useState<string | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
+  /** Bumps on terminate/replan/new takeoff so late plan_trip responses are ignored. */
+  const planGenRef = useRef(0);
 
   const takeoff = useMemo(
     () => takeoffFromState(destination, startDate, days, partySize, budget, tripType, pace, transit),
@@ -636,6 +638,7 @@ export default function PlanPageClient() {
   }, []);
 
   const resetPlanningState = useCallback(() => {
+    planGenRef.current += 1;
     abortRef.current?.abort();
     abortRef.current = null;
     clearFillHoldTimer();
@@ -1364,11 +1367,18 @@ export default function PlanPageClient() {
 
   const runT3SkeletonPlan = useCallback(async (opts?: { answers?: AgentNeedAnswers }) => {
     const fields = takeoff;
-    // Browser-side ceiling slightly above BFF plan timeout so UI never sticks on「正在生成框架」。
+    const expandAnswer = opts?.answers?.expand_radius;
+    // New takeoff never resumes a prior trip_id; only expand_radius continues the same trip.
+    const resumeTrip =
+      (expandAnswer === "yes" || expandAnswer === "no") && Boolean(tripIdRef.current);
+
+    abortRef.current?.abort();
     const controller = new AbortController();
+    abortRef.current = controller;
+    const gen = planGenRef.current;
+    // Browser-side ceiling slightly above BFF plan timeout so UI never sticks on「正在生成框架」。
     const abortTimer = window.setTimeout(() => controller.abort(), 130_000);
     try {
-      const expandAnswer = opts?.answers?.expand_radius;
       const res = await authJson<{
         ok?: boolean;
         trip_id?: string;
@@ -1402,8 +1412,8 @@ export default function PlanPageClient() {
           ...(origin.trim() ? { originName: origin.trim() } : {}),
           startTime: startTime.trim() || "09:00",
           ...(other.trim() ? { other: other.trim() } : {}),
-          ...(tripIdRef.current ? { trip_id: tripIdRef.current } : {}),
-          ...(typeof tripRevisionRef.current === "number"
+          ...(resumeTrip ? { trip_id: tripIdRef.current } : {}),
+          ...(resumeTrip && typeof tripRevisionRef.current === "number"
             ? { revision: tripRevisionRef.current }
             : {}),
           ...(expandAnswer === "yes" || expandAnswer === "no"
@@ -1411,6 +1421,8 @@ export default function PlanPageClient() {
             : {}),
         }),
       });
+
+      if (gen !== planGenRef.current) return;
 
       if (res.phases?.length) setT3Phases(res.phases);
 
@@ -1519,12 +1531,15 @@ export default function PlanPageClient() {
             : {}),
           timeFrom: startTime.trim() || "09:00",
         };
+        const fillGen = gen;
         fillHoldTimerRef.current = window.setTimeout(() => {
           fillHoldTimerRef.current = null;
+          if (fillGen !== planGenRef.current) return;
           void runFillFromSkeleton(fillCriteria);
         }, SKELETON_HOLD_BEFORE_FILL_MS);
       }
     } catch (err) {
+      if (gen !== planGenRef.current || controller.signal.aborted) return;
       const key =
         err instanceof AuthApiError
           ? resolveErrorKey(err.key)
@@ -1543,76 +1558,22 @@ export default function PlanPageClient() {
       }
     } finally {
       window.clearTimeout(abortTimer);
+      if (abortRef.current === controller) abortRef.current = null;
     }
-  }, [locale, takeoff, t, origin, startTime, other, originLat, originLng, originStay, runFillFromSkeleton, clearFillHoldTimer]);
-
-  /**
-   * Story 27: discard unsaved middle itinerary, keep takeoff/intake + local chat,
-   * append a divider line, then re-run the same T3 full loop (plan_trip → fill).
-   * Does not DELETE SavedItinerary rows.
-   */
-  const executeReplan = useCallback(() => {
-    abortRef.current?.abort();
-    abortRef.current = null;
-    clearFillHoldTimer();
-
-    const divider = t("play.plan.replan_divider");
-    const withDivider = appendAssistantLine(navLinesRef.current, divider);
-    navLinesRef.current = withDivider;
-    setNavStatusLines(withDivider);
-
-    setItinerary(null);
-    setLoading(false);
-    setPlanSubPhase("idle");
-    setGenProgress(null);
-    setLiveSlots([]);
-    setFocusDayIndex(null);
-    setDayPending(false);
-    setSkeletonDays([]);
-    setSkeletonDeviations([]);
-    setFillRouteDays([]);
-    setPlanCompleteLine(null);
-    setT3Phases([]);
-    setFrameworkReadyLine(null);
-    setFillBeginLine(null);
-    setSlotPreviewText(null);
-    setTravelTips(null);
-    setTravelTipsError(null);
-    setTravelTipsLoading(false);
-    setSuggestedMustSee([]);
-    setDiscoverLoading(false);
-    setDiscoverSettled(false);
-    setGCandidatesReady(false);
-    setDiscoverPool([]);
-    setTripId(undefined);
-    tripIdRef.current = undefined;
-    setTripRevision(undefined);
-    tripRevisionRef.current = undefined;
-    setMakeElapsedMs(null);
-    setErrorKey(null);
-    setFieldErrors({});
-    setNeedQuestions([]);
-    setNeedIndex(0);
-    setNeedAnswers({});
-
-    setIntakeAnswers((prev) =>
-      Object.keys(prev).length
-        ? prev
-        : {
-            b: origin.trim(),
-            c: startTime.trim() || "09:00",
-            h: other.trim(),
-          },
-    );
-    setIntakeStep(null);
-    setIntakeComplete(true);
-    setPagePhase("progress");
-    setNavOpen(true);
-    setT3Phases([{ phase: "skeleton_generating" }]);
-    setLoading(true);
-    setPlanSubPhase("skeleton");
-    discoverJobRef.current = runT3SkeletonPlan();
-  }, [clearFillHoldTimer, t, origin, startTime, other, runT3SkeletonPlan]);
+  }, [
+    locale,
+    takeoff,
+    t,
+    origin,
+    startTime,
+    other,
+    originLat,
+    originLng,
+    originStay,
+    destVerified,
+    runFillFromSkeleton,
+    clearFillHoldTimer,
+  ]);
 
   runFillFromSkeletonRef.current = runFillFromSkeleton;
 
@@ -1905,7 +1866,7 @@ export default function PlanPageClient() {
 
   function requestReplan() {
     setReplanDialogVariant("replan");
-    setPendingReplanAction(() => () => executeReplan());
+    setPendingReplanAction(() => () => resetToBlankTakeoff());
     setReplanDialogOpen(true);
   }
 

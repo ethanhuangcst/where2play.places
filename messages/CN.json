@@ -200,7 +200,7 @@
   "play.plan.error.trip_timeout": "规划超时，请重试。",
   "play.plan.error.need_input_invalid": "规划器返回的问题不完整。",
   "play.plan.confirm_replan_title": "开始新的行程规划？",
-  "play.plan.confirm_replan_body": "将丢弃未保存的行程并生成新行程。本机对话会保留并加入分隔提示。继续吗？",
+  "play.plan.confirm_replan_body": "将丢弃未保存的行程并返回起飞栏，请重新输入目的地后再规划。继续吗？",
   "play.plan.confirm_replan_confirm": "重新开始",
   "play.plan.confirm_replan_cancel": "继续规划",
   "play.plan.assistant_greeting": "你好！我会问几个简短问题，帮你定制行程。",
