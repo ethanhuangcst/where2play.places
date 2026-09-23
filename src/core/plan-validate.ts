@@ -145,6 +145,20 @@ export function validatePlanBoundaries(input: unknown): {
         : body.mode === "fill" || body.planMode === "fill"
           ? { planMode: "fill" as const }
           : {}),
+      ...(optionalString(body.destinationCountryAlpha3) &&
+      /^[A-Z]{3}$/i.test(optionalString(body.destinationCountryAlpha3)!)
+        ? { destinationCountryAlpha3: optionalString(body.destinationCountryAlpha3)!.toUpperCase() }
+        : {}),
+      ...(optionalString(body.destinationCountryCode) &&
+      /^[A-Z]{2}$/i.test(optionalString(body.destinationCountryCode)!)
+        ? { destinationCountryCode: optionalString(body.destinationCountryCode)!.toUpperCase() }
+        : {}),
+      ...(typeof body.destinationLat === "number" && Number.isFinite(body.destinationLat)
+        ? { destinationLat: body.destinationLat }
+        : {}),
+      ...(typeof body.destinationLng === "number" && Number.isFinite(body.destinationLng)
+        ? { destinationLng: body.destinationLng }
+        : {}),
     },
   };
 }

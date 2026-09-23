@@ -1579,11 +1579,21 @@ describe("2play-plan-94a visa write", () => {
     expect(tipsEv?.data?.visa?.requirement).toBe("visa_free");
   });
 
-  it("should_skip_visa_when_destination_country_missing", async () => {
+  it("should_yield_unavailable_notice_when_destination_country_unresolved", async () => {
     const visaSpy = vi.spyOn(client, "visaRequirement").mockResolvedValue({
       agent: "places-agent",
       ok: true,
       data: { trip_id: "t-visa", revision: 6 },
+    });
+    vi.spyOn(client, "geocode").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: { lat: 38.72, lng: -9.14, crs: "WGS84", city: "Lisbon" },
+    });
+    vi.spyOn(client, "reverseGeocode").mockResolvedValue({
+      agent: "places-agent",
+      ok: false,
+      data: undefined,
     });
     vi.spyOn(client, "fetchTripDetails").mockResolvedValue({
       agent: "places-agent",
@@ -1626,10 +1636,40 @@ describe("2play-plan-94a visa write", () => {
     }
 
     expect(visaSpy).not.toHaveBeenCalled();
-    const blob = JSON.stringify(events);
-    expect(blob).not.toContain("play.plan.travel_tips_visa_need_nationality");
-    expect(blob).not.toContain("visa_notice");
-    expect(blob).not.toContain("visa_free");
+    const tipsEv = events.find((e) => e.type === "tips") as
+      | { type: "tips"; data?: { visa_notice?: { key?: string } } }
+      | undefined;
+    expect(tipsEv?.data?.visa_notice).toEqual({
+      key: "play.plan.travel_tips_visa_unavailable",
+    });
+    expect(JSON.stringify(events)).not.toContain("visa_free");
+  });
+
+  it("should_resolve_dest_iso_from_country_code_and_write_visa", async () => {
+    const visaSpy = vi.spyOn(client, "visaRequirement").mockResolvedValue({
+      agent: "places-agent",
+      ok: true,
+      data: { trip_id: "t-visa", revision: 6 },
+    });
+    const events: SkeletonPlanProgressEvent[] = [];
+    for await (const ev of planItinerarySkeletonFill(
+      {
+        destination: "Lisbon",
+        days: 1,
+        startDate: "2026-10-10",
+        tripId: "t-visa",
+        planMode: "fill",
+        passportAlpha3: "CHN",
+        destinationCountryCode: "PT",
+      },
+      { locale: "EN" },
+    )) {
+      events.push(ev);
+      if (ev.type === "error" || ev.type === "done") break;
+    }
+    expect(visaSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ passport: "CHN", destination: "PRT" }),
+    );
   });
 
   it("should_yield_nationality_notice_without_calling_visa_when_passport_missing", async () => {

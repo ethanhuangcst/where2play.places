@@ -20,6 +20,7 @@ import {
   travelTips,
   visaRequirement,
   geocode,
+  reverseGeocode,
   type AgentEnvelope,
 } from "../places-agent/client";
 import { isResolvablePlaceNativeId } from "./place-native-id";
@@ -38,7 +39,9 @@ import {
   skeletonIsFillable,
   latestFilledStopFromSlice,
   travelTipsPayloadFromSlice,
+  VISA_NOTICE_UNAVAILABLE,
 } from "./plan-fetch-trip";
+import { alpha2ToAlpha3 } from "./country-codes";
 import { t as catalogT } from "../i18n/catalog";
 
 export type SkeletonPlanProgressEvent =
@@ -284,6 +287,12 @@ export async function* planItinerarySkeletonFill(
   let itinerary = emptyItinerary(criteria);
   const daysTotal = Math.max(1, criteria.days);
   const fillOnly = criteria.planMode === "fill" && Boolean(criteria.tripId?.trim());
+
+  // 94a: ensure dest ISO3 before visa write (geocode country_code or reverse pin).
+  const resolvedDest = await resolveDestinationCountryAlpha3(criteria, opts.locale);
+  if (resolvedDest) {
+    criteria = { ...criteria, destinationCountryAlpha3: resolvedDest };
+  }
 
   // F92 / ADR-053: stay = originStay pointer, else intake coords, else city geocode.
   let origin: { name: string; lat?: number; lng?: number; provider?: string; native_id?: string } = {
@@ -581,7 +590,7 @@ export async function* planItinerarySkeletonFill(
       if (typeof fetched.revision === "number") revision = fetched.revision;
       payload = fetched.tips;
     }
-    const notice = missingPassportVisaNotice(criteria);
+    const notice = visaDegradeNotice(criteria);
     if (notice && payload?.visa == null && payload?.visa_notice == null) {
       payload = { ...(payload ?? {}), visa_notice: notice };
     }
@@ -879,15 +888,77 @@ export async function* planItinerarySkeletonFill(
 
 const VISA_NOTICE_NEED_NATIONALITY = "play.plan.travel_tips_visa_need_nationality";
 
-/** 94c: dest known, passport missing — do not call Orizn; ask for profile nationality. */
-function missingPassportVisaNotice(
+/**
+ * Resolve destination ISO alpha-3 for visa write.
+ * Prefer explicit alpha-3 / alpha-2 from takeoff; else reverse/forward geocode.
+ */
+export async function resolveDestinationCountryAlpha3(
   criteria: PlanBoundaries,
-): { key: string; href: string } | null {
+  locale: string,
+): Promise<string | undefined> {
+  const existing = criteria.destinationCountryAlpha3?.trim().toUpperCase() ?? "";
+  if (/^[A-Z]{3}$/.test(existing)) return existing;
+
+  const fromCode = alpha2ToAlpha3(criteria.destinationCountryCode);
+  if (fromCode) return fromCode;
+
+  function fromCountryCode(code: string | undefined): string | undefined {
+    return alpha2ToAlpha3(code) ?? undefined;
+  }
+
+  if (
+    typeof criteria.destinationLat === "number" &&
+    typeof criteria.destinationLng === "number" &&
+    Number.isFinite(criteria.destinationLat) &&
+    Number.isFinite(criteria.destinationLng)
+  ) {
+    try {
+      const hit = await reverseGeocode({
+        lat: criteria.destinationLat,
+        lng: criteria.destinationLng,
+        locale,
+      });
+      const resolved = fromCountryCode(hit.data?.country_code);
+      if (resolved) return resolved;
+    } catch {
+      /* fall through to forward geocode */
+    }
+  }
+
+  const destName = criteria.destination?.trim();
+  if (destName) {
+    try {
+      const hit = await geocode({ query: destName, locale });
+      const resolved = fromCountryCode(hit.data?.country_code);
+      if (resolved) return resolved;
+    } catch {
+      /* ignore */
+    }
+  }
+  return undefined;
+}
+
+/** 94c: honest degrade when visa cannot be shown (not home-country hide). */
+function visaDegradeNotice(
+  criteria: PlanBoundaries,
+): { key: string; href?: string } | null {
   const destination = criteria.destinationCountryAlpha3?.trim().toUpperCase() ?? "";
   const passport = criteria.passportAlpha3?.trim().toUpperCase() ?? "";
-  if (!/^[A-Z]{3}$/.test(destination)) return null;
-  if (/^[A-Z]{3}$/.test(passport)) return null;
-  return { key: VISA_NOTICE_NEED_NATIONALITY, href: "/profile" };
+  const destOk = /^[A-Z]{3}$/.test(destination);
+  const passportOk = /^[A-Z]{3}$/.test(passport);
+  // Home-country: hide (107) — no notice.
+  if (destOk && passportOk && passport === destination) {
+    return null;
+  }
+  if (destOk && !passportOk) {
+    return { key: VISA_NOTICE_NEED_NATIONALITY, href: "/profile" };
+  }
+  // Passport known but dest ISO unresolved — unavailable (not blank card 01).
+  if (!destOk && passportOk) {
+    return { key: VISA_NOTICE_UNAVAILABLE };
+  }
+  // Neither code: hide (94c).
+  return null;
 }
 
 async function writeArtifactsVisa(input: {
@@ -902,15 +973,19 @@ async function writeArtifactsVisa(input: {
   if (!/^[A-Z]{3}$/.test(passport) || !/^[A-Z]{3}$/.test(destination)) return input.revision;
   // 107: home-country travel — skip Orizn; do not invent visa-free days.
   if (passport === destination) return input.revision;
-  const visa = await visaRequirement({
-    passport,
-    destination,
-    trip_id: input.tripId,
-    ...(typeof input.revision === "number" ? { revision: input.revision } : {}),
-    locale: input.locale,
-  });
-  const rev = (visa.data as { revision?: number } | undefined)?.revision;
-  return typeof rev === "number" ? rev : input.revision;
+  try {
+    const visa = await visaRequirement({
+      passport,
+      destination,
+      trip_id: input.tripId,
+      ...(typeof input.revision === "number" ? { revision: input.revision } : {}),
+      locale: input.locale,
+    });
+    const rev = (visa.data as { revision?: number } | undefined)?.revision;
+    return typeof rev === "number" ? rev : input.revision;
+  } catch {
+    return input.revision;
+  }
 }
 
 function sleep(ms: number): Promise<void> {

@@ -80,25 +80,43 @@ export async function POST(request: NextRequest) {
     where: { userId: gate.user.id },
   });
   const prev = (cached?.criteriaJson ?? {}) as PlanBoundaries;
+  // Only inherit stay/origin from session when destination is unchanged (no cross-city bleed).
+  const sameDestination =
+    Boolean(parsed.value.destination?.trim()) &&
+    parsed.value.destination.trim().toLowerCase() ===
+      (typeof prev.destination === "string" ? prev.destination.trim().toLowerCase() : "");
   const dailyStart =
     sanitizeDailyStartName(parsed.value.dailyStart) ||
-    sanitizeDailyStartName(prev.dailyStart);
+    (sameDestination ? sanitizeDailyStartName(prev.dailyStart) : undefined);
   const criteria: PlanBoundaries = {
     ...parsed.value,
     ...(dailyStart ? { dailyStart } : { dailyStart: undefined }),
     originLat:
-      typeof parsed.value.originLat === "number" ? parsed.value.originLat : prev.originLat,
+      typeof parsed.value.originLat === "number"
+        ? parsed.value.originLat
+        : sameDestination
+          ? prev.originLat
+          : undefined,
     originLng:
-      typeof parsed.value.originLng === "number" ? parsed.value.originLng : prev.originLng,
+      typeof parsed.value.originLng === "number"
+        ? parsed.value.originLng
+        : sameDestination
+          ? prev.originLng
+          : undefined,
   };
   const passport = gate.user.nationality?.trim().toUpperCase() ?? "";
   if (/^[A-Z]{3}$/.test(passport)) criteria.passportAlpha3 = passport;
   const destAlpha3 =
+    criteria.destinationCountryAlpha3 ??
     (typeof raw.destinationCountryAlpha3 === "string" && /^[A-Z]{3}$/i.test(raw.destinationCountryAlpha3.trim())
       ? raw.destinationCountryAlpha3.trim().toUpperCase()
       : null) ??
-    alpha2ToAlpha3(typeof raw.country_code === "string" ? raw.country_code : undefined);
+    alpha2ToAlpha3(
+      criteria.destinationCountryCode ??
+        (typeof raw.country_code === "string" ? raw.country_code : undefined),
+    );
   if (destAlpha3) criteria.destinationCountryAlpha3 = destAlpha3;
+  // Never inherit previous trip's dest ISO / pin when destination changed or omitted.
   const stream = request.headers.get("accept")?.includes("application/x-ndjson");
 
   let ledger: PlanLedger = {

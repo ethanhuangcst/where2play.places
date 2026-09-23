@@ -1462,6 +1462,12 @@ export default function PlanPageClient() {
         ...(alpha2ToAlpha3(destVerified?.country_code)
           ? { destinationCountryAlpha3: alpha2ToAlpha3(destVerified?.country_code)! }
           : {}),
+        ...(destVerified?.country_code
+          ? { destinationCountryCode: destVerified.country_code.trim().toUpperCase() }
+          : {}),
+        ...(destVerified
+          ? { destinationLat: destVerified.lat, destinationLng: destVerified.lng }
+          : {}),
       };
       const hydrated = hydrateFromAgentSkeleton(criteria, res.skeleton, t);
       if (!hydrated) {

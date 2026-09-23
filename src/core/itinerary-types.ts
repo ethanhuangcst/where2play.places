@@ -43,6 +43,11 @@ export type PlanBoundaries = {
   passportAlpha3?: string;
   /** ISO alpha-3 destination country. Used by visa write (94a). */
   destinationCountryAlpha3?: string;
+  /** ISO alpha-2 from takeoff destVerified (maps to alpha-3). */
+  destinationCountryCode?: string;
+  /** Takeoff dest pin — reverse geocode for visa ISO when alpha codes missing. */
+  destinationLat?: number;
+  destinationLng?: number;
 };
 
 /** Progressive discover preview (isomorphic slot fields). */
